@@ -1,0 +1,6 @@
+elasticsearch
+flask
+pandas
+pymysql
+ruff
+sqlalchemy

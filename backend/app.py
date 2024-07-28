@@ -6,6 +6,9 @@ from sqlalchemy import Column, ForeignKey, create_engine, func, text
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from sqlalchemy.types import Boolean, DateTime, Integer, String, Text
 
+app = Flask(__name__)
+
+
 Base = declarative_base()
 
 
@@ -54,7 +57,8 @@ def setup_db_engine():
     port = 3306
     database = "arabterm"
     if os.environ.get("USER") == "tools.wikitermbase":  # We are on Toolforge
-        config.read("~/replica.my.cnf")
+        HOME = os.environ["HOME"]
+        config.read(f"{HOME}/replica.my.cnf")
         hostname = "tools.db.svc.wikimedia.cloud"
         user = config["client"]["user"]
         password = config["client"]["password"]
@@ -126,9 +130,6 @@ def search_term(term: str) -> list[dict]:
         results = [{k: v for k, v in r.items() if v is not None} for r in results]
 
         return results
-
-
-app = Flask(__name__)
 
 
 @app.route("/search")

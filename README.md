@@ -47,6 +47,29 @@ As a result, we get a JSON:
 }
 ```
 
+
+### Flask API on Toolforge
+
+- Refs:
+  - https://wikitech.wikimedia.org/wiki/Help:Toolforge/My_first_Flask_OAuth_tool
+  - https://wikitech.wikimedia.org/wiki/Help:Toolforge/Python
+  - https://wikitech.wikimedia.org/wiki/Help:Toolforge/Web/Python
+- Clone the repo: generate token and `git clone https://github.com/forzagreen/wikitermbase`
+- `ssh toolforge` and `become wikitermbase`
+- Enter webservice shell: `toolforge webservice --backend=kubernetes python3.11 shell`
+- `mkdir -p $HOME/www/python`
+- Create a symlink from `$HOME/www/python/src` to the folder `backend` of the cloned repo:
+  - `ln -s /data/project/wikitermbase/wikitermbase/backend /data/project/wikitermbase/www/python/src`
+- Create a virtual environment, activate it, and install dependencies:
+  - `python3 -m venv $HOME/www/python/venv`
+  - `source $HOME/www/python/venv/bin/activate`
+  - `pip install -r $HOME/www/python/src/requirements.txt`
+- Exit out of webservice shell (Ctrl + D)
+- `toolforge webservice --backend=kubernetes python3.11 start` (or `restart`)
+- To test, go to: `https://wikitermbase.toolforge.org/search?q=telescope`
+- Check logs in `/data/project/wikitermbase/uwsgi.log`
+
+
 ## Database: MariaDB
 
 ### Ingesting data:

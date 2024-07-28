@@ -89,7 +89,9 @@ docker cp mariadb:/mnt/arabterm.sql db/arabterm.sql
 - Restore from backup:
   - `cd ~/wikitermbase/db`
   - `mariadb --defaults-file=$HOME/replica.my.cnf -h tools.db.svc.wikimedia.cloud s55953__arabterm < arabterm.sql`
-  - Troubleshooting: https://jira.mariadb.org/browse/MDEV-34183 drop the line `/*!999999\- enable the sandbox mode */`
+- Troubleshooting:
+  - https://jira.mariadb.org/browse/MDEV-34183 drop the line `/*!999999\- enable the sandbox mode */`
+  - `ERROR 1273 (HY000) at line 25: Unknown collation: 'utf8mb4_uca1400_ai_ci'`, replace it with `utf8mb4_unicode_520_ci`
 
 ```sh
 mariadb db_name < backup-file.sql

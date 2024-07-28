@@ -47,14 +47,13 @@ As a result, we get a JSON:
 }
 ```
 
-### Database: MariaDB
+## Database: MariaDB
 
-Ingesting data:
+### Ingesting data:
 - with a script, reading from SQLite database arabterm.db from https://github.com/forzagreen/arabterm
 - adapted some types (string vs char vs text)
 
-
-Creating indexes for Full Text Search:
+### Creating indexes for Full Text Search:
 
 ```sql
 CREATE FULLTEXT INDEX idx_english ON entry (english);
@@ -64,3 +63,31 @@ CREATE FULLTEXT INDEX idx_german ON entry (german);
 CREATE FULLTEXT INDEX idx_description ON entry (description);
 ```
 
+### Backup the database:
+
+- Ref: https://mariadb.com/kb/en/backup-and-restore-overview/
+- Go inside the MariaDB Docker container, and run:
+
+```sh
+mariadb-dump --password=xxxx arabterm > /mnt/arabterm.sql
+```
+
+- Copy the generated file from the container:
+
+```sh
+docker cp mariadb:/mnt/arabterm.sql db/arabterm.sql
+```
+
+### MariaDB on Toolforge
+
+- Ref: https://wikitech.wikimedia.org/wiki/Help:Toolforge/Database#User_databases
+- `ssh toolforge` and `become wikitermbase`
+- Find out your user in `$HOME/replica.my.cnf`
+- Create the database:
+  - Open the SQL console: `sql tools`
+  - Create the database: `MariaDB [(none)]> CREATE DATABASE s55953__arabterm;`
+- Restore from backup:
+
+```sh
+mariadb db_name < backup-file.sql
+```

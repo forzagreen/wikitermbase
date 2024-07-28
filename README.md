@@ -87,6 +87,9 @@ docker cp mariadb:/mnt/arabterm.sql db/arabterm.sql
   - Open the SQL console: `sql tools`
   - Create the database: `MariaDB [(none)]> CREATE DATABASE s55953__arabterm;`
 - Restore from backup:
+  - `cd ~/wikitermbase/db`
+  - `mariadb --defaults-file=$HOME/replica.my.cnf -h tools.db.svc.wikimedia.cloud s55953__arabterm < arabterm.sql`
+  - Troubleshooting: https://jira.mariadb.org/browse/MDEV-34183 drop the line `/*!999999\- enable the sandbox mode */`
 
 ```sh
 mariadb db_name < backup-file.sql

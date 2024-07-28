@@ -1,15 +1,10 @@
+import configparser
+import os
+
 from flask import Flask, request
-
-from sqlalchemy import create_engine, func, text
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine, Column, ForeignKey, select, Index
-from sqlalchemy.types import Integer, String, Boolean, DateTime, Text
-from sqlalchemy.orm import relationship, backref, sessionmaker, declarative_base
-import sqlalchemy.sql.functions as func
-
-from csv import DictReader
-from pathlib import Path
+from sqlalchemy import Column, ForeignKey, create_engine, func, text
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from sqlalchemy.types import Boolean, DateTime, Integer, String, Text
 
 Base = declarative_base()
 
@@ -53,10 +48,28 @@ class Entry(Base):
     category = relationship("Category", back_populates="entries")
 
 
+def setup_db_engine():
+    config = configparser.ConfigParser()
+    hostname = "localhost"
+    port = 3306
+    database = "arabterm"
+    if os.environ.get("USER") == "tools.wikitermbase":  # We are on Toolforge
+        config.read("~/replica.my.cnf")
+        hostname = "tools.db.svc.wikimedia.cloud"
+        user = config["client"]["user"]
+        password = config["client"]["password"]
+        database = f"{user}__arabterm"
+    else:  # We are on localhost
+        config.read("./var/local.cnf")
+        user = config["client"]["user"]
+        password = config["client"]["password"]
+    return create_engine(
+        f"mysql+pymysql://{user}:{password}@{hostname}:{port}/{database}"
+    )
+
+
 # Create a MariaDB connection engine
-mariadb_engine = create_engine(
-    "mysql+pymysql://root:MyTestPassWordOK@localhost:3306/arabterm"
-)
+mariadb_engine = setup_db_engine()
 
 # Create a session
 SessionMariaDB = sessionmaker(bind=mariadb_engine)

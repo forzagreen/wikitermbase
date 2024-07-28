@@ -56,14 +56,16 @@ def setup_db_engine():
     hostname = "localhost"
     port = 3306
     database = "arabterm"
-    if os.environ.get("USER") == "tools.wikitermbase":  # We are on Toolforge
-        HOME = os.environ["HOME"]
+    HOME = os.environ.get("HOME")
+    if HOME == "/data/project/wikitermbase":  # We are on Toolforge
+        print("We are on Toolforge")
         config.read(f"{HOME}/replica.my.cnf")
         hostname = "tools.db.svc.wikimedia.cloud"
         user = config["client"]["user"]
         password = config["client"]["password"]
         database = f"{user}__arabterm"
     else:  # We are on localhost
+        print("We are on localhost")
         config.read("./var/local.cnf")
         user = config["client"]["user"]
         password = config["client"]["password"]

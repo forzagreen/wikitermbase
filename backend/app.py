@@ -74,14 +74,13 @@ def setup_db_engine():
     )
 
 
-# Create a MariaDB connection engine
-mariadb_engine = setup_db_engine()
-
-# Create a session
-SessionMariaDB = sessionmaker(bind=mariadb_engine)
-
-
 def search_term(term: str) -> list[dict]:
+    # Create a MariaDB connection engine
+    mariadb_engine = setup_db_engine()
+
+    # Create a session
+    SessionMariaDB = sessionmaker(bind=mariadb_engine)
+
     with SessionMariaDB() as mariadb_session:
         # Build the relevance expression
         relevance_expr = text(f"""

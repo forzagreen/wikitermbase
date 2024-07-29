@@ -48,7 +48,7 @@ function getSearchPage(term) {
 
     if (LOCAL_TESTING) {
       // URL to test with localhost:
-      var fullUrl = 'http://localhost:5000/search?q=' + term; // local server
+      var fullUrl = 'http://localhost:5001/search?q=' + term; // local server
       // var fullUrl = 'http://localhost:8000/response.json' + term; // local JSON file
       requestOptions = { method: 'GET' };
     }

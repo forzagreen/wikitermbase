@@ -140,5 +140,5 @@ def search():
 
     q = request.args["q"]
     results = search_term(q)
-    response = {"q": q, "number_results": len(results), "results": results}
-    return response
+    response_data = {"q": q, "number_results": len(results), "results": results}
+    return response_data, 200, {"Access-Control-Allow-Origin": "*"}

@@ -2,83 +2,54 @@
 // $('#bodyContent').prepend('<p>Hello world! (test user script)</p>');
 
 /**
- * Parses an HTML string and extracts data from specific columns.
+ * Extracts data from the JSON string. Adds URL to the object.
  * 
- * @param {string} htmlString - The HTML string, contains a table.
+ * @param {string} jsonString - The JSON string to extract data from.
  * @returns {Array} An array of objects containing the extracted data.
  * 
  * @example
- * // Example usage
- * const htmlString = '<table>...</table>'; // Replace with your HTML string
- * const extractedData = parseTable(htmlString);
- * console.log(extractedData);
  * // Output:
  * // [
  * //   {
- * //     ar: "مقراب",
- * //     en: "telescope",
- * //     ge: "",
- * //     fr: "télescope",
- * //     url: "http://www.arabterm.org/index.php?id=40&L=1&tx_3m5techdict_pi1[id]=140327",
+ * //     "arabic": "منظار",
+ * //     "description": "آلة تجمع الضوء لرؤية الكواكب والأنجم البعيدة بوضوح، مكونة صورا مقربة للأجرام السماوية.",
+ * //     "english": "telescope",
+ * //     "french": "télescope ",
+ * //     "id": 114942,
+ * //     "relevance": 31.67395782470703,
+ * //     "url": "https://www.arabterm.org/index.php?L=3&tx_3m5techdict_pi1[id]=114942"
  * //   },
  * //   ...
  * // ]
  */
-function parseTable(htmlString) {
-
-
-  // Parse the HTML string into a document
-  // Otherwise, to parse default document: const doc = document;
-  const doc = new DOMParser().parseFromString(htmlString, "text/html")
-
-  // Example usage (assuming you have a reference to the table element)
-  const tableElement = doc.querySelector('table'); // Replace with your selector
-  const rows = tableElement.querySelectorAll('tr'); // Select all rows
-  const searchData = [];
-
-  // Skip row[0] because it is the header row
-  // Loop through remaining rows
-  for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    const cells = row.querySelectorAll('td');
-    const result = {
-      'en': cells[2].textContent.trim(),
-      'ge': cells[3].textContent.trim(),
-      'fr': cells[4].textContent.trim(),
-      'ar': cells[5].textContent.trim(),
-      'url': cells[2].querySelector('a').href, // hiden in english column
-    };
-
-    searchData.push(result);
-  }
-  return searchData
+function getResults(jsonString) {
+  var results = JSON.parse(jsonString).results;
+  results.forEach(result => {
+    result.url = 'https://www.arabterm.org/index.php?L=3&tx_3m5techdict_pi1[id]=' + result.id;
+  });
+  return results;
 }
 
 function getSearchPage(term) {
   // ES6 (ES2015) doesn't support async/await. So we need to use Promise
   return new Promise((resolve, reject) => {
-    const urlencoded = new URLSearchParams();
-    urlencoded.append('tx_3m5techdict_pi1[action]', 'search');
-    urlencoded.append('tx_3m5techdict_pi1[sword]', term);
-    var requestOptions = {
-      method: "POST",
-      body: urlencoded,
-      redirect: "follow"
-    };
-
     const LOCAL_TESTING = false;
-    const USE_CORS_PROXY = true;
-    const arabTermUrl = 'http://www.arabterm.org/index.php?L=1';
-    var fullUrl = arabTermUrl;
+    const USE_CORS_PROXY = false;
+
+    const backendSearchUrl = 'https://wikitermbase.toolforge.org/search?q=' + term;
+    var fullUrl = backendSearchUrl;
+
+    var requestOptions = { method: 'GET' };
 
     if (USE_CORS_PROXY) {
       // URL with CORS proxy
-      var fullUrl = 'https://corsproxy.io/?' + encodeURIComponent(arabTermUrl);
+      var fullUrl = 'https://corsproxy.io/?' + encodeURIComponent(backendSearchUrl);
     }
 
     if (LOCAL_TESTING) {
       // URL to test with localhost:
-      var fullUrl = 'http://localhost:8000/exampleTelescope.html';
+      var fullUrl = 'http://localhost:5000/search?q=' + term; // local server
+      // var fullUrl = 'http://localhost:8000/response.json' + term; // local JSON file
       requestOptions = { method: 'GET' };
     }
 
@@ -89,11 +60,9 @@ function getSearchPage(term) {
   });
 }
 
-
-
 // // Example usage: search for term 'telescope'
 // responseText = await getSearchPage('telescope')
-// const jsonDataString = parseTable(responseText);
+// const jsonDataString = getResults(responseText);
 // console.log(jsonDataString);
 
 mw.loader.using(['oojs-ui-core', 'oojs-ui-widgets', 'oojs-ui-windows']).done(function () {
@@ -141,8 +110,6 @@ mw.loader.using(['oojs-ui-core', 'oojs-ui-widgets', 'oojs-ui-windows']).done(fun
         const cssTdBorder = '1px solid rgb(160 160 160)';
         const cssTdPadding = '8px 10px';
 
-        // row.append($('<td>').css('border', cssTdBorder).css('padding', cssTdPadding).text(item.ar));
-
         row.append(
           $('<td>')
             .css('border', cssTdBorder)
@@ -151,28 +118,11 @@ mw.loader.using(['oojs-ui-core', 'oojs-ui-widgets', 'oojs-ui-windows']).done(fun
               $('<a>')
                 .attr('href', item.url)
                 .attr('target', '_blank')
-                .text(item.ar)
+                .text(item.arabic)
             )
         );
-        // TODO: icon of external link ?
-
-        // TODO: add link to arabterm.org
-        // const arColumn = $('<td>').css('border', cssTdBorder).css('padding', cssTdPadding).append(
-        //   $('<span>').text(item.ar)
-        // ).append(
-        //   new OO.ui.ButtonWidget({
-        //     framed: false,
-        //     flags: ['progressive'],
-        //     icon: 'external-link',
-        //     href: item.url,
-        //     target: '_blank',
-        //     invisibleLabel: true,
-        //   }).$element
-        // );
-        // row.append(arColumn);
-        //
-        row.append($('<td>').css('border', cssTdBorder).css('padding', cssTdPadding).text(item.fr));
-        row.append($('<td>').css('border', cssTdBorder).css('padding', cssTdPadding).text(item.en));
+        row.append($('<td>').css('border', cssTdBorder).css('padding', cssTdPadding).text(item.french));
+        row.append($('<td>').css('border', cssTdBorder).css('padding', cssTdPadding).text(item.english));
         tbody.append(row);
       });
       this.$table.append(tbody);
@@ -252,30 +202,14 @@ mw.loader.using(['oojs-ui-core', 'oojs-ui-widgets', 'oojs-ui-windows']).done(fun
         console.log('term:', term);
 
         getSearchPage(term)
-          .then(responseText => parseTable(responseText))
+          .then(responseText => getResults(responseText))
           .then(searchData => {
             console.log(searchData);
 
             this.displayResults(searchData); // `this` is the searchWidget
           })
           .catch(error => console.error(error));
-
-
-        // fetch('https://dummyjson.com/products')
-        //   .then(res => res.json())
-        //   .then(data => {
-        //     console.log(data); // Response from the server
-        //     this.results.clearItems();  // here 'this' is the searchWidget
-        //     data['products'].forEach(item => {
-        //       this.results.addItems([new OO.ui.OptionWidget({ data: item.id, label: item.title + ' / ' + item.category })]);
-        //     });
-        //   })
-        //   .catch(error => {
-        //     console.error('Error:', error);
-        //   });
-
       };
-
 
       this.$body.append(this.searchWidget.$element);
 
@@ -315,8 +249,6 @@ mw.loader.using(['oojs-ui-core', 'oojs-ui-widgets', 'oojs-ui-windows']).done(fun
     windowManager.addWindows([processDialog]);
 
     widgets.processDialog = processDialog;
-
-
 
     widgets.button = new OO.ui.ButtonWidget({
       label: 'البحث عن مصطلح',

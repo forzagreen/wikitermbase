@@ -26,24 +26,30 @@ As a result, we get a JSON:
 
 ```json
 {
-    "number_results": 2,
-    "q": "magnetoscope",
-    "results": [
-        {
-            "arabic": "مُسجِّلة فيديو",
-            "english": "video casette recorder (V.C.R.)",
-            "french": "enregistreur vidéocassette; magnétoscope",
-            "id": 204093,
-            "relevance": 23.95148277282715
-        },
-        {
-            "arabic": "مُسجِّلة فيديو",
-            "english": "videotape recorder (V.T.R.)",
-            "french": "magnétoscope",
-            "id": 204126,
-            "relevance": 23.95148277282715
-        }
-    ]
+  "number_results": 2,
+  "q": "magnetoscope",
+  "results": [
+    {
+      "arabic": "مُسجِّلة فيديو",
+      "dictionary_id": 780,
+      "dictionary_name_arabic": "الإعلام والتواصل",
+      "english": "video casette recorder (V.C.R.)",
+      "french": "enregistreur vidéocassette; magnétoscope",
+      "id": 204093,
+      "relevance": 23.9009952545166,
+      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=204093"
+    },
+    {
+      "arabic": "مُسجِّلة فيديو",
+      "dictionary_id": 780,
+      "dictionary_name_arabic": "الإعلام والتواصل",
+      "english": "videotape recorder (V.T.R.)",
+      "french": "magnétoscope",
+      "id": 204126,
+      "relevance": 23.9009952545166,
+      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=204126"
+    }
+  ]
 }
 ```
 
@@ -54,16 +60,17 @@ As a result, we get a JSON:
   - https://wikitech.wikimedia.org/wiki/Help:Toolforge/My_first_Flask_OAuth_tool
   - https://wikitech.wikimedia.org/wiki/Help:Toolforge/Python
   - https://wikitech.wikimedia.org/wiki/Help:Toolforge/Web/Python
-- Generate a token in Github, and clone the repo:
-  - `git clone https://github.com/forzagreen/wikitermbase`
-  - or update it: `git pull origin main`
+
 - `ssh toolforge` and `become wikitermbase`
+- Generate a token in Github, and clone the repo:
+  - (first time only) `git clone https://github.com/forzagreen/wikitermbase`
+  - or update it: `git pull origin main`
 - Enter webservice shell: `toolforge webservice --backend=kubernetes python3.11 shell`
-- `mkdir -p $HOME/www/python`
-- Create a symlink from `$HOME/www/python/src` to the folder `backend` of the cloned repo:
+- (first time only) `mkdir -p $HOME/www/python`
+- (first time only) Create a symlink from `$HOME/www/python/src` to the folder `backend` of the cloned repo:
   - `ln -s /data/project/wikitermbase/wikitermbase/backend /data/project/wikitermbase/www/python/src`
 - Create a virtual environment, activate it, and install dependencies:
-  - `python3 -m venv $HOME/www/python/venv`
+  - (first time only) `python3 -m venv $HOME/www/python/venv`
   - `source $HOME/www/python/venv/bin/activate`
   - `pip install -r $HOME/www/python/src/requirements.txt`
 - Exit out of webservice shell (Ctrl + D)
@@ -79,6 +86,8 @@ As a result, we get a JSON:
 - adapted some types (string vs char vs text)
 
 ### Creating indexes for Full Text Search:
+
+**TODO**: udpate sections with: update process, copy from sqlite to mariadb
 
 ```sql
 CREATE FULLTEXT INDEX idx_english ON entry (english);
@@ -117,12 +126,13 @@ git config http.postBuffer 524288000
 - Ref: https://wikitech.wikimedia.org/wiki/Help:Toolforge/Database#User_databases
 - `ssh toolforge` and `become wikitermbase`
 - Find out your user in `$HOME/replica.my.cnf`
-- Create the database:
+- (first time only) Create the database:
   - Open the SQL console: `sql tools`
   - Create the database: `MariaDB [(none)]> CREATE DATABASE s55953__arabterm;`
 - Restore from backup:
   - `cd ~/wikitermbase/db`
   - `mariadb --defaults-file=$HOME/replica.my.cnf -h tools.db.svc.wikimedia.cloud s55953__arabterm < arabterm.sql`
+
 - Troubleshooting:
   - https://jira.mariadb.org/browse/MDEV-34183 drop the line `/*!999999\- enable the sandbox mode */` or `/*M!999999\- enable the sandbox mode */`
   - `ERROR 1273 (HY000) at line 25: Unknown collation: 'utf8mb4_uca1400_ai_ci'`, replace it with `utf8mb4_unicode_520_ci`

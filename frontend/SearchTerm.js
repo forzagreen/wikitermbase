@@ -13,11 +13,13 @@
  * //   {
  * //     "arabic": "منظار",
  * //     "description": "آلة تجمع الضوء لرؤية الكواكب والأنجم البعيدة بوضوح، مكونة صورا مقربة للأجرام السماوية.",
+ * //     "dictionary_id": 645,
+ * //     "dictionary_name_arabic": "التربية",
  * //     "english": "telescope",
  * //     "french": "télescope ",
  * //     "id": 114942,
- * //     "relevance": 31.67395782470703,
- * //     "uri": "https://www.arabterm.org/index.php?L=3&tx_3m5techdict_pi1[id]=114942"
+ * //     "relevance": 29.9178218841553,
+ * //     "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=114942"
  * //   },
  * //   ...
  * // ]
@@ -25,7 +27,7 @@
 function getResults(jsonString) {
   var results = JSON.parse(jsonString).results;
   results.forEach(result => {
-    result.url = 'https://www.arabterm.org/index.php?L=3&tx_3m5techdict_pi1[id]=' + result.id;
+    result.url = 'http://www.arabterm.org/index.php?L=3&tx_3m5techdict_pi1[id]=' + result.id;
   });
   return results;
 }
@@ -34,17 +36,11 @@ function getSearchPage(term) {
   // ES6 (ES2015) doesn't support async/await. So we need to use Promise
   return new Promise((resolve, reject) => {
     const LOCAL_TESTING = false;
-    const USE_CORS_PROXY = false;
 
     const backendSearchUrl = 'https://wikitermbase.toolforge.org/search?q=' + term;
     var fullUrl = backendSearchUrl;
 
     var requestOptions = { method: 'GET' };
-
-    if (USE_CORS_PROXY) {
-      // URL with CORS proxy
-      var fullUrl = 'https://corsproxy.io/?' + encodeURIComponent(backendSearchUrl);
-    }
 
     if (LOCAL_TESTING) {
       // URL to test with localhost:

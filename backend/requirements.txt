@@ -1,3 +1,4 @@
+git+https://github.com/forzagreen/arabterm.git@feature/arabterm_v2
 elasticsearch
 flask
 pandas

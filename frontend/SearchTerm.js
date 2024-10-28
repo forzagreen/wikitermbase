@@ -17,7 +17,7 @@
  * //     "french": "télescope ",
  * //     "id": 114942,
  * //     "relevance": 31.67395782470703,
- * //     "url": "https://www.arabterm.org/index.php?L=3&tx_3m5techdict_pi1[id]=114942"
+ * //     "uri": "https://www.arabterm.org/index.php?L=3&tx_3m5techdict_pi1[id]=114942"
  * //   },
  * //   ...
  * // ]
@@ -116,7 +116,7 @@ mw.loader.using(['oojs-ui-core', 'oojs-ui-widgets', 'oojs-ui-windows']).done(fun
             .css('padding', cssTdPadding)
             .append(
               $('<a>')
-                .attr('href', item.url)
+                .attr('href', item.uri)
                 .attr('target', '_blank')
                 .text(item.arabic)
             )

@@ -2,53 +2,10 @@ import configparser
 import os
 
 from flask import Flask, request
-from sqlalchemy import Column, ForeignKey, create_engine, func, text
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker
-from sqlalchemy.types import Boolean, DateTime, Integer, String, Text
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
 app = Flask(__name__)
-
-
-Base = declarative_base()
-
-
-class Category(Base):
-    __tablename__ = "category"
-    id = Column(Integer, primary_key=True)
-    type = Column(Text)
-    english = Column(Text)
-    french = Column(Text)
-    arabic = Column(Text)
-    german = Column(Text)
-    name = Column(Text)
-    nbr_entries = Column(Integer)
-
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    entries = relationship("Entry", back_populates="category")
-
-
-class Entry(Base):
-    __tablename__ = "entry"
-    id = Column(Integer, primary_key=True)
-    category_id = Column(Integer, ForeignKey("category.id"), nullable=False)
-    english = Column(String(255), index=True)
-    french = Column(String(255), index=True)
-    arabic = Column(String(255), index=True)
-    german = Column(String(255), index=True)
-    vt = Column(Boolean)
-    uatv = Column(Boolean)
-    uri = Column(Text)
-    has_image = Column(Boolean)
-    image_uri_remote = Column(Text)
-    image_uri_extract = Column(Text)
-    description = Column(Text, index=True)
-
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    category = relationship("Category", back_populates="entries")
 
 
 def setup_db_engine():
@@ -74,63 +31,44 @@ def setup_db_engine():
     )
 
 
-def search_term(term: str) -> list[dict]:
-    # Create a MariaDB connection engine
-    mariadb_engine = setup_db_engine()
+mariadb_engine = setup_db_engine()
+SessionMariaDB = sessionmaker(bind=mariadb_engine)
 
-    # Create a session
-    SessionMariaDB = sessionmaker(bind=mariadb_engine)
 
+def search_terms_mariadb(query_text: str) -> list[dict]:
+    """
+    Search for terms in the MariaDB database.
+    """
+    results = []
     with SessionMariaDB() as mariadb_session:
-        # Build the relevance expression
-        relevance_expr = text(f"""
-            (
-                MATCH(arabic) AGAINST(:search IN NATURAL LANGUAGE MODE) +
-                MATCH(english) AGAINST(:search IN NATURAL LANGUAGE MODE) +
-                MATCH(french) AGAINST(:search IN NATURAL LANGUAGE MODE) +
-                MATCH(german) AGAINST(:search IN NATURAL LANGUAGE MODE) +
-                MATCH(description) AGAINST(:search IN NATURAL LANGUAGE MODE)
-            ) AS relevance
-        """)
-
-        # Custom SQLAlchemy query
-        query = (
-            mariadb_session.query(
-                Entry.id,
-                Entry.arabic,
-                Entry.english,
-                Entry.french,
-                Entry.german,
-                Entry.description,
-                relevance_expr,
-            )
-            .from_statement(
+        results = (
+            mariadb_session.execute(
                 text(
-                    f"""
-                    SELECT
-                        id, arabic, english, french, german, description,
-                        (
-                            MATCH(arabic) AGAINST(:search IN NATURAL LANGUAGE MODE) +
-                            MATCH(english) AGAINST(:search IN NATURAL LANGUAGE MODE) +
-                            MATCH(french) AGAINST(:search IN NATURAL LANGUAGE MODE) +
-                            MATCH(german) AGAINST(:search IN NATURAL LANGUAGE MODE) +
-                            MATCH(description) AGAINST(:search IN NATURAL LANGUAGE MODE)
-                        ) AS relevance
-                    FROM entry
-                    HAVING relevance > 0
-                    ORDER BY relevance DESC
+                    """
+                SELECT
+                    t.*,
+                    d.name_arabic as dictionary_name_arabic,
+                    MATCH(t.arabic, t.english, t.french, t.description)
+                    AGAINST(:query IN NATURAL LANGUAGE MODE) as relevance
+                FROM term t
+                JOIN dictionary d ON t.dictionary_id = d.id
+                WHERE MATCH(t.arabic, t.english, t.french, t.description)
+                AGAINST(:query IN NATURAL LANGUAGE MODE)
+                ORDER BY relevance DESC
                 """
-                )
+                ),
+                {"query": query_text},
             )
-            .params(search=term)
+            .mappings()
+            .all()
         )
-        results_raw = query.all()
-
-        # 'relevance' is the last element in the tuple. It's not part of the Entry model
-        results = [{**r._asdict(), "relevance": r[-1]} for r in results_raw]
-        results = [{k: v for k, v in r.items() if v is not None} for r in results]
-
-        return results
+    # Remove fields from the results
+    excluded_fields = {"created_at", "updated_at", "german"}
+    filtered_results = [
+        {k: v for k, v in result.items() if k not in excluded_fields and v is not None}
+        for result in results
+    ]
+    return filtered_results
 
 
 @app.route("/search")
@@ -139,6 +77,6 @@ def search():
         return {"error": "Missing 'q' parameter"}, 400
 
     q = request.args["q"]
-    results = search_term(q)
+    results = search_terms_mariadb(q)
     response_data = {"q": q, "number_results": len(results), "results": results}
     return response_data, 200, {"Access-Control-Allow-Origin": "*"}

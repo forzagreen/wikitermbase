@@ -54,7 +54,9 @@ As a result, we get a JSON:
   - https://wikitech.wikimedia.org/wiki/Help:Toolforge/My_first_Flask_OAuth_tool
   - https://wikitech.wikimedia.org/wiki/Help:Toolforge/Python
   - https://wikitech.wikimedia.org/wiki/Help:Toolforge/Web/Python
-- Clone the repo: generate token and `git clone https://github.com/forzagreen/wikitermbase`
+- Generate a token in Github, and clone the repo:
+  - `git clone https://github.com/forzagreen/wikitermbase`
+  - or update it: `git pull origin main`
 - `ssh toolforge` and `become wikitermbase`
 - Enter webservice shell: `toolforge webservice --backend=kubernetes python3.11 shell`
 - `mkdir -p $HOME/www/python`
@@ -101,6 +103,15 @@ mariadb-dump --password=xxxx arabterm > /mnt/arabterm.sql
 docker cp mariadb:/mnt/arabterm.sql db/arabterm.sql
 ```
 
+- Enable git to push large files:
+
+```sh
+git config http.postBuffer 524288000
+```
+
+- Commit and push to GitHub.
+
+
 ### MariaDB on Toolforge
 
 - Ref: https://wikitech.wikimedia.org/wiki/Help:Toolforge/Database#User_databases
@@ -113,6 +124,6 @@ docker cp mariadb:/mnt/arabterm.sql db/arabterm.sql
   - `cd ~/wikitermbase/db`
   - `mariadb --defaults-file=$HOME/replica.my.cnf -h tools.db.svc.wikimedia.cloud s55953__arabterm < arabterm.sql`
 - Troubleshooting:
-  - https://jira.mariadb.org/browse/MDEV-34183 drop the line `/*!999999\- enable the sandbox mode */`
+  - https://jira.mariadb.org/browse/MDEV-34183 drop the line `/*!999999\- enable the sandbox mode */` or `/*M!999999\- enable the sandbox mode */`
   - `ERROR 1273 (HY000) at line 25: Unknown collation: 'utf8mb4_uca1400_ai_ci'`, replace it with `utf8mb4_unicode_520_ci`
 

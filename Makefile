@@ -6,6 +6,9 @@ format:
 	ruff check --select I --fix backend
 	ruff format backend
 
+build_frontend:
+	cd backend/frontend && npm install && npm run build
+
 download_dump:
 	@echo "Downloading arabterm.sql..."
 	@if command -v wget > /dev/null; then \

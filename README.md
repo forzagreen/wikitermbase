@@ -96,6 +96,8 @@ For the initial setup of the repository in Toolforge:
 - To test, go to: `https://wikitermbase.toolforge.org/search?q=telescope`
 - Make sure the gadget in Wikipedia is still working.
 
+**TODO**: updating frontend.
+
 ## Database: MariaDB
 
 ### Ingesting data:

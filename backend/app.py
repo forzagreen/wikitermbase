@@ -3,13 +3,28 @@ import os
 
 from arabterm.mariadb_models import Dictionary as MariaDBDictionary
 from arabterm.mariadb_models import Term as MariaDBTerm
-from flask import Flask, request
+from flask import Flask, render_template, request, send_from_directory
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 RESPONSE_HEADERS = {"Access-Control-Allow-Origin": "*"}
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    static_folder="frontend/dist",  # Where your React built files will be
+    template_folder="frontend/dist",  # Where your index.html will be
+)
+
+
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+
+# Serve static files for React app
+@app.route("/assets/<path:path>")
+def serve_static(path):
+    return send_from_directory("frontend/dist/assets", path)
 
 
 def setup_db_engine():

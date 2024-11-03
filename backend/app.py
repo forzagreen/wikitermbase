@@ -1,9 +1,13 @@
 import configparser
 import os
 
+from arabterm.mariadb_models import Dictionary as MariaDBDictionary
+from arabterm.mariadb_models import Term as MariaDBTerm
 from flask import Flask, request
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+
+RESPONSE_HEADERS = {"Access-Control-Allow-Origin": "*"}
 
 app = Flask(__name__)
 
@@ -80,4 +84,39 @@ def search():
     q = request.args["q"]
     results = search_terms_mariadb(q)
     response_data = {"q": q, "number_results": len(results), "results": results}
-    return response_data, 200, {"Access-Control-Allow-Origin": "*"}
+    return response_data, 200, RESPONSE_HEADERS
+
+
+@app.route("/dicts")
+def list_dicts():
+    with SessionMariaDB() as mariadb_session:
+        results = mariadb_session.query(MariaDBDictionary).all()
+
+        dictionaries = [
+            {
+                column.name: getattr(result, column.name)
+                for column in MariaDBDictionary.__table__.columns
+            }
+            for result in results
+        ]
+
+        return (
+            {"number": len(dictionaries), "dictionaries": dictionaries},
+            200,
+            RESPONSE_HEADERS,
+        )
+
+
+@app.route("/stats")
+def get_stats():
+    with SessionMariaDB() as mariadb_session:
+        num_terms = mariadb_session.query(MariaDBTerm).count()
+        num_dicts = mariadb_session.query(MariaDBDictionary).count()
+        return (
+            {
+                "number_terms": num_terms,
+                "number_dictionaries": num_dicts,
+            },
+            200,
+            RESPONSE_HEADERS,
+        )

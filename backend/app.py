@@ -51,7 +51,6 @@ def setup_db_engine():
 
 
 mariadb_engine = setup_db_engine()
-SessionMariaDB = sessionmaker(bind=mariadb_engine)
 
 
 def search_terms_mariadb(query_text: str) -> list[dict]:
@@ -59,6 +58,7 @@ def search_terms_mariadb(query_text: str) -> list[dict]:
     Search for terms in the MariaDB database.
     """
     results = []
+    SessionMariaDB = sessionmaker(bind=mariadb_engine)
     with SessionMariaDB() as mariadb_session:
         results = (
             mariadb_session.execute(
@@ -104,6 +104,7 @@ def search():
 
 @app.route("/dicts")
 def list_dicts():
+    SessionMariaDB = sessionmaker(bind=mariadb_engine)
     with SessionMariaDB() as mariadb_session:
         results = mariadb_session.query(MariaDBDictionary).all()
 
@@ -124,6 +125,7 @@ def list_dicts():
 
 @app.route("/stats")
 def get_stats():
+    SessionMariaDB = sessionmaker(bind=mariadb_engine)
     with SessionMariaDB() as mariadb_session:
         num_terms = mariadb_session.query(MariaDBTerm).count()
         num_dicts = mariadb_session.query(MariaDBDictionary).count()

@@ -84,19 +84,22 @@ For the initial setup of the repository in Toolforge:
 
 - `ssh toolforge` and `become wikitermbase`
 - `cd wikitermbase` and `git pull origin main` (supply username and token)
-- Enter webservice shell: `toolforge webservice --backend=kubernetes python3.11 shell`
-- Enter python virtual environment and update dependencies:
-  ```sh
-  source $HOME/www/python/venv/bin/activate
-  pip uninstall arabterm
-  pip install -r $HOME/www/python/src/requirements.txt
-  ```
-- Exit the webservice shell (`exit`)
+- If python code changed:
+  - Enter webservice shell: `toolforge webservice --backend=kubernetes python3.11 shell`
+  - Enter python virtual environment and update dependencies:
+    ```sh
+    source $HOME/www/python/venv/bin/activate
+    pip uninstall arabterm
+    pip install -r $HOME/www/python/src/requirements.txt
+    ```
+  - Exit the webservice shell (`exit`)
+- If javascript/html/css code changed:
+  - Enter Node.js shell: `toolforge webservice node18 shell`
+  - `cd wikitermbase`, `make build_frontend`, and exit the shell.
 - `toolforge webservice --backend=kubernetes python3.11 restart`
 - To test, go to: `https://wikitermbase.toolforge.org/search?q=telescope`
 - Make sure the gadget in Wikipedia is still working.
 
-**TODO**: updating frontend.
 
 ## Database: MariaDB
 

@@ -133,12 +133,16 @@ Commit and push to arabterm GitHub repository.
 Now, from [wikitermbase](https://github.com/forzagreen/wikitermbase) repository:
 
 ```sh
-git pull origin main
+# If python dependencies (including arabterm python package) changed:
 pip uninstall arabterm
 make init
+
+# Download dump from arabterm repository, branch arabterm_v2
 make download_dump
 make fix_dump
 ```
+
+Commit changes to git. Then go to ToolForge and update the database.
 
 
 ### MariaDB on Toolforge

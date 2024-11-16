@@ -114,7 +114,7 @@ Ref: https://mariadb.com/kb/en/backup-and-restore-overview/
 
 Prerequisite: SQLite arabterm.db is up to date in arabterm repository.
 
-From arabterm repository, generate MariaDB database:
+From [arabterm](https://github.com/forzagreen/arabterm) repository, generate MariaDB database:
 
 ```sh
 make init_mariadb  # only once
@@ -130,7 +130,7 @@ make dump
 
 Commit and push to arabterm GitHub repository.
 
-Now, from `wikitermbase` repository:
+Now, from [wikitermbase](https://github.com/forzagreen/wikitermbase) repository:
 
 ```sh
 git pull origin main

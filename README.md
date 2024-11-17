@@ -1,8 +1,8 @@
 # wikitermbase
 
-## Frontend
+## Wiki Gadget
 
-Frontend is a mediawiki gadget [SearchTerm.js](SearchTerm.js)
+One frontend is a mediawiki gadget [SearchTerm.js](SearchTerm.js)
 
 Deployed at: 
 - Latest: https://ar.wikipedia.org/wiki/مستخدم:ForzaGreen/SearchTerm.js
@@ -75,6 +75,8 @@ For the initial setup of the repository in Toolforge:
   - `python3 -m venv $HOME/www/python/venv`
   - `source $HOME/www/python/venv/bin/activate`
   - `pip install -r $HOME/www/python/src/requirements.txt`
+- Download Sina Tools models:
+  - `download_files`
 - Exit out of webservice shell (Ctrl + D or `exit`)
 - `toolforge webservice --backend=kubernetes python3.11 start`
 - To test, go to: `https://wikitermbase.toolforge.org/search?q=telescope`
@@ -133,7 +135,7 @@ Commit and push to arabterm GitHub repository.
 Now, from [wikitermbase](https://github.com/forzagreen/wikitermbase) repository:
 
 ```sh
-# If python dependencies (including arabterm python package) changed:
+# If python dependencies changed (including arabterm python package):
 pip uninstall arabterm
 make init
 

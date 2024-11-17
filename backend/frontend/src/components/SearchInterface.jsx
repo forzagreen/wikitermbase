@@ -4,6 +4,7 @@ import { Search, ExternalLink, ChevronDown, ChevronUp, Link2, Loader2 } from 'lu
 const SearchInterface = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState([]);
+  const [morphResults, setMorphResults] = useState(null);
   const [expandedItems, setExpandedItems] = useState(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -12,13 +13,24 @@ const SearchInterface = () => {
     const debounceTimer = setTimeout(() => {
       if (searchQuery.trim()) {
         performSearch(searchQuery);
+        if (isArabic(searchQuery)) {
+          performMorphAnalysis(searchQuery);
+        } else {
+          setMorphResults(null);
+        }
       } else {
         setResults([]);
+        setMorphResults(null);
       }
     }, 300);
 
     return () => clearTimeout(debounceTimer);
   }, [searchQuery]);
+
+  const isArabic = (text) => {
+    const arabicPattern = /[\u0600-\u06FF]/;
+    return arabicPattern.test(text);
+  };
 
   const performSearch = async (query) => {
     setIsLoading(true);
@@ -35,6 +47,20 @@ const SearchInterface = () => {
       setResults([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const performMorphAnalysis = async (query) => {
+    try {
+      const response = await fetch(`/morph_analyzer?q=${encodeURIComponent(query)}`);
+      if (!response.ok) {
+        throw new Error('حدث خطأ في التحليل الصرفي');
+      }
+      const data = await response.json();
+      setMorphResults(data.results?.[0] || null);
+    } catch (err) {
+      console.error('Morph analysis error:', err);
+      setMorphResults(null);
     }
   };
 
@@ -67,6 +93,35 @@ const SearchInterface = () => {
         </div>
       </div>
 
+      {/* Morphological Analysis Section */}
+      {morphResults && morphResults.lemma_id !== 0 && (
+        <div className="bg-gray-50 rounded-lg p-4 mb-6">
+          <h2 className="text-lg font-bold mb-2">التحليل الصرفي</h2>
+          <div className="flex flex-wrap gap-4">
+            <div>
+              <span className="text-gray-600">الأساس:</span>
+              <a 
+                href={`https://sina.birzeit.edu/qabas/lemma/${morphResults.lemma_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mr-2 font-bold text-blue-600 hover:text-blue-800 inline-flex items-center gap-1"
+              >
+                {morphResults.lemma}
+                <ExternalLink size={14} />
+              </a>
+            </div>
+            <div>
+              <span className="text-gray-600">الجذر:</span>
+              <span className="mr-2 font-bold">{morphResults.root}</span>
+            </div>
+            <div>
+              <span className="text-gray-600">السمة الصرفية:</span>
+              <span className="mr-2 font-bold">{morphResults.pos}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Error Message */}
       {error && (
         <div className="text-red-600 bg-red-50 p-4 rounded-lg mb-4 text-center">
@@ -87,26 +142,22 @@ const SearchInterface = () => {
           <div key={item.id} className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors p-6">
             {/* Main Term Row */}
             <div className="flex justify-between items-start mb-2">
-              <div className="flex-grow">
-                <h2 className="text-2xl font-bold mb-2">{item.arabic}</h2>
-                <div className="flex flex-wrap gap-4 text-lg">
-                  <span className="text-gray-700">{item.english}</span>
-                  <span className="text-gray-700">{item.french}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {item.uri && (
-                  <a href={item.uri} target="_blank" rel="noopener noreferrer" 
-                     className="text-blue-600 hover:text-blue-800">
-                    <Link2 size={18} />
-                  </a>
-                )}
+              <h2 className="text-2xl font-bold">{item.arabic}</h2>
+              <div className="text-left" dir="ltr">
+                <div className="text-xl font-semibold text-gray-800">{item.english}</div>
+                <div className="text-lg text-gray-600">{item.french}</div>
               </div>
             </div>
 
             {/* Dictionary Info */}
             <div className="flex items-center gap-2 text-sm text-gray-500 mt-2">
               <span>{item.dictionary_name_arabic}</span>
+              {item.page && (
+                <>
+                  <span>•</span>
+                  <span>صفحة {item.page}</span>
+                </>
+              )}
               {item.dictionary_wikidata_id && (
                 <>
                   <span>•</span>
@@ -118,6 +169,19 @@ const SearchInterface = () => {
                   >
                     {item.dictionary_wikidata_id}
                     <ExternalLink size={14} />
+                  </a>
+                </>
+              )}
+              {item.uri && (
+                <>
+                  <span>•</span>
+                  <a
+                    href={item.uri}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    <Link2 size={18} />
                   </a>
                 </>
               )}

@@ -14,7 +14,7 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
+# dist/ # Uncommented in order to share React built assets
 downloads/
 eggs/
 .eggs/

@@ -4,6 +4,7 @@ import os
 from arabterm.mariadb_models import Dictionary as MariaDBDictionary
 from arabterm.mariadb_models import Term as MariaDBTerm
 from flask import Flask, render_template, request, send_from_directory
+from sinatools.morphology import morph_analyzer
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -155,6 +156,20 @@ def get_stats():
             "number_terms": terms_count.scalar(),
             "number_dictionaries": dicts_count.scalar(),
         },
+        200,
+        RESPONSE_HEADERS,
+    )
+
+
+@app.route("/morph_analyzer")
+def morph_analyzer_handler():
+    if "q" not in request.args:
+        return {"error": "Missing 'q' parameter"}, 400
+
+    q = request.args["q"]
+    results = morph_analyzer.analyze(q)
+    return (
+        {"q": q, "number_results": len(results), "results": results},
         200,
         RESPONSE_HEADERS,
     )

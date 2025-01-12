@@ -164,6 +164,7 @@ Ref: https://wikitech.wikimedia.org/wiki/Help:Toolforge/Database#User_databases
 To update/restore the database:
 
 - `ssh toolforge` and `become wikitermbase`
+- `cd wikitermbase` and `git pull origin main` (supply username and token)
 - `cd ~/wikitermbase/db`
 - `mariadb --defaults-file=$HOME/replica.my.cnf -h tools.db.svc.wikimedia.cloud s55953__arabterm < arabterm.sql`
 

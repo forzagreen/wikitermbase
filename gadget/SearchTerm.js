@@ -1,277 +1,305 @@
-// // Minimal code to test user scripts
-// $('#bodyContent').prepend('<p>Hello world! (test user script)</p>');
+// <nowiki>
+mw.loader.using(['mediawiki.util', 'jquery', 'oojs-ui-core', 'oojs-ui-widgets'], function () {
+  console.log('WikiDictionary: Script loading...');
 
-/**
- * Extracts data from the JSON string. Adds URL to the object.
- * 
- * @param {string} jsonString - The JSON string to extract data from.
- * @returns {Array} An array of objects containing the extracted data.
- * 
- * @example
- * // Output:
- * // [
- * //   {
- * //     "arabic": "منظار",
- * //     "description": "آلة تجمع الضوء لرؤية الكواكب والأنجم البعيدة بوضوح، مكونة صورا مقربة للأجرام السماوية.",
- * //     "dictionary_id": 645,
- * //     "dictionary_name_arabic": "التربية",
- * //     "english": "telescope",
- * //     "french": "télescope ",
- * //     "id": 114942,
- * //     "relevance": 29.9178218841553,
- * //     "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=114942"
- * //   },
- * //   ...
- * // ]
- */
-function getResults(jsonString) {
-  var results = JSON.parse(jsonString).results;
-  results.forEach(result => {
-    result.url = 'http://www.arabterm.org/index.php?L=3&tx_3m5techdict_pi1[id]=' + result.id;
-  });
-  return results;
-}
-
-function getSearchPage(term) {
-  // ES6 (ES2015) doesn't support async/await. So we need to use Promise
-  return new Promise((resolve, reject) => {
-    const LOCAL_TESTING = false;
-
-    const backendSearchUrl = 'https://wikitermbase.toolforge.org/search?q=' + term;
-    var fullUrl = backendSearchUrl;
-
-    var requestOptions = { method: 'GET' };
-
-    if (LOCAL_TESTING) {
-      // URL to test with localhost:
-      var fullUrl = 'http://localhost:5001/search?q=' + term; // local server
-      // var fullUrl = 'http://localhost:8000/response.json' + term; // local JSON file
-      requestOptions = { method: 'GET' };
+  // Add styles
+  const styles = `
+    /* Modal styles */
+    #wdict-modal {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
-    fetch(fullUrl, requestOptions)
-      .then(response => response.text())
-      .then(responseText => resolve(responseText))
-      .catch(error => reject(error));
-  });
-}
-
-// // Example usage: search for term 'telescope'
-// responseText = await getSearchPage('telescope')
-// const jsonDataString = getResults(responseText);
-// console.log(jsonDataString);
-
-mw.loader.using(['oojs-ui-core', 'oojs-ui-widgets', 'oojs-ui-windows']).done(function () {
-  $(function () {
-
-    var widgets = {};
-
-    /////////
-    // ================================================= //
-    OO.ui.TableWidget = function OoUiTableWidget(config) {
-      // Parent constructor
-      OO.ui.TableWidget.super.call(this, config);
-
-      // Create table element
-      this.$table = $('<table>')
-        .addClass('oo-ui-tableWidget')
-        .css('border', '2px solid rgb(140 140 140)')
-        .css('border-collapse', 'collapse').css('text-align', 'center');
-
-      // Append the table to the widget's $element
-      this.$element.append(this.$table);
-    };
-
-    OO.inheritClass(OO.ui.TableWidget, OO.ui.Widget);
-
-    // Method to set headers
-    OO.ui.TableWidget.prototype.setHeaders = function () {
-      var thead = $('<thead>');
-      const trHead = $('<tr>');
-      const cssThBorder = '1px solid rgb(160 160 160)';
-      const cssThPadding = '8px 10px';
-      trHead.append($('<th scope="col">').css('border', cssThBorder).css('padding', cssThPadding).text('العربية'));
-      trHead.append($('<th scope="col">').css('border', cssThBorder).css('padding', cssThPadding).text('الفرنسية'));
-      trHead.append($('<th scope="col">').css('border', cssThBorder).css('padding', cssThPadding).text('الإنجليزية'));
-
-      thead.append(trHead);
-      this.$table.append(thead);
-    };
-
-    // Method to add rows
-    OO.ui.TableWidget.prototype.addRows = function (searchData) {
-      const tbody = $('<tbody>');
-      searchData.forEach(item => {
-        const row = $('<tr>');
-        const cssTdBorder = '1px solid rgb(160 160 160)';
-        const cssTdPadding = '8px 10px';
-
-        row.append(
-          $('<td>')
-            .css('border', cssTdBorder)
-            .css('padding', cssTdPadding)
-            .append(
-              $('<a>')
-                .attr('href', item.uri)
-                .attr('target', '_blank')
-                .text(item.arabic)
-            )
-        );
-        row.append($('<td>').css('border', cssTdBorder).css('padding', cssTdPadding).text(item.french));
-        row.append($('<td>').css('border', cssTdBorder).css('padding', cssTdPadding).text(item.english));
-        tbody.append(row);
-      });
-      this.$table.append(tbody);
-    };
-
-    // ================================================= //
-    // Integrate Custom Widget with OO.ui.SearchWidget
-    // Extend the OO.ui.SearchWidget to use your TableWidget
-    OO.ui.CustomSearchWidget = function OoUiCustomSearchWidget(config) {
-      // Parent constructor
-      OO.ui.CustomSearchWidget.super.call(this, config);
-
-      // Replace the results widget with a custom table widget
-      this.results = new OO.ui.TableWidget();
-
-      // Class oo-ui-searchWidget-results has a css line-hight:0
-      // => must disable it for table to display correctly
-      this.results.$element.addClass('oo-ui-searchWidget-results').css('line-height', 'normal');
-
-      // Replace the results menu with our custom table
-      this.$results.replaceWith(this.results.$element);
-      this.$results = this.results.$element;
-    };
-
-    // Inherit from OO.ui.SearchWidget
-    OO.inheritClass(OO.ui.CustomSearchWidget, OO.ui.SearchWidget);
-
-    // Method to set search results
-    OO.ui.CustomSearchWidget.prototype.displayResults = function (searchData) {
-      this.results.$table.empty(); // Clear previous results
-      this.results.setHeaders();
-      this.results.addRows(searchData);
-    };
-
-    // ================================================= //
-
-
-    // Initial example from: https://www.mediawiki.org/wiki/OOUI/Windows/Process_Dialogs
-    // Subclass ProcessDialog.
-    function ProcessDialog(config) {
-      ProcessDialog.super.call(this, config);
+    .wdict-hidden {
+      display: none !important;
     }
-    OO.inheritClass(ProcessDialog, OO.ui.ProcessDialog);
 
-    // Specify a name for .addWindows()
-    ProcessDialog.static.name = 'myDialog';
-    // Specify a static title and actions.
-    ProcessDialog.static.title = 'البحث عن مصطلحات';
-    ProcessDialog.static.actions = [
-      { action: 'cancel', label: 'Cancel', flags: ['safe', 'close'] }
-    ];
+    .wdict-modal-content {
+      background: white;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 800px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      box-sizing: border-box;
+    }
 
+    .wdict-header {
+      padding: 1rem;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
 
-    // Use the initialize() method to add content to the dialog's $body,
-    // to initialize widgets, and to set up event handlers.
-    ProcessDialog.prototype.initialize = function () {
-      ProcessDialog.super.prototype.initialize.apply(this, arguments);
+    .wdict-header h2 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
 
-      // TODO: use OO.ui.ButtonInputWidget instead ? (in OO.ui.FormLayout)
-      // TODO: use OO.ui.PanelLayout to display results ?
-      // this.searchWidget = new OO.ui.SearchWidget();
-      this.searchWidget = new OO.ui.CustomSearchWidget();
-      widgets.searchWidget = this.searchWidget;
+    .wdict-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      padding: 0.5rem;
+      color: #666;
+    }
 
-      // // Initialisation example: add 10 items
-      // var items = [];
-      // for (let i = 1; i <= 10; i++) {
-      //   items.push(new OO.ui.OptionWidget({ data: i, label: 'Item ' + i }));
-      // }
-      // this.searchWidget.results.addItems(items);
+    .wdict-search {
+      padding: 1rem;
+      position: relative;
+      box-sizing: border-box;
+    }
 
-      this.searchWidget.onQueryChange = function () {
-        // console.log('query changed');
-      };
-      this.searchWidget.onQueryEnter = function () {
-        var term = this.getQuery().value; // here 'this' is the searchWidget
-        console.log('term:', term);
+    .wdict-search input {
+      width: 100%;
+      padding: 0.75rem 2.5rem 0.75rem 1rem;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
 
-        getSearchPage(term)
-          .then(responseText => getResults(responseText))
-          .then(searchData => {
-            console.log(searchData);
+    .wdict-search-icon {
+      position: absolute;
+      left: 1.5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #666;
+    }
 
-            this.displayResults(searchData); // `this` is the searchWidget
-          })
-          .catch(error => console.error(error));
-      };
+    .wdict-results {
+      padding: 1rem;
+    }
 
-      this.$body.append(this.searchWidget.$element);
+    .wdict-result {
+      border: 1px solid #eee;
+      border-radius: 6px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
 
-    };
+    .wdict-result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.5rem;
+    }
 
-    // Use the getActionProcess() method to specify a process to handle the
-    // actions (for the 'save' action, in this example).
-    ProcessDialog.prototype.getActionProcess = function (action) {
-      var dialog = this;
-      if (action) {
-        return new OO.ui.Process(function () {
-          dialog.close({
-            action: action
-          });
-        });
-      }
-      // Fallback to parent handler.
-      return ProcessDialog.super.prototype.getActionProcess.call(this, action);
-    };
+    .wdict-translations {
+      text-align: left;
+    }
 
-    // Get dialog height.
-    ProcessDialog.prototype.getBodyHeight = function () {
-      // return this.searchWidget.$element.outerHeight(true); // FIXME: not working
-      return 300
-    };
+    .wdict-english {
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
 
-    // Create and append the window manager.
-    var windowManager = new OO.ui.WindowManager();
-    $(document.body).append(windowManager.$element);
+    .wdict-french {
+      color: #666;
+    }
 
-    // Create a new dialog window.
-    var processDialog = new ProcessDialog({
-      size: 'large'
-    });
+    .wdict-meta {
+      font-size: 0.9rem;
+      color: #666;
+      margin: 0.5rem 0;
+    }
 
-    // Add windows to window manager using the addWindows() method.
-    windowManager.addWindows([processDialog]);
+    .wdict-meta span:not(:last-child) {
+      margin-left: 0.5rem;
+    }
 
-    widgets.processDialog = processDialog;
+    .wdict-toggle {
+      background: none;
+      border: none;
+      color: #2196F3;
+      cursor: pointer;
+      padding: 0.5rem 0;
+      display: flex;
+      align-items: center;
+    }
 
-    widgets.button = new OO.ui.ButtonWidget({
+    .wdict-description-content {
+      background: #f5f5f5;
+      border-radius: 4px;
+      padding: 1rem;
+      margin-top: 0.5rem;
+    }
+
+    .wdict-loading {
+      text-align: center;
+      padding: 2rem;
+      color: #666;
+    }
+
+    .wdict-error {
+      text-align: center;
+      padding: 2rem;
+      color: #dc3545;
+    }
+
+    /* Fix for input container */
+    .wdict-search {
+      max-width: 100%;
+      margin: 0;
+    }
+  `;
+
+  // Add styles to page
+  mw.util.addCSS(styles);
+  console.log('WikiDictionary: Styles added');
+
+  // Initialize main functionality
+  function initialize() {
+    console.log('WikiDictionary: Initializing...');
+
+    // Create OOUI button
+    const button = new OO.ui.ButtonWidget({
       label: 'البحث عن مصطلح',
       icon: 'search',
       flags: ['progressive'],
-      framed: false,
-    });
-    widgets.button.on('click', function () {
-      // OO.ui.alert('You clicked the button!');
-      // Open the window.
-      windowManager.openWindow(processDialog);
+      framed: false
     });
 
-    if (mw.config.get('wgPageName') === 'Special:ContentTranslation') {
-      var checkElement = setInterval(function () {
-        if ($('.cx-feedback-link').length) {
-          clearInterval(checkElement);
-          $('.cx-feedback-link').prepend(widgets.button.$element);
-        }
-      }, 100);
-
+    // Different placement based on Vector skin version
+    if ($('.vector-search-box').length) {
+      // Vector 2
+      $('.vector-search-box').after(button.$element);
+      console.log('WikiDictionary: Button added to Vector 2');
     } else {
-      $('#p-search').after(widgets.button.$element);
-      // $('#mw-content-text').append(button.$element);
+      // Vector legacy or other skins
+      $('#p-search').after(button.$element);
+      console.log('WikiDictionary: Button added to Vector legacy');
     }
 
-    // expose this so we can reference widgets in the console
-    mw.mywidgets = widgets;
+    // Create modal container
+    const modal = $(`
+      <div id="wdict-modal" class="wdict-hidden" dir="rtl">
+        <div class="wdict-modal-content">
+          <div class="wdict-header">
+            <h2>قاموس المصطلحات التقنية</h2>
+            <button class="wdict-close">×</button>
+          </div>
+          <div class="wdict-search">
+            <input type="text" placeholder="ابحث عن مصطلح..." />
+            <div class="wdict-search-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </div>
+          </div>
+          <div class="wdict-results"></div>
+        </div>
+      </div>
+    `);
+
+    $('body').append(modal);
+    console.log('WikiDictionary: Modal added to DOM');
+
+    // Event handlers
+    button.on('click', function () {
+      console.log('WikiDictionary: Button clicked');
+      $('#wdict-modal').removeClass('wdict-hidden');
+    });
+
+    $('.wdict-close').on('click', function () {
+      console.log('WikiDictionary: Close button clicked');
+      $('#wdict-modal').addClass('wdict-hidden');
+    });
+
+    // Close on click outside
+    $(document).on('click', function (e) {
+      if (!$(e.target).closest('.wdict-modal-content').length
+        && !$(e.target).closest('.oo-ui-buttonElement-button').length
+        && !$('#wdict-modal').hasClass('wdict-hidden')) {
+        console.log('WikiDictionary: Clicked outside modal');
+        $('#wdict-modal').addClass('wdict-hidden');
+      }
+    });
+
+    // Search functionality
+    let searchTimeout;
+    $('#wdict-modal input').on('input', function () {
+      const query = $(this).val();
+      clearTimeout(searchTimeout);
+
+      if (query.length < 2) {
+        $('#wdict-modal .wdict-results').empty();
+        return;
+      }
+
+      const resultsContainer = $('#wdict-modal .wdict-results');
+      resultsContainer.html('<div class="wdict-loading">جارٍ البحث...</div>');
+
+      searchTimeout = setTimeout(() => {
+        console.log('WikiDictionary: Searching for:', query);
+        fetch(`https://wikitermbase.toolforge.org/search?q=${encodeURIComponent(query)}`)
+          .then(response => response.json())
+          .then(data => {
+            console.log('WikiDictionary: Search results received:', data);
+            resultsContainer.empty();
+            data.results.forEach(item => {
+              const resultElement = $(`
+                <div class="wdict-result">
+                  <div class="wdict-result-header">
+                    <h3>${item.arabic}</h3>
+                    <div class="wdict-translations">
+                      <div class="wdict-english">${item.english}</div>
+                      <div class="wdict-french">${item.french}</div>
+                    </div>
+                  </div>
+                  <div class="wdict-meta">
+                    <span>${item.dictionary_name_arabic}</span>
+                    ${item.page ? `<span>• صفحة ${item.page}</span>` : ''}
+                    ${item.dictionary_wikidata_id ? `
+                      <span>• 
+                        <a href="https://www.wikidata.org/wiki/${item.dictionary_wikidata_id}" 
+                           target="_blank">${item.dictionary_wikidata_id}</a>
+                      </span>
+                    ` : ''}
+                  </div>
+                  ${item.description ? `
+                    <div class="wdict-description">
+                      <button class="wdict-toggle">التفاصيل</button>
+                      <div class="wdict-description-content wdict-hidden">
+                        ${item.description}
+                      </div>
+                    </div>
+                  ` : ''}
+                </div>
+              `);
+
+              resultElement.find('.wdict-toggle').on('click', function () {
+                $(this).next('.wdict-description-content').toggleClass('wdict-hidden');
+              });
+
+              resultsContainer.append(resultElement);
+            });
+          })
+          .catch(error => {
+            console.error('WikiDictionary: Search error:', error);
+            resultsContainer.html('<div class="wdict-error">حدث خطأ في البحث</div>');
+          });
+      }, 300);
+    });
+  }
+
+  // Call initialize when document is ready
+  $(document).ready(function () {
+    initialize();
+    console.log('WikiDictionary: Initialization complete');
   });
 });
+// </nowiki>

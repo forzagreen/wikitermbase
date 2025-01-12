@@ -1,3 +1,4 @@
+// src/components/SearchInterface.jsx
 import React, { useState, useEffect } from 'react';
 import { Search, ExternalLink, ChevronDown, ChevronUp, Link2, Loader2 } from 'lucide-react';
 
@@ -138,10 +139,28 @@ const SearchInterface = () => {
 
       {/* Results */}
       <div className="space-y-4">
-        {results.map((item) => (
-          <div key={item.id} className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors p-6">
+        {results.map((item, index) => (
+          <div key={item.id} className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-colors p-6 relative">
+            {/* Side Column for Number and Link */}
+            <div className="absolute top-4 right-4 flex flex-col items-center space-y-2 w-8">
+              <div className="text-lg font-semibold text-gray-400">
+                {index + 1}
+              </div>
+              
+              {item.uri && (
+                <a
+                  href={item.uri}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  <Link2 size={16} />
+                </a>
+              )}
+            </div>
+
             {/* Main Term Row */}
-            <div className="flex justify-between items-start mb-2">
+            <div className="flex justify-between items-start mb-2 pr-16">
               <h2 className="text-2xl font-bold">{item.arabic}</h2>
               <div className="text-left" dir="ltr">
                 <div className="text-xl font-semibold text-gray-800">{item.english}</div>
@@ -155,34 +174,18 @@ const SearchInterface = () => {
               {item.page && (
                 <>
                   <span>•</span>
-                  <span>صفحة {item.page}</span>
+                  <span>ص. {item.page}</span>
                 </>
               )}
               {item.dictionary_wikidata_id && (
                 <>
                   <span>•</span>
-                  <a
-                    href={`https://www.wikidata.org/wiki/${item.dictionary_wikidata_id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-blue-600 hover:text-blue-800"
-                  >
-                    {item.dictionary_wikidata_id}
-                    <ExternalLink size={14} />
-                  </a>
-                </>
-              )}
-              {item.uri && (
-                <>
-                  <span>•</span>
-                  <a
-                    href={item.uri}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800"
-                  >
-                    <Link2 size={18} />
-                  </a>
+                  <span>QID: <a
+                      href={`https://www.wikidata.org/wiki/${item.dictionary_wikidata_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800"
+                    >{item.dictionary_wikidata_id}</a></span>
                 </>
               )}
             </div>

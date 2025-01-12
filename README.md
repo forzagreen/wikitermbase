@@ -1,12 +1,29 @@
 # wikitermbase
 
+## Table of Contents
+
+- [Wiki Gadget](#wiki-gadget)
+- [Backend](#backend)
+  - [Flask API](#flask-api)
+  - [Flask API on Toolforge](#flask-api-on-toolforge)
+    - [Initial Setup](#initial-setup)
+    - [Updating the Codebase](#updating-the-codebase)
+- [Database: MariaDB](#database-mariadb)
+  - [Ingesting data](#ingesting-data)
+  - [Backup the database](#backup-the-database)
+  - [MariaDB on Toolforge](#mariadb-on-toolforge)
+    - [Initial Setup](#initial-setup-1)
+    - [Updating the Database](#updating-the-database)
+    - [Troubleshooting](#troubleshooting)
+
 ## Wiki Gadget
 
-One frontend is a mediawiki gadget [SearchTerm.js](SearchTerm.js)
+The frontend in Wikipedia is a mediawiki gadget [SearchTerm.js](SearchTerm.js)
 
 Deployed at: 
 - Latest: https://ar.wikipedia.org/wiki/مستخدم:ForzaGreen/SearchTerm.js
 - version URL: https://ar.wikipedia.org/w/index.php?title=مستخدم:ForzaGreen/SearchTerm.js&oldid=67150710
+- Dev: https://ar.wikipedia.org/wiki/مستخدم:ForzaGreen/SearchTerm-dev.js
 
 
 ## Backend
@@ -105,12 +122,12 @@ For the initial setup of the repository in Toolforge:
 
 ## Database: MariaDB
 
-### Ingesting data:
+### Ingesting data
 - with a script, reading from SQLite database arabterm.db from https://github.com/forzagreen/arabterm
 - adapted some types (string vs char vs text)
 
 
-### Backup the database:
+### Updating data
 
 Ref: https://mariadb.com/kb/en/backup-and-restore-overview/
 
@@ -159,7 +176,7 @@ Ref: https://wikitech.wikimedia.org/wiki/Help:Toolforge/Database#User_databases
   - Open the SQL console: `sql tools`
   - Create the database: `MariaDB [(none)]> CREATE DATABASE s55953__arabterm;`
 
-#### Updating the Database:
+#### Updating the Database
 
 To update/restore the database:
 
@@ -169,7 +186,7 @@ To update/restore the database:
 - `mariadb --defaults-file=$HOME/replica.my.cnf -h tools.db.svc.wikimedia.cloud s55953__arabterm < arabterm.sql`
 
 
-#### Troubleshooting:
+#### Troubleshooting
 
 All these issues are fixed by running `make fix_dump`
   - https://jira.mariadb.org/browse/MDEV-34183 drop the line `/*!999999\- enable the sandbox mode */` or `/*M!999999\- enable the sandbox mode */`

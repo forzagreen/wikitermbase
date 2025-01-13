@@ -83,7 +83,7 @@ mw.loader.using(['mediawiki.util', 'jquery', 'oojs-ui-core', 'oojs-ui-widgets'],
       padding: 1rem;
     }
 
-    /* Updated result card styles */
+    /* Result card styles */
     .wdict-result {
       border: 1px solid #eee;
       border-radius: 6px;
@@ -97,7 +97,6 @@ mw.loader.using(['mediawiki.util', 'jquery', 'oojs-ui-core', 'oojs-ui-widgets'],
       border-color: #ddd;
     }
 
-    /* New styles for number and link column */
     .wdict-side-column {
       position: absolute;
       top: 1rem;
@@ -124,7 +123,6 @@ mw.loader.using(['mediawiki.util', 'jquery', 'oojs-ui-core', 'oojs-ui-widgets'],
       color: #1d4ed8;
     }
 
-    /* Updated result header with padding for side column */
     .wdict-result-header {
       display: flex;
       justify-content: space-between;
@@ -150,15 +148,10 @@ mw.loader.using(['mediawiki.util', 'jquery', 'oojs-ui-core', 'oojs-ui-widgets'],
       font-size: 0.9rem;
       color: #666;
       margin: 0.5rem 0;
-    }
-
-    .wdict-meta {
-      font-size: 0.9rem;
-      color: #666;
-      margin: 0.5rem 0;
       display: flex;
       gap: 0.5rem;
       align-items: center;
+      flex-wrap: wrap;
     }
 
     .wdict-meta-separator {
@@ -194,10 +187,85 @@ mw.loader.using(['mediawiki.util', 'jquery', 'oojs-ui-core', 'oojs-ui-widgets'],
       color: #dc3545;
     }
 
-    /* Fix for input container */
-    .wdict-search {
-      max-width: 100%;
-      margin: 0;
+    /* Citation styles */
+    .wdict-citation-button {
+      display: inline-flex;
+      align-items: center;
+      color: #666;
+      transition: color 0.2s;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      margin-right: 0.5rem;
+    }
+
+    .wdict-citation-button:hover {
+      color: #2563eb;
+    }
+
+    .wdict-citation-popup {
+      position: absolute;
+      left: 1rem;
+      right: 1rem;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      padding: 1rem;
+      z-index: 11;
+      /* Change positioning */
+      top: 100%;  /* Position below the button */
+      margin-top: 0.5rem;  /* Add small gap */
+    }
+
+    /* Keep the responsive adjustment */
+    @media (min-width: 640px) {
+      .wdict-citation-popup {
+        left: auto;
+        right: 0;
+        width: 24rem;
+      }
+    }
+
+    .wdict-citation-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .wdict-citation-title {
+      font-weight: 600;
+      color: #111;
+    }
+
+    .wdict-copy-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      color: #666;
+      transition: color 0.2s;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0.25rem;
+    }
+
+    .wdict-copy-button:hover {
+      color: #2563eb;
+    }
+
+    .wdict-citation-code {
+      background: #f9fafb;
+      padding: 0.5rem;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.875rem;
+      color: #333;
+      overflow-x: auto;
+      border: 1px solid #eee;
+      word-break: break-all;
     }
   `;
 
@@ -219,11 +287,9 @@ mw.loader.using(['mediawiki.util', 'jquery', 'oojs-ui-core', 'oojs-ui-widgets'],
 
     // Different placement based on Vector skin version
     if ($('.vector-search-box').length) {
-      // Vector 2
       $('.vector-search-box').after(button.$element);
       console.log('WikiDictionary: Button added to Vector 2');
     } else {
-      // Vector legacy or other skins
       $('#p-search').after(button.$element);
       console.log('WikiDictionary: Button added to Vector legacy');
     }
@@ -257,7 +323,6 @@ mw.loader.using(['mediawiki.util', 'jquery', 'oojs-ui-core', 'oojs-ui-widgets'],
     button.on('click', function () {
       console.log('WikiDictionary: Button clicked');
       $('#wdict-modal').removeClass('wdict-hidden');
-      // Focus the search input after modal is shown
       setTimeout(() => {
         $('#wdict-modal input').focus();
       }, 0);
@@ -276,9 +341,15 @@ mw.loader.using(['mediawiki.util', 'jquery', 'oojs-ui-core', 'oojs-ui-widgets'],
         console.log('WikiDictionary: Clicked outside modal');
         $('#wdict-modal').addClass('wdict-hidden');
       }
+
+      // Close citation popups when clicking outside
+      if (!$(e.target).closest('.wdict-citation-popup').length &&
+        !$(e.target).closest('.wdict-citation-button').length) {
+        $('.wdict-citation-popup').remove();
+      }
     });
 
-    // Search functionality with updated result rendering
+    // Search functionality
     let searchTimeout;
     $('#wdict-modal input').on('input', function () {
       const query = $(this).val();
@@ -327,14 +398,20 @@ mw.loader.using(['mediawiki.util', 'jquery', 'oojs-ui-core', 'oojs-ui-widgets'],
                     <span>${item.dictionary_name_arabic}</span>
                     ${item.page ? `
                       <span class="wdict-meta-separator">•</span>
-                      <span>صفحة ${item.page}</span>
-                    ` : ''}
+                      <span>ص. ${item.page}</span>
+                      ` : ''}
                     ${item.dictionary_wikidata_id ? `
                       <span class="wdict-meta-separator">•</span>
                       <span>
-                        <a href="https://www.wikidata.org/wiki/${item.dictionary_wikidata_id}" 
-                           target="_blank">${item.dictionary_wikidata_id}</a>
+                        QID: <a href="https://www.wikidata.org/wiki/${item.dictionary_wikidata_id}" 
+                          target="_blank"
+                          rel="noopener noreferrer">${item.dictionary_wikidata_id}</a>
                       </span>
+                      <span class="wdict-meta-separator">•</span>
+                      <button class="wdict-citation-button" data-item-id="${item.id}">
+                        <span class="oo-ui-widget oo-ui-widget-enabled oo-ui-iconElement oo-ui-iconElement-icon oo-ui-icon-quotes oo-ui-labelElement-invisible oo-ui-iconWidget"></span>
+                        <span style="margin-right: 0.25rem">استشهاد</span>
+                      </button>
                     ` : ''}
                   </div>
                   ${item.description ? `
@@ -348,6 +425,69 @@ mw.loader.using(['mediawiki.util', 'jquery', 'oojs-ui-core', 'oojs-ui-widgets'],
                 </div>
               `);
 
+              // Add citation functionality
+              let activePopup = null;
+              resultElement.find('.wdict-citation-button').on('click', function (e) {
+                e.stopPropagation();
+                const button = $(this);
+
+                // Remove any existing popups
+                $('.wdict-citation-popup').remove();
+
+                if (activePopup === item.id) {
+                  activePopup = null;
+                  return;
+                }
+
+                activePopup = item.id;
+
+                const citation = item.page
+                  ? `{{استشهاد بويكي بيانات|${item.dictionary_wikidata_id}|ص=${item.page}}}`
+                  : `{{استشهاد بويكي بيانات|${item.dictionary_wikidata_id}}}`;
+
+                const popup = $(`
+                  <div class="wdict-citation-popup">
+                    <div class="wdict-citation-header">
+                      <span class="wdict-citation-title">رمز الاستشهاد</span>
+                      <button class="wdict-copy-button">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none">
+                          <path d="M8 17.929H6c-1.105 0-2-.912-2-2.036V5.036C4 3.912 4.895 3 6 3h8c1.105 0 2 .912 2 2.036v1.866m-6 .17h8c1.105 0 2 .91 2 2.035v10.857C20 21.088 19.105 22 18 22h-8c-1.105 0-2-.912-2-2.036V9.107c0-1.124.895-2.036 2-2.036z"/>
+                        </svg>
+                        <span>نسخ</span>
+                      </button>
+                    </div>
+                    <div class="wdict-citation-code">${citation}</div>
+                  </div>
+                `);
+
+                // Handle copy button click
+                popup.find('.wdict-copy-button').on('click', async function () {
+                  try {
+                    await navigator.clipboard.writeText(citation);
+                    const button = $(this);
+                    button.html(`
+                      <svg viewBox="0 0 24 24" width="16" height="16" stroke="#16a34a" fill="none">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                      <span style="color: #16a34a">تم النسخ</span>
+                    `);
+                    setTimeout(() => {
+                      button.html(`
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none">
+                          <path d="M8 17.929H6c-1.105 0-2-.912-2-2.036V5.036C4 3.912 4.895 3 6 3h8c1.105 0 2 .912 2 2.036v1.866m-6 .17h8c1.105 0 2 .91 2 2.035v10.857C20 21.088 19.105 22 18 22h-8c-1.105 0-2-.912-2-2.036V9.107c0-1.124.895-2.036 2-2.036z"/>
+                        </svg>
+                        <span>نسخ</span>
+                      `);
+                    }, 2000);
+                  } catch (err) {
+                    console.error('Failed to copy:', err);
+                  }
+                });
+
+                button.after(popup);
+              });
+
+              // Add description toggle functionality
               resultElement.find('.wdict-toggle').on('click', function () {
                 $(this).next('.wdict-description-content').toggleClass('wdict-hidden');
               });

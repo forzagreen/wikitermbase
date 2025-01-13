@@ -1,6 +1,6 @@
 git+https://github.com/forzagreen/arabterm.git@feature/arabterm_v2
-git+https://github.com/forzagreen/sinatools
-elasticsearch
+# git+https://github.com/forzagreen/sinatools
+# elasticsearch
 flask
 pandas
 pymysql

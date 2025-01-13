@@ -112,7 +112,7 @@ For the initial setup of the repository in Toolforge:
     pip install -r $HOME/www/python/src/requirements.txt
     ```
   - Exit the webservice shell (`exit`)
-- If javascript/html/css code changed:
+- If npm dependencies changed, or to rebuild javascript/html/css code:
   - Enter Node.js shell: `toolforge webservice node18 shell`
   - `cd wikitermbase`, `make build_frontend`, and exit the shell.
 - `toolforge webservice --backend=kubernetes python3.11 restart`

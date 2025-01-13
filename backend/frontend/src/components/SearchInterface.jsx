@@ -1,6 +1,6 @@
 // src/components/SearchInterface.jsx
 import React, { useState, useEffect } from 'react';
-import { Search, ExternalLink, ChevronDown, ChevronUp, Link2, Loader2 } from 'lucide-react';
+import { Search, ExternalLink, ChevronDown, ChevronUp, Link2, Loader2, Quote, Check, Copy } from 'lucide-react';
 
 const SearchInterface = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -9,6 +9,20 @@ const SearchInterface = () => {
   const [expandedItems, setExpandedItems] = useState(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
+  const [openPopupId, setOpenPopupId] = useState(null);
+
+  // Add click outside handler
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openPopupId && !event.target.closest('.citation-popup')) {
+        setOpenPopupId(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [openPopupId]);
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
@@ -87,6 +101,7 @@ const SearchInterface = () => {
             className="w-full p-4 pl-12 text-lg rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            autoFocus
           />
           <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400">
             {isLoading ? <Loader2 className="animate-spin" /> : <Search />}
@@ -180,12 +195,78 @@ const SearchInterface = () => {
               {item.dictionary_wikidata_id && (
                 <>
                   <span>•</span>
-                  <span>QID: <a
+                  <span>
+                    QID: <a
                       href={`https://www.wikidata.org/wiki/${item.dictionary_wikidata_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:text-blue-800"
-                    >{item.dictionary_wikidata_id}</a></span>
+                      className="group relative text-blue-600 hover:text-blue-800"
+                    >
+                      {item.dictionary_wikidata_id}
+                      <span className="absolute bottom-full right-1/2 transform translate-x-1/2 mb-2 hidden group-hover:block bg-gray-800 text-white text-sm px-2 py-1 rounded whitespace-nowrap">
+                        عنصر ويكي بيانات
+                      </span>
+                    </a>
+                  </span>
+                  <span>•</span>
+                  <span className="relative">
+                    <button
+                      className="inline-flex items-center text-gray-600 hover:text-blue-600 transition-colors citation-popup"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenPopupId(openPopupId === item.id ? null : item.id);
+                      }}
+                    >
+                      <Quote size={16} />
+                      <span className="mr-1">استشهاد</span>
+                    </button>
+                      
+                    {/* Citation Preview Popup */}
+                    {openPopupId === item.id && (
+                      <div 
+                        className="fixed sm:absolute left-4 right-4 sm:left-auto sm:right-0 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-10 citation-popup w-auto sm:w-96 bottom-4 sm:bottom-full sm:mb-2"
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="font-semibold text-gray-900">رمز الاستشهاد</span>
+                          <button
+                            className="text-gray-600 hover:text-blue-600 flex items-center gap-1 transition-colors"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const citation = item.page 
+                                ? `{{استشهاد بويكي بيانات|${item.dictionary_wikidata_id}|ص=${item.page}}}`
+                                : `{{استشهاد بويكي بيانات|${item.dictionary_wikidata_id}}}`;
+                              
+                              try {
+                                await navigator.clipboard.writeText(citation);
+                                setCopiedId(item.id);
+                                setTimeout(() => setCopiedId(null), 2000);
+                              } catch (err) {
+                                console.error('Failed to copy:', err);
+                              }
+                            }}
+                          >
+                            {copiedId === item.id ? (
+                              <>
+                                <Check size={16} className="text-green-600" />
+                                <span className="text-green-600">تم النسخ</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={16} />
+                                <span>نسخ</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <div className="bg-gray-50 p-2 rounded text-sm font-mono text-gray-800 overflow-x-auto border border-gray-100 break-all">
+                          {item.page 
+                            ? `{{استشهاد بويكي بيانات|${item.dictionary_wikidata_id}|ص=${item.page}}}`
+                            : `{{استشهاد بويكي بيانات|${item.dictionary_wikidata_id}}}`
+                          }
+                        </div>
+                      </div>
+                    )}
+                  </span>
                 </>
               )}
             </div>

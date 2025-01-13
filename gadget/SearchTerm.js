@@ -83,18 +83,54 @@ mw.loader.using(['mediawiki.util', 'jquery', 'oojs-ui-core', 'oojs-ui-widgets'],
       padding: 1rem;
     }
 
+    /* Updated result card styles */
     .wdict-result {
       border: 1px solid #eee;
       border-radius: 6px;
       padding: 1rem;
       margin-bottom: 1rem;
+      position: relative;
+      transition: border-color 0.2s;
     }
 
+    .wdict-result:hover {
+      border-color: #ddd;
+    }
+
+    /* New styles for number and link column */
+    .wdict-side-column {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      width: 2rem;
+    }
+
+    .wdict-result-number {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: #9ca3af;
+    }
+
+    .wdict-external-link {
+      color: #2563eb;
+      transition: color 0.2s;
+    }
+
+    .wdict-external-link:hover {
+      color: #1d4ed8;
+    }
+
+    /* Updated result header with padding for side column */
     .wdict-result-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
       margin-bottom: 0.5rem;
+      padding-right: 3rem;
     }
 
     .wdict-translations {
@@ -116,8 +152,17 @@ mw.loader.using(['mediawiki.util', 'jquery', 'oojs-ui-core', 'oojs-ui-widgets'],
       margin: 0.5rem 0;
     }
 
-    .wdict-meta span:not(:last-child) {
-      margin-left: 0.5rem;
+    .wdict-meta {
+      font-size: 0.9rem;
+      color: #666;
+      margin: 0.5rem 0;
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .wdict-meta-separator {
+      margin: 0 0.25rem;
     }
 
     .wdict-toggle {
@@ -212,6 +257,10 @@ mw.loader.using(['mediawiki.util', 'jquery', 'oojs-ui-core', 'oojs-ui-widgets'],
     button.on('click', function () {
       console.log('WikiDictionary: Button clicked');
       $('#wdict-modal').removeClass('wdict-hidden');
+      // Focus the search input after modal is shown
+      setTimeout(() => {
+        $('#wdict-modal input').focus();
+      }, 0);
     });
 
     $('.wdict-close').on('click', function () {
@@ -229,7 +278,7 @@ mw.loader.using(['mediawiki.util', 'jquery', 'oojs-ui-core', 'oojs-ui-widgets'],
       }
     });
 
-    // Search functionality
+    // Search functionality with updated result rendering
     let searchTimeout;
     $('#wdict-modal input').on('input', function () {
       const query = $(this).val();
@@ -250,21 +299,39 @@ mw.loader.using(['mediawiki.util', 'jquery', 'oojs-ui-core', 'oojs-ui-widgets'],
           .then(data => {
             console.log('WikiDictionary: Search results received:', data);
             resultsContainer.empty();
-            data.results.forEach(item => {
+            data.results.forEach((item, index) => {
               const resultElement = $(`
                 <div class="wdict-result">
+                  <div class="wdict-side-column">
+                    <div class="wdict-result-number">${index + 1}</div>
+                    ${item.uri ? `
+                      <a href="${item.uri}" 
+                         target="_blank" 
+                         rel="noopener noreferrer" 
+                         class="wdict-external-link">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none">
+                          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                        </svg>
+                      </a>
+                    ` : ''}
+                  </div>
                   <div class="wdict-result-header">
                     <h3>${item.arabic}</h3>
                     <div class="wdict-translations">
                       <div class="wdict-english">${item.english}</div>
-                      <div class="wdict-french">${item.french}</div>
+                      ${item.french ? `<div class="wdict-french">${item.french}</div>` : ''}
                     </div>
                   </div>
                   <div class="wdict-meta">
                     <span>${item.dictionary_name_arabic}</span>
-                    ${item.page ? `<span>• صفحة ${item.page}</span>` : ''}
+                    ${item.page ? `
+                      <span class="wdict-meta-separator">•</span>
+                      <span>صفحة ${item.page}</span>
+                    ` : ''}
                     ${item.dictionary_wikidata_id ? `
-                      <span>• 
+                      <span class="wdict-meta-separator">•</span>
+                      <span>
                         <a href="https://www.wikidata.org/wiki/${item.dictionary_wikidata_id}" 
                            target="_blank">${item.dictionary_wikidata_id}</a>
                       </span>

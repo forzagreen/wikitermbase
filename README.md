@@ -136,7 +136,7 @@ Prerequisite: SQLite arabterm.db is up to date in arabterm repository.
 From [arabterm](https://github.com/forzagreen/arabterm) repository, generate MariaDB database:
 
 ```sh
-make init_mariadb  # only once
+make init_mariadb  # start or create container
 make delete_mariadb
 make migrate_to_mariadb
 
@@ -147,7 +147,7 @@ make search term="telescope"
 make dump
 ```
 
-Commit and push to arabterm GitHub repository.
+Commit and push `arabterm.db` and `db/` to arabterm GitHub repository:
 
 Now, from [wikitermbase](https://github.com/forzagreen/wikitermbase) repository:
 

@@ -1,5 +1,6 @@
 import configparser
 import os
+import re
 
 from arabterm.mariadb_models import Dictionary as MariaDBDictionary
 from arabterm.mariadb_models import Term as MariaDBTerm
@@ -123,6 +124,54 @@ def search_terms_mariadb(query_text: str) -> list[dict]:
     ]
 
 
+def normalize_arabic(text: str) -> str:
+    """Normalize Arabic text by removing diacritics and unwanted characters."""
+    # Remove diacritics
+    text = re.sub(r"[\u064B-\u0652]", "", text)
+    # Remove tatweel
+    text = re.sub(r"\u0640", "", text)
+    # Remove non-Arabic characters
+    text = re.sub(r"[^\u0600-\u06FF\s]", "", text)
+    return text
+
+
+def aggregate_terms(results: list[dict]) -> list[dict]:
+    """Aggregate terms by arabic term (after cleaning it)."""
+    for term in results:
+        term["arabic_normalised"] = normalize_arabic(term["arabic"])
+
+    groups_dict = dict()
+    for term in results:
+        arabic_normalised = term["arabic_normalised"]
+        if arabic_normalised not in groups_dict:
+            groups_dict[arabic_normalised] = []
+        groups_dict[arabic_normalised].append(term)
+
+    groups = [
+        {"arabic_normalised": key, "occurences": value}
+        for key, value in groups_dict.items()
+    ]
+
+    # Add unique dictionaries ids
+    for group in groups:
+        group["dictionary_ids"] = list(
+            set(term["dictionary_id"] for term in group["occurences"])
+        )
+
+    # Add total relevance
+    groups.sort(key=lambda x: len(x["occurences"]), reverse=True)
+    for group in groups:
+        group["total_relevance"] = sum(
+            variant["relevance"] for variant in group["occurences"]
+        )
+
+    # Sort by: number of unique dictionaries, then total relevance:
+    groups.sort(
+        key=lambda x: (len(x["dictionary_ids"]), x["total_relevance"]), reverse=True
+    )
+    return groups
+
+
 @app.route("/search")
 def search():
     if "q" not in request.args:
@@ -132,6 +181,21 @@ def search():
     results = search_terms_mariadb(q)
     return (
         {"q": q, "number_results": len(results), "results": results},
+        200,
+        RESPONSE_HEADERS,
+    )
+
+
+@app.route("/search/aggregated", methods=["GET"])
+def search_aggregated():
+    if "q" not in request.args:
+        return {"error": "Missing 'q' parameter"}, 400
+
+    q = request.args["q"]
+    results = search_terms_mariadb(q)
+    groups = aggregate_terms(results)
+    return (
+        {"q": q, "number_groups": len(groups), "groups": groups},
         200,
         RESPONSE_HEADERS,
     )

@@ -1,8 +1,8 @@
-// src/components/SearchInterface.jsx
+// src/components/RawSearch.jsx
 import React, { useState, useEffect } from 'react';
 import { Search, ExternalLink, ChevronDown, ChevronUp, Link2, Loader2, Quote, Check, Copy } from 'lucide-react';
 
-const SearchInterface = () => {
+const RawSearch = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState([]);
   const [morphResults, setMorphResults] = useState(null);
@@ -51,7 +51,7 @@ const SearchInterface = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/search?q=${encodeURIComponent(query)}`);
+      const response = await fetch(`/api/v1/search?q=${encodeURIComponent(query)}`);
       if (!response.ok) {
         throw new Error('حدث خطأ في البحث');
       }
@@ -299,4 +299,4 @@ const SearchInterface = () => {
   );
 };
 
-export default SearchInterface;
+export default RawSearch;

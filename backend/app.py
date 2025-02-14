@@ -1,6 +1,7 @@
 import configparser
 import os
 import re
+from collections import Counter
 
 from arabterm.mariadb_models import Dictionary as MariaDBDictionary
 from arabterm.mariadb_models import Term as MariaDBTerm
@@ -12,7 +13,9 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.pool import QueuePool
 
-RESPONSE_HEADERS = {"Access-Control-Allow-Origin": "*"}
+RESPONSE_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+}
 POOL_SIZE = 10
 POOL_RECYCLE = 3600  # Recycle connections after 1 hour
 MAX_OVERFLOW = 20
@@ -26,6 +29,7 @@ app = Flask(
 )
 
 
+@app.route("/ui/search/raw")
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -124,8 +128,8 @@ def search_terms_mariadb(query_text: str) -> list[dict]:
     ]
 
 
-def normalize_arabic(text: str) -> str:
-    """Normalize Arabic text by removing diacritics and unwanted characters."""
+def normalise_arabic(text: str) -> str:
+    """Normalise Arabic text by removing diacritics and unwanted characters."""
     # Remove diacritics
     text = re.sub(r"[\u064B-\u0652]", "", text)
     # Remove tatweel
@@ -143,10 +147,26 @@ def normalize_arabic(text: str) -> str:
     return text
 
 
+def normalise_english(text: str) -> str:
+    """Normalise English text by removing unwanted characters."""
+    # Strip and remove extra spaces
+    text = re.sub(r"\s+", " ", text.strip())
+    return text
+
+
+def normalise_french(text: str) -> str:
+    """Normalise French text by removing unwanted characters."""
+    # Remove '(m.)', '(f.)', '[m.]', '[f.]'
+    text = re.sub(r"\(m\.\)|\(f\.\)|\[m\.\]|\[f\.\]", "", text)
+    # Strip and remove extra spaces
+    text = re.sub(r"\s+", " ", text.strip())
+    return text
+
+
 def aggregate_terms(results: list[dict]) -> list[dict]:
     """Aggregate terms by arabic term (after cleaning it)."""
     for term in results:
-        term["arabic_normalised"] = normalize_arabic(term["arabic"])
+        term["arabic_normalised"] = normalise_arabic(term["arabic"])
 
     groups_dict = dict()
     for term in results:
@@ -160,11 +180,28 @@ def aggregate_terms(results: list[dict]) -> list[dict]:
         for key, value in groups_dict.items()
     ]
 
-    # Add unique dictionaries ids
     for group in groups:
+        # Add unique dictionaries ids
         group["dictionary_ids"] = list(
             set(term["dictionary_id"] for term in group["occurences"])
         )
+
+        # Elect an english term (normalised), the most used one.
+        # Attention: we assume all entries have an english term.
+        english_terms = [normalise_english(x["english"]) for x in group["occurences"]]
+        group["english_normalised"] = Counter(english_terms).most_common(1)[0][0]
+
+        # Elect a french term (normalised) among entries with french.
+        french_terms = [
+            normalise_french(x["french"])
+            for x in group["occurences"]
+            if x.get("french")
+        ]
+        if french_terms:
+            group["french_normalised"] = Counter(french_terms).most_common(1)[0][0]
+
+        # In occurences, keep the order, but bubble the ones without QID to the end
+        group["occurences"].sort(key=lambda x: x.get("dictionary_wikidata_id") is None)
 
     # Add total relevance
     groups.sort(key=lambda x: len(x["occurences"]), reverse=True)
@@ -180,6 +217,7 @@ def aggregate_terms(results: list[dict]) -> list[dict]:
     return groups
 
 
+@app.route("/api/v1/search")
 @app.route("/search")
 def search():
     if "q" not in request.args:
@@ -194,7 +232,7 @@ def search():
     )
 
 
-@app.route("/search/aggregated", methods=["GET"])
+@app.route("/api/v1/search/aggregated", methods=["GET"])
 def search_aggregated():
     if "q" not in request.args:
         return {"error": "Missing 'q' parameter"}, 400

@@ -10,6 +10,9 @@ export default defineConfig({
     proxy: {
       // Proxy API endpoints to port 5001
       '/search': 'http://localhost:5001',
+      '/api/v1/search': 'http://localhost:5001',
+      '/ui/search/raw': 'http://localhost:5001',
+      '/api/v1/search/aggregated': 'http://localhost:5001',
       '/dicts': 'http://localhost:5001',
       '/stats': 'http://localhost:5001'
     }

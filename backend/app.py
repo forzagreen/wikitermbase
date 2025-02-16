@@ -22,6 +22,8 @@ MAX_OVERFLOW = 20
 POOL_TIMEOUT = 30
 RETRY_COUNT = 3
 
+DISABLE_ARABTERM_URIS = True
+
 app = Flask(
     __name__,
     static_folder="frontend/dist",  # Where your React built files will be
@@ -239,6 +241,13 @@ def search_aggregated():
 
     q = request.args["q"]
     results = search_terms_mariadb(q)
+
+    # Disable arabterm URIs as it's disabled in their website
+    if DISABLE_ARABTERM_URIS:
+        for result in results:
+            if "uri" in result and "arabterm.org" in result["uri"]:
+                del result["uri"]
+
     groups = aggregate_terms(results)
     return (
         {"q": q, "number_groups": len(groups), "groups": groups},

@@ -40,7 +40,6 @@ const DictionaryApp = () => {
     }));
   };
 
-  // Function to format dictionary count in Arabic
   const formatDictionaryCount = (count) => {
     if (count === 0) return 'لم يرد في أي معجم';
     if (count === 1) return 'ورد في معجم واحد:';
@@ -58,10 +57,24 @@ const DictionaryApp = () => {
     }
     
     if (occurrence.dictionary_wikidata_id) {
-      parts.push(`QID: ${occurrence.dictionary_wikidata_id}`);
+      parts.push(
+        <a 
+          href={`https://www.wikidata.org/wiki/${occurrence.dictionary_wikidata_id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
+        >
+          <span title="عنصر ويكي بيانات">QID: {occurrence.dictionary_wikidata_id}</span>
+        </a>
+      );
     }
     
-    return parts.join(' • ');
+    return parts.map((part, index) => (
+      <React.Fragment key={index}>
+        {index > 0 && <span className="mx-2">•</span>}
+        {part}
+      </React.Fragment>
+    ));
   };
 
   // Search function with debouncing
@@ -81,11 +94,8 @@ const DictionaryApp = () => {
       }
       const data = await response.json();
       
-      // Check if data contains groups array
       if (data && Array.isArray(data.groups)) {
         setResults(data.groups);
-        
-        // Initialize expanded state for new results
         const initialExpanded = data.groups.reduce((acc, _, index) => {
           acc[index] = true;
           return acc;
@@ -103,20 +113,17 @@ const DictionaryApp = () => {
     }
   };
 
-  // Handle search input change with debouncing
   const handleSearchInputChange = (e) => {
     const newTerm = e.target.value;
     setSearchTerm(newTerm);
 
-    // Clear existing timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    // Set new timeout
     searchTimeoutRef.current = setTimeout(() => {
       handleSearch(newTerm);
-    }, 300); // 300ms delay
+    }, 300);
   };
 
   const themeClasses = darkMode ? 
@@ -134,6 +141,16 @@ const DictionaryApp = () => {
   const occurrenceClasses = darkMode ?
     'bg-gray-700' :
     'bg-gray-50';
+
+  const LanguageLabel = ({ lang }) => (
+    <span className={`text-xs px-1.5 py-0.5 rounded ${
+      darkMode 
+        ? 'bg-gray-700 text-gray-300' 
+        : 'bg-gray-200 text-gray-600'
+    }`}>
+      {lang}
+    </span>
+  );
 
   return (
     <div className={`min-h-screen ${themeClasses}`} dir="rtl">
@@ -189,22 +206,33 @@ const DictionaryApp = () => {
       <div className="max-w-4xl mx-auto mt-8 px-4 pb-12">
         {results.map((group, index) => (
           <div key={index} className={`${cardClasses} rounded-lg mb-6 p-6`}>
-            {/* Header with term numbers */}
-            <div className="flex items-center gap-4 mb-4">
-              <span className="text-lg font-semibold text-blue-600">{index + 1}</span>
-              <div className="flex flex-1 justify-between items-baseline">
-                <div className="text-right">
+            {/* Card Header */}
+            <div className="flex items-center mb-4">
+              <span className="text-lg font-semibold text-blue-600 ml-4">{index + 1}</span>
+              <div className="flex-1 flex items-start gap-8">
+                <div className="text-right flex-shrink-0">
                   <span className="text-xl font-bold">{group.arabic_normalised}</span>
                 </div>
-                <div dir="ltr" className="text-left">
-                  <span className="text-xl font-bold">{group.english_normalised}</span>
-                  <span className="text-sm text-gray-500 mx-3">•</span>
-                  <span className="text-sm text-gray-500">{group.french_normalised}</span>
+                <div dir="ltr" className="flex-1 text-left">
+                  <div className="flex-1 flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <LanguageLabel lang="en" />
+                      <span className="text-xl font-bold">{group.english_normalised}</span>
+                    </div>
+                    {group.french_normalised && (
+                      <div className="flex items-center gap-2">
+                        <LanguageLabel lang="fr" />
+                        <span className="text-lg text-gray-600 dark:text-gray-300 italic">
+                          {group.french_normalised}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Dictionary entries */}
+            {/* Dictionary entries section */}
             <div className="border-t pt-4">
               <div className="flex justify-between items-center mb-2">
                 <p className="text-gray-500">
@@ -225,12 +253,31 @@ const DictionaryApp = () => {
                       <p className="text-sm text-gray-500 mb-1">
                         {formatDictionaryInfo(occurrence)}
                       </p>
-                      <div className="mt-2 space-x-3 space-x-reverse mr-6">
-                        <span className="text-right">{occurrence.arabic}</span>
-                        <span className="text-gray-400">•</span>
-                        <span dir="ltr" className="text-gray-500">{occurrence.english}</span>
-                        <span className="text-gray-400">•</span>
-                        <span dir="ltr" className="text-gray-500">{occurrence.french}</span>
+                      <div className="mt-2 flex items-start gap-8">
+                        <div className="text-right flex-shrink-0">
+                          <span>{occurrence.arabic}</span>
+                        </div>
+                        <div dir="ltr" className="flex-1 text-left">
+                          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+                            <div className="inline-flex items-center gap-2">
+                              <LanguageLabel lang="en" />
+                              <span className="text-gray-700 dark:text-gray-300">
+                                {occurrence.english}
+                              </span>
+                            </div>
+                            {occurrence.french && (
+                              <>
+                                <span className="hidden sm:inline text-gray-400">•</span>
+                                <div className="inline-flex items-center gap-2">
+                                  <LanguageLabel lang="fr" />
+                                  <span className="text-gray-600 dark:text-gray-400 italic">
+                                    {occurrence.french}
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                     {occurrence.uri && (

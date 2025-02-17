@@ -1,6 +1,6 @@
 // src/components/DictionaryApp.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, ExternalLink, ChevronDown, ChevronUp, Moon, Sun } from 'lucide-react';
+import { Search, ExternalLink, ChevronDown, ChevronUp, Moon, Sun, Quote, Copy, Check } from 'lucide-react';
 
 const DictionaryApp = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -9,6 +9,8 @@ const DictionaryApp = () => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [openPopupId, setOpenPopupId] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
   const searchInputRef = useRef(null);
   const searchTimeoutRef = useRef(null);
 
@@ -23,6 +25,18 @@ const DictionaryApp = () => {
       setDarkMode(true);
     }
   }, []);
+
+  // Handle click outside citation popup
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openPopupId && !event.target.closest('.citation-popup')) {
+        setOpenPopupId(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [openPopupId]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -58,14 +72,76 @@ const DictionaryApp = () => {
     
     if (occurrence.dictionary_wikidata_id) {
       parts.push(
-        <a 
-          href={`https://www.wikidata.org/wiki/${occurrence.dictionary_wikidata_id}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
-        >
-          <span title="عنصر ويكي بيانات">QID: {occurrence.dictionary_wikidata_id}</span>
-        </a>
+        <span title="عنصر ويكي بيانات">
+          QID: <a 
+            href={`https://wikidata.org/wiki/${occurrence.dictionary_wikidata_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
+          >{occurrence.dictionary_wikidata_id}</a>
+        </span>
+      )
+
+      parts.push(
+        <div key="wikidata" className="inline-flex items-center">
+          <span className="relative mr-2">
+            <button
+              className="inline-flex items-center text-gray-600 hover:text-blue-600 transition-colors citation-popup"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpenPopupId(openPopupId === occurrence.id ? null : occurrence.id);
+              }}
+            >
+              <Quote size={16} />
+              <span className="mr-1">استشهاد</span>
+            </button>
+            
+            {openPopupId === occurrence.id && (
+              <div 
+                className="fixed sm:absolute left-4 right-4 sm:left-auto sm:right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 z-10 citation-popup w-auto sm:w-96 bottom-4 sm:bottom-full sm:mb-2"
+              >
+                <div className="flex justify-between items-center mb-2">
+                  <span className="font-semibold text-gray-900 dark:text-gray-100">رمز الاستشهاد</span>
+                  <button
+                    className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 transition-colors"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const citation = occurrence.page 
+                        ? `{{استشهاد بويكي بيانات|${occurrence.dictionary_wikidata_id}|ص=${occurrence.page}}}`
+                        : `{{استشهاد بويكي بيانات|${occurrence.dictionary_wikidata_id}}}`;
+                      
+                      try {
+                        await navigator.clipboard.writeText(citation);
+                        setCopiedId(occurrence.id);
+                        setTimeout(() => setCopiedId(null), 2000);
+                      } catch (err) {
+                        console.error('Failed to copy:', err);
+                      }
+                    }}
+                  >
+                    {copiedId === occurrence.id ? (
+                      <>
+                        <Check size={16} className="text-green-600" />
+                        <span className="text-green-600">تم النسخ</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={16} />
+                        <span>نسخ</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-900 p-2 rounded text-sm font-mono text-gray-800 dark:text-gray-200 overflow-x-auto border border-gray-100 dark:border-gray-700 break-all">
+                  {occurrence.page 
+                    ? `{{استشهاد بويكي بيانات|${occurrence.dictionary_wikidata_id}|ص=${occurrence.page}}}`
+                    : `{{استشهاد بويكي بيانات|${occurrence.dictionary_wikidata_id}}}`
+                  }
+                </div>
+              </div>
+            )}
+          </span>
+        </div>
       );
     }
     

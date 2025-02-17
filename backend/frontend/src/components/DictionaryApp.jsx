@@ -254,7 +254,7 @@ const DictionaryApp = () => {
             ref={searchInputRef}
             type="text"
             className={`w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${inputClasses}`}
-            placeholder="ابحث عن مصطلح..."
+            placeholder="ابحث عن مصطلح (إنجليزي، فرنسي، عربي)..."
             value={searchTerm}
             onChange={handleSearchInputChange}
           />
@@ -280,6 +280,11 @@ const DictionaryApp = () => {
 
       {/* Results Section */}
       <div className="max-w-4xl mx-auto mt-8 px-4 pb-12">
+        {!loading && !error && results.length === 0 && searchTerm && (
+          <div className={`${cardClasses} rounded-lg p-6 text-center`}>
+            <p className="text-lg">عذرًا، لم نعثر على أي نتائج.</p>
+          </div>
+        )}
         {results.map((group, index) => (
           <div key={index} className={`${cardClasses} rounded-lg mb-6 p-6`}>
             {/* Card Header */}

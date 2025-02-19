@@ -22,7 +22,10 @@ MAX_OVERFLOW = 20
 POOL_TIMEOUT = 30
 RETRY_COUNT = 3
 
-DISABLE_ARABTERM_URIS = True
+# Don't return Arabterm URIs in the results
+DISABLE_ARABTERM_URIS = False
+# Disable descriptions in all results
+DISABLE_DESCRIPTIONS = False
 
 app = Flask(
     __name__,
@@ -103,7 +106,9 @@ def execute_with_retry(query, params=None, max_retries=RETRY_COUNT):
         session.close()
 
 
-def search_terms_mariadb(query_text: str) -> list[dict]:
+def search_terms_mariadb(
+    query_text: str, include_descriptions: bool = True
+) -> list[dict]:
     """Search for terms in the MariaDB database."""
     search_query = text("""
         SELECT
@@ -124,6 +129,8 @@ def search_terms_mariadb(query_text: str) -> list[dict]:
 
     # Remove excluded fields
     excluded_fields = {"created_at", "updated_at", "german"}
+    if (not include_descriptions) or DISABLE_DESCRIPTIONS:
+        excluded_fields.add("description")
     return [
         {k: v for k, v in row.items() if k not in excluded_fields and v is not None}
         for row in results
@@ -225,8 +232,12 @@ def search():
     if "q" not in request.args:
         return {"error": "Missing 'q' parameter"}, 400
 
+    include_descriptions: bool = (
+        request.args.get("include_descriptions", "true").lower() == "true"
+    )
+
     q = request.args["q"]
-    results = search_terms_mariadb(q)
+    results = search_terms_mariadb(q, include_descriptions)
     return (
         {"q": q, "number_results": len(results), "results": results},
         200,
@@ -239,8 +250,12 @@ def search_aggregated():
     if "q" not in request.args:
         return {"error": "Missing 'q' parameter"}, 400
 
+    include_descriptions: bool = (
+        request.args.get("include_descriptions", "true").lower() == "true"
+    )
+
     q = request.args["q"]
-    results = search_terms_mariadb(q)
+    results = search_terms_mariadb(q, include_descriptions)
 
     # Disable arabterm URIs as it's disabled in their website
     if DISABLE_ARABTERM_URIS:

@@ -2,6 +2,29 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, ExternalLink, ChevronDown, ChevronUp, Moon, Sun, Quote, Copy, Check } from 'lucide-react';
 
+const ExpandableText = ({ text, charLimit = 200 }) => {
+  const [expanded, setExpanded] = useState(false);
+  const toggleExpanded = () => setExpanded((prev) => !prev);
+
+  // Check if text exceeds the character limit
+  const shouldTruncate = text.length > charLimit;
+  const displayText = expanded || !shouldTruncate ? text : `${text.substring(0, charLimit)}...`;
+
+  return (
+    <div className="mt-2">
+      <p className="text-sm text-gray-600 dark:text-gray-300">{displayText}</p>
+      {shouldTruncate && (
+        <button 
+          onClick={toggleExpanded} 
+          className="mt-1 text-blue-600 hover:underline focus:outline-none dark:text-blue-400 dark:hover:text-blue-300"
+        >
+          {expanded ? 'اظهر أقل' : 'اظهر المزيد'}
+        </button>
+      )}
+    </div>
+  );
+};
+
 const DictionaryApp = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedGroups, setExpandedGroups] = useState({});
@@ -254,7 +277,7 @@ const DictionaryApp = () => {
             ref={searchInputRef}
             type="text"
             className={`w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${inputClasses}`}
-            placeholder="ابحث عن مصطلح (إنجليزي، فرنسي، عربي)..."
+            placeholder="ابحث عن مصطلح (بالإنجليزية أو الفرنسية أو العربية)..."
             value={searchTerm}
             onChange={handleSearchInputChange}
           />
@@ -360,6 +383,10 @@ const DictionaryApp = () => {
                           </div>
                         </div>
                       </div>
+                      {/* Arabic description section */}
+                      {occurrence.description && (
+                        <ExpandableText text={occurrence.description} />
+                      )}
                     </div>
                     {occurrence.uri && (
                       <a 
@@ -375,6 +402,7 @@ const DictionaryApp = () => {
                 </div>
               ))}
             </div>
+
           </div>
         ))}
       </div>

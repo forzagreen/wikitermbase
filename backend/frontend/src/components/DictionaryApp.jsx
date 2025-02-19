@@ -18,7 +18,7 @@ const ExpandableText = ({ text, charLimit = 200 }) => {
           onClick={toggleExpanded} 
           className="mt-1 text-blue-600 hover:underline focus:outline-none dark:text-blue-400 dark:hover:text-blue-300"
         >
-          {expanded ? 'اظهر أقل' : 'اظهر المزيد'}
+          {expanded ? 'أظهر أقل' : 'أظهر المزيد'}
         </button>
       )}
     </div>

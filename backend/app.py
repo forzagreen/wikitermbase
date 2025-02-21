@@ -145,8 +145,10 @@ def normalise_arabic(text: str) -> str:
     text = re.sub(r"\u0640", "", text)
     # Remove AL prefix for all words
     text = re.sub(r"\bال", "", text)
-    # Replace أ and إ and آ with ا
-    text = re.sub(r"[\u0623\u0625\u0622]", "\u0627", text)
+
+    # # [DISABLED] Replace أ and إ and آ with ا
+    # text = re.sub(r"[\u0623\u0625\u0622]", "\u0627", text)
+
     # Remove anything inside parentheses
     text = re.sub(r"\(.*?\)", "", text)
     # Replace non-Arabic characters with space

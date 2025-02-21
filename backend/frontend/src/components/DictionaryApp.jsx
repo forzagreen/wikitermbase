@@ -308,8 +308,14 @@ const DictionaryApp = () => {
             <p className="text-lg">عذرًا، لم نعثر على أي نتائج.</p>
           </div>
         )}
-        {results.map((group, index) => (
-          <div key={index} className={`${cardClasses} rounded-lg mb-6 p-6`}>
+        {results.map((group, index) => {
+          const occurrencesCounts = results.map(g => g.occurences.length);
+          const maxOccurrences = Math.max(...occurrencesCounts);
+          const topResultsCount = occurrencesCounts.filter(count => count === maxOccurrences).length;
+          const isTopResult = group.occurences.length === maxOccurrences && topResultsCount === 1; // Check if only one top result
+
+          return (
+          <div key={index} className={`${cardClasses} rounded-lg mb-6 p-6 ${isTopResult ? 'border-2 border-blue-500' : ''}`}>
             {/* Card Header */}
             <div className="flex items-center mb-4">
               <span className="text-lg font-semibold text-blue-600 ml-4">{index + 1}</span>
@@ -317,6 +323,11 @@ const DictionaryApp = () => {
                 <div className="text-right flex-shrink-0">
                   <span className="text-xl font-bold">{group.arabic_normalised}</span>
                 </div>
+                {isTopResult && (
+                  <span className="bg-blue-100 text-blue-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded dark:bg-blue-200 dark:text-blue-800">
+                    التعريب المقترح
+                  </span>
+                )}
                 <div dir="ltr" className="flex-1 text-left">
                   <div className="flex-1 flex flex-col gap-2">
                     <div className="flex items-center gap-2">
@@ -404,7 +415,7 @@ const DictionaryApp = () => {
             </div>
 
           </div>
-        ))}
+        )})}
       </div>
     </div>
   );

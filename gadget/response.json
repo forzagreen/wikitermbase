@@ -1,246 +1,510 @@
 {
-  "number_results": 21,
-  "q": "telescope",
-  "results": [
+  "groups": [
     {
-      "arabic": "منظار",
-      "description": "آلة تجمع الضوء لرؤية الكواكب والأنجم البعيدة بوضوح، مكونة صورا مقربة للأجرام السماوية.",
-      "dictionary_id": 645,
-      "dictionary_name_arabic": "التربية",
-      "english": "telescope",
-      "french": "télescope ",
-      "id": 114942,
-      "relevance": 29.2255535125732,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=114942"
+      "arabic_normalised": "منظار",
+      "dictionary_ids": [
+        645,
+        39
+      ],
+      "english_normalised": "telescope",
+      "french_normalised": "télescope",
+      "occurences": [
+        {
+          "arabic": "مِنْظار",
+          "arabic_normalised": "منظار",
+          "dictionary_id": 39,
+          "dictionary_name_arabic": "المعجم الموحد لمصطلحات الهندسة المدنية (2012)",
+          "dictionary_wikidata_id": "Q116255030",
+          "english": "telescope",
+          "french": "lunette",
+          "id": 60082,
+          "relevance": 17.3929862976074,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=60082"
+        },
+        {
+          "arabic": "منظار",
+          "arabic_normalised": "منظار",
+          "description": "آلة تجمع الضوء لرؤية الكواكب والأنجم البعيدة بوضوح، مكونة صورا مقربة للأجرام السماوية.",
+          "dictionary_id": 645,
+          "dictionary_name_arabic": "مسرد التربية، المنظمة العربية للتربية والثقافة والعلوم (موقع ArabTerm)",
+          "english": "telescope",
+          "french": "télescope ",
+          "id": 114942,
+          "relevance": 34.7859725952148,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=114942"
+        }
+      ],
+      "total_relevance": 52.1789588928223
     },
     {
-      "arabic": "مرقب راديوي",
-      "dictionary_id": 668,
-      "dictionary_name_arabic": "المعجم الموحد لمصطلحات الرياضيات والفلك",
-      "dictionary_wikidata_id": "Q114600477",
-      "english": "radio telescope",
-      "french": "radio-télescope",
-      "id": 134356,
-      "relevance": 29.2255535125732,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=134356"
+      "arabic_normalised": "مرقاب بأشعة تحت حمراء",
+      "dictionary_ids": [
+        673
+      ],
+      "english_normalised": "infra-red telescope; telethermoscope",
+      "french_normalised": "télescope infrarouge",
+      "occurences": [
+        {
+          "arabic": "مِرْقاب بأشِعَّةٍ تَحْتُ الحَمراء",
+          "arabic_normalised": "مرقاب بأشعة تحت حمراء",
+          "dictionary_id": 673,
+          "dictionary_name_arabic": "المعجم الموحد لمصطلحات الأرصاد الجوية (1999)",
+          "dictionary_wikidata_id": "Q116153637",
+          "english": "infra-red telescope; telethermoscope",
+          "french": "télescope infrarouge",
+          "id": 155629,
+          "relevance": 34.7859725952148,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=155629"
+        },
+        {
+          "arabic": "مِرْقَابٌ بأشِعَةٍ تَحْتَ الحَمراء",
+          "arabic_normalised": "مرقاب بأشعة تحت حمراء",
+          "dictionary_id": 673,
+          "dictionary_name_arabic": "المعجم الموحد لمصطلحات الأرصاد الجوية (1999)",
+          "dictionary_wikidata_id": "Q116153637",
+          "english": "telethermoscope; infra-red telescope",
+          "french": "télescope infrarouge",
+          "id": 156495,
+          "relevance": 34.7859725952148,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=156495"
+        }
+      ],
+      "total_relevance": 69.5719451904297
     },
     {
-      "arabic": "مرقب",
-      "dictionary_id": 668,
-      "dictionary_name_arabic": "المعجم الموحد لمصطلحات الرياضيات والفلك",
-      "dictionary_wikidata_id": "Q114600477",
-      "english": "telescope",
-      "french": "télescope",
-      "id": 134457,
-      "relevance": 29.2255535125732,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=134457"
+      "arabic_normalised": "مقراب غاليلي",
+      "dictionary_ids": [
+        669
+      ],
+      "english_normalised": "Galileo telescope",
+      "french_normalised": "télescope de Galilée",
+      "occurences": [
+        {
+          "arabic": "مقراب \u003Cغاليلي\u003E",
+          "arabic_normalised": "مقراب غاليلي",
+          "dictionary_id": 669,
+          "dictionary_name_arabic": "المعجم الموحد لمصطلحات الفيزياء العامة والنووية (1989)",
+          "dictionary_wikidata_id": "Q113987323",
+          "english": "Galileo telescope",
+          "french": "télescope de Galilée",
+          "id": 137054,
+          "page": 126,
+          "relevance": 34.7859725952148,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=137054"
+        },
+        {
+          "arabic": "مقراب \u003Cغاليلي\u003E",
+          "arabic_normalised": "مقراب غاليلي",
+          "dictionary_id": 669,
+          "dictionary_name_arabic": "المعجم الموحد لمصطلحات الفيزياء العامة والنووية (1989)",
+          "dictionary_wikidata_id": "Q113987323",
+          "english": "Galilean telescope",
+          "french": "lunette de Galilée",
+          "id": 137052,
+          "page": 126,
+          "relevance": 17.3929862976074,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=137052"
+        }
+      ],
+      "total_relevance": 52.1789588928223
     },
     {
-      "arabic": "مقراب \u003Cغاليلي\u003E",
-      "dictionary_id": 669,
-      "dictionary_name_arabic": "المعجم الموحد لمصطلحات الفيزياء العامة والنووية",
-      "dictionary_wikidata_id": "Q113987323",
-      "english": "Galileo telescope",
-      "french": "télescope de Galilée",
-      "id": 137054,
-      "page": 126,
-      "relevance": 29.2255535125732,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=137054"
+      "arabic_normalised": "مرقب راديوي",
+      "dictionary_ids": [
+        668
+      ],
+      "english_normalised": "radio telescope",
+      "french_normalised": "radio-télescope",
+      "occurences": [
+        {
+          "arabic": "مرقب راديوي",
+          "arabic_normalised": "مرقب راديوي",
+          "dictionary_id": 668,
+          "dictionary_name_arabic": "المعجم الموحد لمصطلحات الرياضيات والفلك (1990)",
+          "dictionary_wikidata_id": "Q114600477",
+          "english": "radio telescope",
+          "french": "radio-télescope",
+          "id": 134356,
+          "relevance": 34.7859725952148,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=134356"
+        }
+      ],
+      "total_relevance": 34.7859725952148
     },
     {
-      "arabic": "مقراب نيوتوني",
-      "dictionary_id": 669,
-      "dictionary_name_arabic": "المعجم الموحد لمصطلحات الفيزياء العامة والنووية",
-      "dictionary_wikidata_id": "Q113987323",
-      "english": "Newtonian telescope",
-      "french": "télescope Newtonien",
-      "id": 138520,
-      "page": 200,
-      "relevance": 29.2255535125732,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=138520"
+      "arabic_normalised": "مرقب",
+      "dictionary_ids": [
+        668
+      ],
+      "english_normalised": "telescope",
+      "french_normalised": "télescope",
+      "occurences": [
+        {
+          "arabic": "مرقب",
+          "arabic_normalised": "مرقب",
+          "dictionary_id": 668,
+          "dictionary_name_arabic": "المعجم الموحد لمصطلحات الرياضيات والفلك (1990)",
+          "dictionary_wikidata_id": "Q114600477",
+          "english": "telescope",
+          "french": "télescope",
+          "id": 134457,
+          "relevance": 34.7859725952148,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=134457"
+        }
+      ],
+      "total_relevance": 34.7859725952148
     },
     {
-      "arabic": "مقراب عاكس",
-      "dictionary_id": 669,
-      "dictionary_name_arabic": "المعجم الموحد لمصطلحات الفيزياء العامة والنووية",
-      "dictionary_wikidata_id": "Q113987323",
-      "english": "reflecting telescope",
-      "french": "télescope à réflexion; à miroir (reflecteur)",
-      "id": 139509,
-      "page": 248,
-      "relevance": 29.2255535125732,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=139509"
+      "arabic_normalised": "مقراب نيوتوني",
+      "dictionary_ids": [
+        669
+      ],
+      "english_normalised": "Newtonian telescope",
+      "french_normalised": "télescope Newtonien",
+      "occurences": [
+        {
+          "arabic": "مقراب نيوتوني",
+          "arabic_normalised": "مقراب نيوتوني",
+          "dictionary_id": 669,
+          "dictionary_name_arabic": "المعجم الموحد لمصطلحات الفيزياء العامة والنووية (1989)",
+          "dictionary_wikidata_id": "Q113987323",
+          "english": "Newtonian telescope",
+          "french": "télescope Newtonien",
+          "id": 138520,
+          "page": 200,
+          "relevance": 34.7859725952148,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=138520"
+        }
+      ],
+      "total_relevance": 34.7859725952148
     },
     {
-      "arabic": "مقراب",
-      "dictionary_id": 669,
-      "dictionary_name_arabic": "المعجم الموحد لمصطلحات الفيزياء العامة والنووية",
-      "dictionary_wikidata_id": "Q113987323",
-      "english": "telescope",
-      "french": "télescope",
-      "id": 140327,
-      "page": 285,
-      "relevance": 29.2255535125732,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=140327"
+      "arabic_normalised": "مقراب عاكس",
+      "dictionary_ids": [
+        669
+      ],
+      "english_normalised": "reflecting telescope",
+      "french_normalised": "télescope à réflexion; à miroir (reflecteur)",
+      "occurences": [
+        {
+          "arabic": "مقراب عاكس",
+          "arabic_normalised": "مقراب عاكس",
+          "dictionary_id": 669,
+          "dictionary_name_arabic": "المعجم الموحد لمصطلحات الفيزياء العامة والنووية (1989)",
+          "dictionary_wikidata_id": "Q113987323",
+          "english": "reflecting telescope",
+          "french": "télescope à réflexion; à miroir (reflecteur)",
+          "id": 139509,
+          "page": 248,
+          "relevance": 34.7859725952148,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=139509"
+        }
+      ],
+      "total_relevance": 34.7859725952148
     },
     {
-      "arabic": "مِرْقاب بأشِعَّةٍ تَحْتُ الحَمراء",
-      "dictionary_id": 673,
-      "dictionary_name_arabic": "المعجم الموحد لمصطلحات الأرصاد الجوية",
-      "dictionary_wikidata_id": "Q116153637",
-      "english": "infra-red telescope; telethermoscope",
-      "french": "télescope infrarouge",
-      "id": 155629,
-      "relevance": 29.2255535125732,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=155629"
+      "arabic_normalised": "مقراب",
+      "dictionary_ids": [
+        669
+      ],
+      "english_normalised": "telescope",
+      "french_normalised": "télescope",
+      "occurences": [
+        {
+          "arabic": "مقراب",
+          "arabic_normalised": "مقراب",
+          "dictionary_id": 669,
+          "dictionary_name_arabic": "المعجم الموحد لمصطلحات الفيزياء العامة والنووية (1989)",
+          "dictionary_wikidata_id": "Q113987323",
+          "english": "telescope",
+          "french": "télescope",
+          "id": 140327,
+          "page": 285,
+          "relevance": 34.7859725952148,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=140327"
+        }
+      ],
+      "total_relevance": 34.7859725952148
     },
     {
-      "arabic": "مِرْقَابٌ بأشِعَةٍ تَحْتَ الحَمراء",
-      "dictionary_id": 673,
-      "dictionary_name_arabic": "المعجم الموحد لمصطلحات الأرصاد الجوية",
-      "dictionary_wikidata_id": "Q116153637",
-      "english": "telethermoscope; infra-red telescope",
-      "french": "télescope infrarouge",
-      "id": 156495,
-      "relevance": 29.2255535125732,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=156495"
+      "arabic_normalised": "مقارب كاسجرين، تلسكوب كاسجرين",
+      "dictionary_ids": [
+        718
+      ],
+      "english_normalised": "cassegrain telescope",
+      "french_normalised": "télescope de cassegrain",
+      "occurences": [
+        {
+          "arabic": "مقارب كاسجرين، تلسكوب كاسجرين",
+          "arabic_normalised": "مقارب كاسجرين، تلسكوب كاسجرين",
+          "description": "تلسكوب عاكس مجهز بمرآة على شكل قطع زائد، تعكس الحزمة الضوئية المجمّعة المرتدة من مرآة أولية نحو فتحة في هذه المرآة ويتميز بذلك عن تلسكوب نيوتن حيث يتم التكبير بواسطة عدسات انكسار",
+          "dictionary_id": 718,
+          "dictionary_name_arabic": "المعجم الموحد لمصطلحات الاستشعار عن بعد (2000)",
+          "dictionary_wikidata_id": "Q116167591",
+          "english": "cassegrain telescope",
+          "french": "télescope de cassegrain",
+          "id": 182901,
+          "page": 19,
+          "relevance": 34.7859725952148,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=182901"
+        }
+      ],
+      "total_relevance": 34.7859725952148
     },
     {
-      "arabic": "مقارب كاسجرين، تلسكوب كاسجرين",
-      "description": "تلسكوب عاكس مجهز بمرآة على شكل قطع زائد، تعكس الحزمة الضوئية المجمّعة المرتدة من مرآة أولية نحو فتحة في هذه المرآة ويتميز بذلك عن تلسكوب نيوتن حيث يتم التكبير بواسطة عدسات انكسار",
-      "dictionary_id": 718,
-      "dictionary_name_arabic": "المعجم الموحد لمصطلحات الاستشعار عن بعد",
-      "dictionary_wikidata_id": "Q116167591",
-      "english": "cassegrain telescope",
-      "french": "télescope de cassegrain",
-      "id": 182901,
-      "page": 19,
-      "relevance": 29.2255535125732,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=182901"
+      "arabic_normalised": "تلسكوب، مقراب",
+      "dictionary_ids": [
+        782
+      ],
+      "english_normalised": "telescope",
+      "french_normalised": "télescope",
+      "occurences": [
+        {
+          "arabic": "تلسكوب، مِقْراب",
+          "arabic_normalised": "تلسكوب، مقراب",
+          "dictionary_id": 782,
+          "dictionary_name_arabic": "مسرد الفن، التسلية والرياضة، المنظمة العربية للتربية والثقافة والعلوم (موقع ArabTerm)",
+          "english": "telescope",
+          "french": "télescope",
+          "id": 208889,
+          "relevance": 34.7859725952148,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=208889"
+        }
+      ],
+      "total_relevance": 34.7859725952148
     },
     {
-      "arabic": "تلسكوب، مِقْراب",
-      "dictionary_id": 782,
-      "dictionary_name_arabic": "الفن، التسلية والرياضة",
-      "english": "telescope",
-      "french": "télescope",
-      "id": 208889,
-      "relevance": 29.2255535125732,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=208889"
+      "arabic_normalised": "مرصد",
+      "dictionary_ids": [
+        784
+      ],
+      "english_normalised": "telescope",
+      "french_normalised": "télescope",
+      "occurences": [
+        {
+          "arabic": "مرصد",
+          "arabic_normalised": "مرصد",
+          "dictionary_id": 784,
+          "dictionary_name_arabic": "مسرد الجغرافيا والتاريخ، المنظمة العربية للتربية والثقافة والعلوم (موقع ArabTerm)",
+          "english": "telescope",
+          "french": "télescope",
+          "id": 218612,
+          "relevance": 34.7859725952148,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=218612"
+        }
+      ],
+      "total_relevance": 34.7859725952148
     },
     {
-      "arabic": "مرصد",
-      "dictionary_id": 784,
-      "dictionary_name_arabic": "الجغرافيا والتاريخ",
-      "english": "telescope",
-      "french": "télescope",
-      "id": 218612,
-      "relevance": 29.2255535125732,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=218612"
+      "arabic_normalised": "منظار مصحح",
+      "dictionary_ids": [
+        39
+      ],
+      "english_normalised": "anallatic telescope",
+      "french_normalised": "lunette anallatique",
+      "occurences": [
+        {
+          "arabic": "منظار مصحِّح",
+          "arabic_normalised": "منظار مصحح",
+          "dictionary_id": 39,
+          "dictionary_name_arabic": "المعجم الموحد لمصطلحات الهندسة المدنية (2012)",
+          "dictionary_wikidata_id": "Q116255030",
+          "english": "anallatic telescope",
+          "french": "lunette anallatique",
+          "id": 59306,
+          "relevance": 17.3929862976074,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=59306"
+        }
+      ],
+      "total_relevance": 17.3929862976074
     },
     {
-      "arabic": "منظار مصحِّح",
-      "dictionary_id": 39,
-      "dictionary_name_arabic": "المعجم الموحد لمصطلحات الهندسة المدنية",
-      "dictionary_wikidata_id": "Q116255030",
-      "english": "anallatic telescope",
-      "french": "lunette anallatique",
-      "id": 59306,
-      "relevance": 14.6127767562866,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=59306"
+      "arabic_normalised": "قلب نظارة",
+      "dictionary_ids": [
+        39
+      ],
+      "english_normalised": "reversal of the telescope",
+      "french_normalised": "retournement de la lunette",
+      "occurences": [
+        {
+          "arabic": "قَلْب النظارة",
+          "arabic_normalised": "قلب نظارة",
+          "dictionary_id": 39,
+          "dictionary_name_arabic": "المعجم الموحد لمصطلحات الهندسة المدنية (2012)",
+          "dictionary_wikidata_id": "Q116255030",
+          "english": "reversal of the telescope",
+          "french": "retournement de la lunette",
+          "id": 59949,
+          "relevance": 17.3929862976074,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=59949"
+        }
+      ],
+      "total_relevance": 17.3929862976074
     },
     {
-      "arabic": "قَلْب النظارة",
-      "dictionary_id": 39,
-      "dictionary_name_arabic": "المعجم الموحد لمصطلحات الهندسة المدنية",
-      "dictionary_wikidata_id": "Q116255030",
-      "english": "reversal of the telescope",
-      "french": "retournement de la lunette",
-      "id": 59949,
-      "relevance": 14.6127767562866,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=59949"
+      "arabic_normalised": "منظار ستاديمتري",
+      "dictionary_ids": [
+        39
+      ],
+      "english_normalised": "stadimetric telescope",
+      "french_normalised": "lunette stadimétrique",
+      "occurences": [
+        {
+          "arabic": "منظار ستاديمتري",
+          "arabic_normalised": "منظار ستاديمتري",
+          "description": "محفور على محكمه خطان متناظران بالنسبة للخط الوسطي للمحكم",
+          "dictionary_id": 39,
+          "dictionary_name_arabic": "المعجم الموحد لمصطلحات الهندسة المدنية (2012)",
+          "dictionary_wikidata_id": "Q116255030",
+          "english": "stadimetric telescope",
+          "french": "lunette stadimétrique",
+          "id": 60032,
+          "relevance": 17.3929862976074,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=60032"
+        }
+      ],
+      "total_relevance": 17.3929862976074
     },
     {
-      "arabic": "منظار ستاديمتري",
-      "description": "محفور على محكمه خطان متناظران بالنسبة للخط الوسطي للمحكم",
-      "dictionary_id": 39,
-      "dictionary_name_arabic": "المعجم الموحد لمصطلحات الهندسة المدنية",
-      "dictionary_wikidata_id": "Q116255030",
-      "english": "stadimetric telescope",
-      "french": "lunette stadimétrique",
-      "id": 60032,
-      "relevance": 14.6127767562866,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=60032"
+      "arabic_normalised": "كوكبة منظار، كوكبة مرقب",
+      "dictionary_ids": [
+        668
+      ],
+      "english_normalised": "telescopium",
+      "french_normalised": "le télescope",
+      "occurences": [
+        {
+          "arabic": "كوكبة المنظار، كوكبة المرقب",
+          "arabic_normalised": "كوكبة منظار، كوكبة مرقب",
+          "dictionary_id": 668,
+          "dictionary_name_arabic": "المعجم الموحد لمصطلحات الرياضيات والفلك (1990)",
+          "dictionary_wikidata_id": "Q114600477",
+          "english": "telescopium",
+          "french": "le télescope",
+          "id": 134458,
+          "relevance": 17.3929862976074,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=134458"
+        }
+      ],
+      "total_relevance": 17.3929862976074
     },
     {
-      "arabic": "مِنْظار",
-      "dictionary_id": 39,
-      "dictionary_name_arabic": "المعجم الموحد لمصطلحات الهندسة المدنية",
-      "dictionary_wikidata_id": "Q116255030",
-      "english": "telescope",
-      "french": "lunette",
-      "id": 60082,
-      "relevance": 14.6127767562866,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=60082"
+      "arabic_normalised": "عينية",
+      "dictionary_ids": [
+        669
+      ],
+      "english_normalised": "eyepiece",
+      "french_normalised": "oculaire (de téléscope ets..) viseur",
+      "occurences": [
+        {
+          "arabic": "عينية",
+          "arabic_normalised": "عينية",
+          "dictionary_id": 669,
+          "dictionary_name_arabic": "المعجم الموحد لمصطلحات الفيزياء العامة والنووية (1989)",
+          "dictionary_wikidata_id": "Q113987323",
+          "english": "eyepiece",
+          "french": "oculaire (de téléscope ets..) viseur",
+          "id": 136718,
+          "page": 109,
+          "relevance": 17.3929862976074,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=136718"
+        }
+      ],
+      "total_relevance": 17.3929862976074
     },
     {
-      "arabic": "كوكبة المنظار، كوكبة المرقب",
-      "dictionary_id": 668,
-      "dictionary_name_arabic": "المعجم الموحد لمصطلحات الرياضيات والفلك",
-      "dictionary_wikidata_id": "Q114600477",
-      "english": "telescopium",
-      "french": "le télescope",
-      "id": 134458,
-      "relevance": 14.6127767562866,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=134458"
+      "arabic_normalised": "مقراب راديوي",
+      "dictionary_ids": [
+        718
+      ],
+      "english_normalised": "radio-telescope",
+      "french_normalised": "radiotélescope",
+      "occurences": [
+        {
+          "arabic": "مقراب راديوي",
+          "arabic_normalised": "مقراب راديوي",
+          "description": "جهاز لاستقبال الإشعاع الراديوي الناشئ خارج الغلاف الجوي، وتضخيمه وقياس شدته، ويستخدم في علم الفلك الراديوي",
+          "dictionary_id": 718,
+          "dictionary_name_arabic": "المعجم الموحد لمصطلحات الاستشعار عن بعد (2000)",
+          "dictionary_wikidata_id": "Q116167591",
+          "english": "radio-telescope",
+          "french": "radiotélescope",
+          "id": 183617,
+          "page": 96,
+          "relevance": 17.3929862976074,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=183617"
+        }
+      ],
+      "total_relevance": 17.3929862976074
     },
     {
-      "arabic": "عينية",
-      "dictionary_id": 669,
-      "dictionary_name_arabic": "المعجم الموحد لمصطلحات الفيزياء العامة والنووية",
-      "dictionary_wikidata_id": "Q113987323",
-      "english": "eyepiece",
-      "french": "oculaire (de téléscope ets..) viseur",
-      "id": 136718,
-      "page": 109,
-      "relevance": 14.6127767562866,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=136718"
+      "arabic_normalised": "متداخل",
+      "dictionary_ids": [
+        783
+      ],
+      "english_normalised": "Telescoped",
+      "french_normalised": "Télescopé",
+      "occurences": [
+        {
+          "arabic": "متداخل",
+          "arabic_normalised": "متداخل",
+          "description": "صفة الأشكال أو الصيغ الناتجة عن جمع أو تداخل كلمتين متجاورتين في كلمة واحدة أو عن تأثير لفظ بآخر ينتمي إلى الطبقة المنسقية نفسها. وتشيع المتداخلات عند مرضى الحبسة المتعلقة بالحواس.",
+          "dictionary_id": 783,
+          "dictionary_name_arabic": "مسرد اللغة والأدب، المنظمة العربية للتربية والثقافة والعلوم (موقع ArabTerm)",
+          "english": "Telescoped",
+          "french": "Télescopé",
+          "id": 214533,
+          "relevance": 17.3929862976074,
+          "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=214533"
+        }
+      ],
+      "total_relevance": 17.3929862976074
     },
     {
-      "arabic": "مقراب \u003Cغاليلي\u003E",
-      "dictionary_id": 669,
-      "dictionary_name_arabic": "المعجم الموحد لمصطلحات الفيزياء العامة والنووية",
-      "dictionary_wikidata_id": "Q113987323",
-      "english": "Galilean telescope",
-      "french": "lunette de Galilée",
-      "id": 137052,
-      "page": 126,
-      "relevance": 14.6127767562866,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=137052"
+      "arabic_normalised": "كرسي سني ذو استطالة مضاعفة",
+      "dictionary_ids": [
+        787
+      ],
+      "english_normalised": "double telescope dental chair",
+      "french_normalised": "chaise dentaire à double téloscope",
+      "occurences": [
+        {
+          "arabic": "كُرْسِيٌّ سِنِّيٌّ ذُو اسْتِطالَةٍ مُضاعَفَةٍ",
+          "arabic_normalised": "كرسي سني ذو استطالة مضاعفة",
+          "dictionary_id": 787,
+          "dictionary_name_arabic": "المعجم الطبي الموحد (2009)",
+          "dictionary_wikidata_id": "Q113466993",
+          "english": "double telescope dental chair",
+          "french": "chaise dentaire à double téloscope",
+          "id": 273498,
+          "relevance": 17.3929862976074
+        }
+      ],
+      "total_relevance": 17.3929862976074
     },
     {
-      "arabic": "مقراب راديوي",
-      "description": "جهاز لاستقبال الإشعاع الراديوي الناشئ خارج الغلاف الجوي، وتضخيمه وقياس شدته، ويستخدم في علم الفلك الراديوي",
-      "dictionary_id": 718,
-      "dictionary_name_arabic": "المعجم الموحد لمصطلحات الاستشعار عن بعد",
-      "dictionary_wikidata_id": "Q116167591",
-      "english": "radio-telescope",
-      "french": "radiotélescope",
-      "id": 183617,
-      "page": 96,
-      "relevance": 14.6127767562866,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=183617"
-    },
-    {
-      "arabic": "متداخل",
-      "description": "صفة الأشكال أو الصيغ الناتجة عن جمع أو تداخل كلمتين متجاورتين في كلمة واحدة أو عن تأثير لفظ بآخر ينتمي إلى الطبقة المنسقية نفسها. وتشيع المتداخلات عند مرضى الحبسة المتعلقة بالحواس.",
-      "dictionary_id": 783,
-      "dictionary_name_arabic": "اللغة والأدب",
-      "english": "Telescoped",
-      "french": "Télescopé",
-      "id": 214533,
-      "relevance": 14.6127767562866,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=214533"
+      "arabic_normalised": "كرسي سني ذو استطالة واحدة",
+      "dictionary_ids": [
+        787
+      ],
+      "english_normalised": "one telescope dental chair",
+      "french_normalised": "chaise dentaire à une seule téloscope",
+      "occurences": [
+        {
+          "arabic": "كُرْسِيٌّ سِنِّيٌّ ذُو اسْتِطالَةٍ واحِدَةٍ",
+          "arabic_normalised": "كرسي سني ذو استطالة واحدة",
+          "dictionary_id": 787,
+          "dictionary_name_arabic": "المعجم الطبي الموحد (2009)",
+          "dictionary_wikidata_id": "Q113466993",
+          "english": "one telescope dental chair",
+          "french": "chaise dentaire à une seule téloscope",
+          "id": 273502,
+          "relevance": 17.3929862976074
+        }
+      ],
+      "total_relevance": 17.3929862976074
     }
-  ]
+  ],
+  "number_groups": 20,
+  "q": "telescope"
 }

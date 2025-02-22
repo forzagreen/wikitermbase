@@ -12,7 +12,10 @@
       function gtag() { dataLayer.push(arguments); }
       gtag('js', new Date());
 
-      gtag('config', 'G-26Q6KBLB8M');
+      // Configure GA4 with cookie flags for third-party contexts:
+      gtag('config', 'G-26Q6KBLB8M', {
+        'cookie_flags': 'SameSite=None; Secure'
+      });
     </script>
     <!-- End Google Analytics -->
   </head>

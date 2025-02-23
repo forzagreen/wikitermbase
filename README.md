@@ -92,8 +92,6 @@ For the initial setup of the repository in Toolforge:
   - `python3 -m venv $HOME/www/python/venv`
   - `source $HOME/www/python/venv/bin/activate`
   - `pip install -r $HOME/www/python/src/requirements.txt`
-- Download Sina Tools models:
-  - `download_files`
 - Exit out of webservice shell (Ctrl + D or `exit`)
 - `toolforge webservice --backend=kubernetes python3.11 start`
 - To test, go to: `https://wikitermbase.toolforge.org/search?q=telescope`

@@ -28,8 +28,6 @@ mw.loader.using([
   // Set up the dialog layout
   WikiTermDialog.prototype.initialize = function () {
     WikiTermDialog.super.prototype.initialize.call(this);
-
-    // Create iframe to load the external content
     this.content = $('<iframe>')
       .attr({
         src: 'https://wikitermbase.toolforge.org/',
@@ -39,8 +37,6 @@ mw.loader.using([
       .css({
         'height': $(window).height() < 600 ? '100vh' : '80vh'
       });
-
-    // Add content to dialog
     this.$body.append(this.content);
   };
 
@@ -56,17 +52,11 @@ mw.loader.using([
 
   // Initialize main functionality
   function initialize() {
-    console.log('WikiDictionary: Initializing...');
-
-    // Create window manager
     const windowManager = new OO.ui.WindowManager();
     $('body').append(windowManager.$element);
-
-    // Create dialog window
     const dialog = new WikiTermDialog();
     windowManager.addWindows([dialog]);
 
-    // Create OOUI button
     const button = new OO.ui.ButtonWidget({
       label: 'مسرد الويكي',
       icon: 'search',
@@ -74,22 +64,40 @@ mw.loader.using([
       framed: false
     });
 
-    // Different placement based on Vector skin version
-    if ($('.vector-search-box').length) {
+    // Mobile-specific styling
+    if (mw.config.get('skin') === 'minerva') {
+      console.log('WikiDictionary: Mobile skin detected');
+      button.$element.addClass('mobile-wiki-dictionary-button');
+      mw.util.addCSS(`
+        .mobile-wiki-dictionary-button {
+          margin: 0.5em auto;
+          padding: 8px;
+          display: block;
+          text-align: center;
+          background: #fff;
+          border-bottom: 1px solid #eaecf0;
+        }
+        .mobile-wiki-dictionary-button .oo-ui-buttonElement-button {
+          width: 90%;
+          max-width: 300px;
+        }
+      `);
+      $('.header-container').after(button.$element);
+    } else if ($('.vector-search-box').length) {
+      // Vector 2
       $('.vector-search-box').after(button.$element);
       console.log('WikiDictionary: Button added to Vector 2');
     } else {
+      // Vector legacy
       $('#p-search').after(button.$element);
       console.log('WikiDictionary: Button added to Vector legacy');
     }
 
-    // Add click handler to button
     button.on('click', function () {
       windowManager.openWindow(dialog);
     });
   }
 
-  // Call initialize when document is ready
   $(document).ready(function () {
     initialize();
     console.log('WikiDictionary: Initialization complete');

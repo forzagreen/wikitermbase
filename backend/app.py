@@ -3,6 +3,7 @@ import os
 import re
 from collections import Counter
 
+import sentry_sdk
 from arabterm.mariadb_models import Dictionary as MariaDBDictionary
 from arabterm.mariadb_models import Term as MariaDBTerm
 from flask import Flask, render_template, request, send_from_directory
@@ -26,6 +27,22 @@ RETRY_COUNT = 3
 DISABLE_ARABTERM_URIS = False
 # Disable descriptions in all results
 DISABLE_DESCRIPTIONS = False
+
+
+def setup_sentry():
+    """Setup Sentry (only in Toolforge)."""
+    HOME = os.environ.get("HOME")
+    if HOME == "/data/project/wikitermbase":  # Toolforge
+        sentry_sdk.init(
+            dsn="https://8b5085bb300d843114fe9414af77ed76@o91475.ingest.us.sentry.io/4508865550286848",
+            # Do not track PII (Personally Identifiable Information)
+            send_default_pii=False,
+            # Set traces_sample_rate to 1.0 to capture 100% of transactions for tracing.
+            traces_sample_rate=1.0,
+        )
+
+
+setup_sentry()
 
 app = Flask(
     __name__,

@@ -5,4 +5,5 @@ flask
 # flask-cors
 pandas
 pymysql
+sentry-sdk[flask]
 sqlalchemy

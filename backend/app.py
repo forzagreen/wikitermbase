@@ -246,7 +246,6 @@ def aggregate_terms(results: list[dict]) -> list[dict]:
 
 
 @app.route("/api/v1/search")
-@app.route("/search")
 def search():
     if "q" not in request.args:
         return {"error": "Missing 'q' parameter"}, 400
@@ -290,7 +289,7 @@ def search_aggregated():
     )
 
 
-@app.route("/dicts")
+@app.route("/api/v1/dicts")
 def list_dicts():
     result = execute_with_retry(text("SELECT * FROM dictionary"))
     dictionaries = [dict(row) for row in result.mappings().all()]
@@ -301,7 +300,7 @@ def list_dicts():
     )
 
 
-@app.route("/stats")
+@app.route("/api/v1/stats")
 def get_stats():
     terms_count = execute_with_retry(text("SELECT COUNT(*) as count FROM term"))
     dicts_count = execute_with_retry(text("SELECT COUNT(*) as count FROM dictionary"))
@@ -315,7 +314,7 @@ def get_stats():
     )
 
 
-# @app.route("/morph_analyzer")
+# @app.route("/api/v1/morph_analyzer")
 # def morph_analyzer_handler():
 #     if "q" not in request.args:
 #         return {"error": "Missing 'q' parameter"}, 400

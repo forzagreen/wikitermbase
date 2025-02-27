@@ -187,7 +187,7 @@ const DictionaryApp = () => {
     setError(null);
 
     try {
-      const response = await fetch(`/api/v1/search/aggregated?q=${encodeURIComponent(term)}`);
+      const response = await fetch(`/api/v1/search/aggregated?q="${encodeURIComponent(term)}"`);
       if (!response.ok) {
         throw new Error('حدث خطأ في البحث. الرجاء المحاولة مرة أخرى.');
       }
@@ -220,9 +220,10 @@ const DictionaryApp = () => {
       clearTimeout(searchTimeoutRef.current);
     }
 
+    // Wait 600 ms before searching
     searchTimeoutRef.current = setTimeout(() => {
       handleSearch(newTerm);
-    }, 300);
+    }, 600);
   };
 
   const themeClasses = darkMode ? 

@@ -20,7 +20,9 @@
 
 ## Overview
 
-Wiki Term Base is a tool designed to standardize terminology used on Arabic Wikipedia and accelerate vocabulary translation.
+The Wiki Term Base web application is available at [wikitermbase.toolforge.org](https://wikitermbase.toolforge.org/)
+
+Wiki Term Base is a tool designed to standardise terminology used on Arabic Wikipedia and accelerate vocabulary translation.
 
 It is hosted on [Toolforge](https://wikitech.wikimedia.org/wiki/Help:Toolforge), as a [Python web](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Web/Python) application built with the Flask framework, using a [MariaDB](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Database) relational database.
 
@@ -42,18 +44,29 @@ Deployed at:
 
 ## Local Setup
 
-Start the MariaDB database in a Docker container with the following commands:
+Please note that the database content is managed in the project [arabterm](https://github.com/forzagreen/arabterm/tree/feature/arabterm_v2), (currently still on beta at branch `feature/arabterm_v2`)
 
-```sh
-# Download dump from arabterm repository, branch arabterm_v2
-make download_dump
-make fix_dump
-```
-
-Install python dependencies:
+Clone the arabterm repository, and start the MariaDB database in a Docker container:
 
 ```sh
 make init
+make init_mariadb  # start or create container
+make delete_mariadb  # delete database if exists
+make migrate_to_mariadb  # migrate the SQLite content to MariaDB
+```
+
+Then from wikitermbase repository, install python dependencies:
+
+```sh
+make init
+```
+
+Create a file at `./var/local.cnf` with (adapt values):
+
+```ini
+[client]
+user = MyUserName
+password = MyTestPassword
 ```
 
 Start the Flask application:
@@ -141,7 +154,7 @@ For the initial setup of the repository in Toolforge:
 
 Ref: https://mariadb.com/kb/en/backup-and-restore-overview/
 
-Prerequisite: SQLite arabterm.db is up to date in arabterm repository (currently on branch arabterm_v2).
+Prerequisite: SQLite arabterm.db is up to date in arabterm repository (currently on branch feature/arabterm_v2).
 
 From [arabterm](https://github.com/forzagreen/arabterm) repository, generate MariaDB database:
 
@@ -166,7 +179,7 @@ Then, from [wikitermbase](https://github.com/forzagreen/wikitermbase) repository
 pip uninstall arabterm
 make init
 
-# Download dump from arabterm repository, branch arabterm_v2
+# Download dump from arabterm repository, branch feature/arabterm_v2
 make download_dump
 make fix_dump
 ```

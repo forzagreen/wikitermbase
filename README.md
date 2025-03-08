@@ -2,6 +2,7 @@
 
 ## Table of Contents
 
+- [Overview](#overview)
 - [Wiki Gadget](#wiki-gadget)
 - [Backend](#backend)
   - [Flask API](#flask-api)
@@ -10,20 +11,58 @@
     - [Updating the Codebase](#updating-the-codebase)
 - [Database: MariaDB](#database-mariadb)
   - [Ingesting data](#ingesting-data)
-  - [Backup the database](#backup-the-database)
+  - [Updating data](#updating-data)
   - [MariaDB on Toolforge](#mariadb-on-toolforge)
     - [Initial Setup](#initial-setup-1)
     - [Updating the Database](#updating-the-database)
     - [Troubleshooting](#troubleshooting)
 
+
+## Overview
+
+Wiki Term Base is a tool designed to standardize terminology used on Arabic Wikipedia and accelerate vocabulary translation.
+
+It is hosted on [Toolforge](https://wikitech.wikimedia.org/wiki/Help:Toolforge), as a [Python web](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Web/Python) application built with the Flask framework, using a [MariaDB](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Database) relational database.
+
+The frontend is built with [React](https://react.dev/) framework.
+The single-page application is embedded in a Wikipedia gadget via an iframe.
+
+
 ## Wiki Gadget
 
-The frontend in Wikipedia is a mediawiki gadget [SearchTerm.js](SearchTerm.js)
+🚧 _Currently it's a [user script](https://en.wikipedia.org/wiki/Wikipedia:User_scripts). Waiting for validation in [Wikipedia](https://w.wiki/DLxB) to upgrade it to a [gadget](https://en.wikipedia.org/wiki/Wikipedia:Gadget)._
+
+The script can be found at [gadget/SearchTerm.js](gadget/SearchTerm.js)
 
 Deployed at: 
 - Latest: https://ar.wikipedia.org/wiki/مستخدم:ForzaGreen/SearchTerm.js
-- version URL: https://ar.wikipedia.org/w/index.php?title=مستخدم:ForzaGreen/SearchTerm.js&oldid=67150710
+- version URL: https://ar.wikipedia.org/w/index.php?title=مستخدم:ForzaGreen/SearchTerm.js&oldid=69679290
 - Dev: https://ar.wikipedia.org/wiki/مستخدم:ForzaGreen/SearchTerm-dev.js
+
+
+## Local Setup
+
+Start the MariaDB database in a Docker container with the following commands:
+
+```sh
+# Download dump from arabterm repository, branch arabterm_v2
+make download_dump
+make fix_dump
+```
+
+Install python dependencies:
+
+```sh
+make init
+```
+
+Start the Flask application:
+
+```sh
+FLASK_APP=backend/app.py python -m flask run --port=5001
+```
+
+You can then open the web application at `http://127.0.0.1:5001/`
 
 
 ## Backend
@@ -32,42 +71,20 @@ Python version: 3.11
 
 ### Flask API
 
-Examples of queries:
+- Aggregated search (results are groupped by the arabic term):
 
 ```
-GET /search?q=حرارة
-GET /search?q=magnetoscope
+GET /api/v1/search/aggregated?q=magnetoscope
+GET /api/v1/search/aggregated?q=اشتقاق
 ```
 
-As a result, we get a JSON:
+As a result, we get a JSON. An example can found at [gadget/response.json](gadget/response.json)
 
-```json
-{
-  "number_results": 2,
-  "q": "magnetoscope",
-  "results": [
-    {
-      "arabic": "مُسجِّلة فيديو",
-      "dictionary_id": 780,
-      "dictionary_name_arabic": "الإعلام والتواصل",
-      "english": "video casette recorder (V.C.R.)",
-      "french": "enregistreur vidéocassette; magnétoscope",
-      "id": 204093,
-      "relevance": 23.4629344940186,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=204093"
-    },
-    {
-      "arabic": "مُسجِّلة فيديو",
-      "dictionary_id": 780,
-      "dictionary_name_arabic": "الإعلام والتواصل",
-      "english": "videotape recorder (V.T.R.)",
-      "french": "magnétoscope",
-      "id": 204126,
-      "relevance": 23.4629344940186,
-      "uri": "http://arabterm.org/index.php?tx_3m5techdict_pi1[id]=204126"
-    }
-  ]
-}
+- Raw search (without groupping):
+
+```
+GET /api/v1/search?q=magnetoscope
+GET /api/v1/search?q=اشتقاق
 ```
 
 
@@ -120,16 +137,11 @@ For the initial setup of the repository in Toolforge:
 
 ## Database: MariaDB
 
-### Ingesting data
-- with a script, reading from SQLite database arabterm.db from https://github.com/forzagreen/arabterm
-- adapted some types (string vs char vs text)
-
-
 ### Updating data
 
 Ref: https://mariadb.com/kb/en/backup-and-restore-overview/
 
-Prerequisite: SQLite arabterm.db is up to date in arabterm repository.
+Prerequisite: SQLite arabterm.db is up to date in arabterm repository (currently on branch arabterm_v2).
 
 From [arabterm](https://github.com/forzagreen/arabterm) repository, generate MariaDB database:
 
@@ -147,7 +159,7 @@ make dump
 
 Commit and push `arabterm.db` and `db/` to arabterm GitHub repository:
 
-Now, from [wikitermbase](https://github.com/forzagreen/wikitermbase) repository:
+Then, from [wikitermbase](https://github.com/forzagreen/wikitermbase) repository:
 
 ```sh
 # If python dependencies changed (including arabterm python package):

@@ -1,0 +1,19 @@
+/**
+ * WikiTerm Gadget - Resource Loader Configuration
+ * 
+ * Installation instructions:
+ * 
+ * 1. Create a new page on ar.wikipedia.org called "MediaWiki:Gadget-wikitermbase.js"
+ *    - Copy and paste the contents of WikiTermGadget.js into this page
+ * 
+ * 2. Create a new page called "MediaWiki:Gadgets-definition" or edit the existing one 
+ *    - Add the following line:
+ *    * wikitermbase[ResourceLoader|dependencies=mediawiki.util,oojs-ui,jquery]|wikitermbase.js
+ * 
+ * 3. Create "MediaWiki:Gadget-wikitermbase" with the following description:
+ *    - أداة مسرد الويكي للبحث عن المصطلحات العربية والإنكليزية والفرنسية
+ * 
+ * Note: You will need administrator rights to edit these MediaWiki namespace pages.
+ * Alternative approach: You can ask users to add the code to their common.js page
+ * if you don't have administrator rights.
+ */

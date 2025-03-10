@@ -14,8 +14,10 @@ mw.loader.using([
   'oojs-ui-core',
   'oojs-ui-widgets',
   'oojs-ui-windows',
+  'oojs-ui.styles.icons-content',
+  'oojs-ui.styles.icons-editing-advanced',
   'oojs-ui.styles.icons-editing-citation',
-  'oojs-ui.styles.icons-interactions'
+  'oojs-ui.styles.icons-interactions',
 ], function () {
   'use strict';
   console.log('WikiTermGadget: Script loading...');
@@ -264,7 +266,7 @@ mw.loader.using([
         ? 'معجمان' 
         : (dictCount <= 10
           ? `${dictCount} معاجم`
-          : `${dictCount} معجم`));
+          : `${dictCount} معجما`));
     
     const dictCountEl = $('<div>')
       .addClass('wikiterm-dictionary-count')
@@ -608,7 +610,7 @@ mw.loader.using([
   WikiTermDialog.prototype.applyCustomCSS = function () {
     mw.util.addCSS(`
       /* Fix dialog size and layout */
-      .oo-ui-window-frame {
+      .oo-ui-dialog-wikiTermDialog .oo-ui-window-frame {
         max-height: 80vh !important;
       }
       

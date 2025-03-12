@@ -504,40 +504,25 @@ mw.loader.using([
     // Generate citation template
     const template = createCitationTemplate(term);
 
-    // Create popup
-    const popup = $('<div>')
-      .addClass('wikiterm-citation-popup')
-      .css({
-        position: 'absolute',
-        zIndex: 1000,
-        backgroundColor: '#fff',
-        border: '1px solid #a2a9b1',
-        borderRadius: '2px',
-        padding: '8px',
-        boxShadow: '0 2px 2px 0 rgba(0,0,0,0.25)',
-        width: '300px'
-      });
+    // Create content for the popup
+    const content = new OO.ui.PanelLayout({
+      padded: true,
+      expanded: false
+    });
 
     // Title
-    popup.append(
-      $('<div>')
-        .addClass('wikiterm-citation-title')
-        .text('رمز الاستشهاد')
-    );
+    const title = new OO.ui.LabelWidget({
+      label: 'رمز الاستشهاد',
+      classes: ['wikiterm-citation-title']
+    });
 
     // Text area with citation
-    const textarea = $('<textarea>')
-      .addClass('wikiterm-citation-text')
-      .val(template)
-      .attr('readonly', 'readonly')
-      .css({
-        width: '100%',
-        height: '50px',
-        margin: '8px 0',
-        padding: '4px',
-        resize: 'none',
-        fontFamily: 'monospace'
-      });
+    const textarea = new OO.ui.MultilineTextInputWidget({
+      value: template,
+      readOnly: true,
+      rows: 3,
+      classes: ['wikiterm-citation-text']
+    });
 
     // Copy button
     const copyBtn = new OO.ui.ButtonWidget({
@@ -557,50 +542,30 @@ mw.loader.using([
       }, 2000);
     });
 
-    popup.append(textarea, copyBtn.$element);
+    // Add elements to the panel
+    content.$element.append(
+      title.$element,
+      textarea.$element,
+      $('<div>').css('margin-top', '8px').append(copyBtn.$element)
+    );
 
-    // Add to DOM first so we can calculate its dimensions
-    this.$element.append(popup);
-    this.activePopup = popup;
-
-    // Get dimensions and positions
-    const targetOffset = $target.offset();
-    const dialogOffset = this.$element.offset();
-    const dialogWidth = this.$element.width();
-    const dialogHeight = this.$element.height();
-    const popupWidth = popup.outerWidth();
-    const popupHeight = popup.outerHeight();
-
-    // Default position calculation
-    let top = targetOffset.top - dialogOffset.top + $target.outerHeight() + 5;
-    let left = targetOffset.left - dialogOffset.left;
-
-    // Check right boundary - ensure popup doesn't go beyond right edge
-    if (left + popupWidth > dialogWidth - 20) {
-      left = Math.max(10, dialogWidth - popupWidth - 20);
-    }
-
-    // Check bottom boundary - if popup would go below viewport, show it above the button instead
-    if (top + popupHeight > dialogHeight - 60) {
-      top = targetOffset.top - dialogOffset.top - popupHeight - 5;
-
-      // If that would put it above the top of the dialog, prioritize showing it below
-      // and let it scroll if needed
-      if (top < 10) {
-        top = Math.min(targetOffset.top - dialogOffset.top + $target.outerHeight() + 5, dialogHeight - popupHeight - 10);
-
-        // If we're on a small screen device, center it
-        if (window.innerWidth < 500) {
-          left = (dialogWidth - popupWidth) / 2;
-        }
-      }
-    }
-
-    // Apply final position
-    popup.css({
-      top: top + 'px',
-      left: left + 'px'
+    // Create the popup
+    const popup = new OO.ui.PopupWidget({
+      $content: content.$element,
+      $floatableContainer: $target,
+      padded: true,
+      width: 300,
+      align: 'forwards',
+      position: 'below',
+      autoClose: true,
+      head: false
     });
+
+    // Add popup to the DOM and show it
+    this.$element.append(popup.$element);
+    popup.toggle(true);
+
+    this.activePopup = popup;
 
     // Focus and select text
     setTimeout(() => {
@@ -610,18 +575,10 @@ mw.loader.using([
 
   WikiTermDialog.prototype.closeActivePopup = function () {
     if (this.activePopup) {
-      this.activePopup.remove();
+      this.activePopup.toggle(false);
+      this.activePopup.$element.remove();
       this.activePopup = null;
     }
-  };
-
-  WikiTermDialog.prototype.getActionProcess = function (action) {
-    if (action === 'close') {
-      return new OO.ui.Process(() => {
-        this.close();
-      });
-    }
-    return WikiTermDialog.super.prototype.getActionProcess.call(this, action);
   };
 
   // When the dialog is ready, focus on the search input
@@ -635,7 +592,6 @@ mw.loader.using([
       });
   };
 
-  // Apply custom CSS for the gadget
   WikiTermDialog.prototype.applyCustomCSS = function () {
     mw.util.addCSS(`
       /* Fix dialog size and layout */
@@ -791,7 +747,40 @@ mw.loader.using([
       .wikiterm-description-toggle:hover {
         text-decoration: underline;
       }
+      
+      /* Citation Popup Styles */
+      .wikiterm-citation-title {
+        font-weight: bold;
+        margin-bottom: 8px;
+      }
+      
+      .wikiterm-citation-text {
+        width: 100%;
+        margin: 8px 0;
+      }
+      
+      .wikiterm-citation-text textarea,
+      .oo-ui-textInputWidget.wikiterm-citation-text textarea.oo-ui-inputWidget-input {
+        font-family: 'Courier New', Courier, monospace !important; /* Using !important to override OOUI styles */
+        direction: rtl;
+        background-color: #f8f9fa;
+        color: #000;
+        padding: 8px;
+        border: 1px solid #a2a9b1;
+        border-radius: 2px;
+        font-size: 13px;
+        line-height: 1.4;
+      }
     `);
+  };
+
+  WikiTermDialog.prototype.getActionProcess = function (action) {
+    if (action === 'close') {
+      return new OO.ui.Process(() => {
+        this.close();
+      });
+    }
+    return WikiTermDialog.super.prototype.getActionProcess.call(this, action);
   };
 
   // Initialize main functionality

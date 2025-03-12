@@ -500,10 +500,10 @@ mw.loader.using([
   WikiTermDialog.prototype.showCitationPopup = function ($target, term) {
     // Close any open popup
     this.closeActivePopup();
-    
+
     // Generate citation template
     const template = createCitationTemplate(term);
-    
+
     // Create popup
     const popup = $('<div>')
       .addClass('wikiterm-citation-popup')
@@ -517,14 +517,14 @@ mw.loader.using([
         boxShadow: '0 2px 2px 0 rgba(0,0,0,0.25)',
         width: '300px'
       });
-    
+
     // Title
     popup.append(
       $('<div>')
         .addClass('wikiterm-citation-title')
         .text('رمز الاستشهاد')
     );
-    
+
     // Text area with citation
     const textarea = $('<textarea>')
       .addClass('wikiterm-citation-text')
@@ -538,41 +538,70 @@ mw.loader.using([
         resize: 'none',
         fontFamily: 'monospace'
       });
-    
+
     // Copy button
     const copyBtn = new OO.ui.ButtonWidget({
       label: 'نسخ',
       icon: 'copy',
       flags: ['progressive']
     });
-    
+
     copyBtn.on('click', () => {
       textarea.select();
       document.execCommand('copy');
-      
+
       // Show copied message
       copyBtn.setLabel('تم النسخ!');
       setTimeout(() => {
         copyBtn.setLabel('نسخ');
       }, 2000);
     });
-    
+
     popup.append(textarea, copyBtn.$element);
-    
-    // Position the popup
-    const targetOffset = $target.offset();
-    const dialogOffset = this.$element.offset();
-    
-    // Adjust position relative to dialog
-    popup.css({
-      top: (targetOffset.top - dialogOffset.top + $target.outerHeight() + 5) + 'px',
-      left: (targetOffset.left - dialogOffset.left) + 'px'
-    });
-    
-    // Add to DOM
+
+    // Add to DOM first so we can calculate its dimensions
     this.$element.append(popup);
     this.activePopup = popup;
-    
+
+    // Get dimensions and positions
+    const targetOffset = $target.offset();
+    const dialogOffset = this.$element.offset();
+    const dialogWidth = this.$element.width();
+    const dialogHeight = this.$element.height();
+    const popupWidth = popup.outerWidth();
+    const popupHeight = popup.outerHeight();
+
+    // Default position calculation
+    let top = targetOffset.top - dialogOffset.top + $target.outerHeight() + 5;
+    let left = targetOffset.left - dialogOffset.left;
+
+    // Check right boundary - ensure popup doesn't go beyond right edge
+    if (left + popupWidth > dialogWidth - 20) {
+      left = Math.max(10, dialogWidth - popupWidth - 20);
+    }
+
+    // Check bottom boundary - if popup would go below viewport, show it above the button instead
+    if (top + popupHeight > dialogHeight - 60) {
+      top = targetOffset.top - dialogOffset.top - popupHeight - 5;
+
+      // If that would put it above the top of the dialog, prioritize showing it below
+      // and let it scroll if needed
+      if (top < 10) {
+        top = Math.min(targetOffset.top - dialogOffset.top + $target.outerHeight() + 5, dialogHeight - popupHeight - 10);
+
+        // If we're on a small screen device, center it
+        if (window.innerWidth < 500) {
+          left = (dialogWidth - popupWidth) / 2;
+        }
+      }
+    }
+
+    // Apply final position
+    popup.css({
+      top: top + 'px',
+      left: left + 'px'
+    });
+
     // Focus and select text
     setTimeout(() => {
       textarea.focus().select();

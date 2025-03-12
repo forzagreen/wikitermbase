@@ -532,7 +532,7 @@ mw.loader.using([
       .attr('readonly', 'readonly')
       .css({
         width: '100%',
-        height: '80px',
+        height: '50px',
         margin: '8px 0',
         padding: '4px',
         resize: 'none',

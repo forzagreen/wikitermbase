@@ -747,18 +747,18 @@ mw.loader.using([
       .wikiterm-description-toggle:hover {
         text-decoration: underline;
       }
-      
+
       /* Citation Popup Styles */
       .wikiterm-citation-title {
         font-weight: bold;
         margin-bottom: 8px;
       }
-      
+
       .wikiterm-citation-text {
         width: 100%;
         margin: 8px 0;
       }
-      
+
       .wikiterm-citation-text textarea,
       .oo-ui-textInputWidget.wikiterm-citation-text textarea.oo-ui-inputWidget-input {
         font-family: 'Courier New', Courier, monospace !important; /* Using !important to override OOUI styles */

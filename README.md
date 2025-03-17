@@ -20,26 +20,31 @@
 
 ## Overview
 
-The Wiki Term Base web application is available at [wikitermbase.toolforge.org](https://wikitermbase.toolforge.org/)
-
 Wiki Term Base is a tool designed to standardise terminology used on Arabic Wikipedia and accelerate vocabulary translation.
+
+ℹ For functional documentation, please check the dedicated Wikipedia page [مسرد الويكي](https://ar.wikipedia.org/wiki/ويكيبيديا:مسرد_الويكي) (in Arabic).
+
+🌐 The website is available at: [https://wikitermbase.toolforge.org](https://wikitermbase.toolforge.org/)
 
 It is hosted on [Toolforge](https://wikitech.wikimedia.org/wiki/Help:Toolforge), as a [Python web](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Web/Python) application built with the Flask framework, using a [MariaDB](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Database) relational database.
 
-The frontend is built with [React](https://react.dev/) framework.
-The single-page application is embedded in a Wikipedia gadget via an iframe.
+The website's frontend is built with [React](https://react.dev/) framework.
+
+The Wikipedia gadget frontend is built with [OOUI](https://www.mediawiki.org/wiki/OOUI) and can be enabled in Arabic Wikipedia's user preferences.
 
 
 ## Wiki Gadget
 
-🚧 _Currently it's a [user script](https://en.wikipedia.org/wiki/Wikipedia:User_scripts). Waiting for validation in [Wikipedia](https://w.wiki/DLxB) to upgrade it to a [gadget](https://en.wikipedia.org/wiki/Wikipedia:Gadget)._
+The Wikipedia [gadget](https://en.wikipedia.org/wiki/Wikipedia:Gadget) can be activated in [user preferences](https://ar.wikipedia.org/wiki/خاص:تفضيلات#mw-prefsection-gadgets) -> "مسرد الويكي".
 
-The script can be found at [gadget/SearchTerm.js](gadget/SearchTerm.js)
+The deployed version in Arabic Wikipedia:
+- Gadget definition: [gadget-WikiTerm](https://ar.wikipedia.org/wiki/خاص:إضافات#gadget-WikiTerm)
+- Gadget Javascript code: [Gadget-WikiTerm.js](https://ar.wikipedia.org/wiki/ميدياويكي:Gadget-WikiTerm.js)
+- Gadget CSS code: [Gadget-WikiTerm.css](https://ar.wikipedia.org/wiki/ميدياويكي:Gadget-WikiTerm.css)
 
-Deployed at: 
-- Latest: https://ar.wikipedia.org/wiki/مستخدم:ForzaGreen/SearchTerm.js
-- version URL: https://ar.wikipedia.org/w/index.php?title=مستخدم:ForzaGreen/SearchTerm.js&oldid=69679290
-- Dev: https://ar.wikipedia.org/wiki/مستخدم:ForzaGreen/SearchTerm-dev.js
+On Wikipedia, gadgets are production-ready features, while user scripts serve as a flexible environment for development and experimentation.
+
+The [user script](https://en.wikipedia.org/wiki/Wikipedia:User_scripts), available at [gadget/SearchTerm.js](gadget/SearchTerm.js), differs from gadget code in that it consolidates all imports, JavaScript code, and CSS styles into a single file.
 
 
 ## Local Setup

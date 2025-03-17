@@ -594,29 +594,25 @@ mw.loader.using([
 
   WikiTermDialog.prototype.applyCustomCSS = function () {
     mw.util.addCSS(`
-      /* Fix dialog size and layout */
-      .oo-ui-dialog-wikiTermDialog .oo-ui-window-frame {
-        max-height: 80vh !important;
-      }
-      
       /* Make sure top controls stay in place */
       .wikiterm-search-form {
-        margin: 12px 12px 12px 12px; /* top right bottom left */
-        background: #fff;
+        margin: 12px 12px 12px 12px;
+        /* top right bottom left */
+        background-color: var(--background-color-base, #fff);
         z-index: 2;
       }
-      
+
       .wikiterm-search-input {
         width: 100%;
       }
-      
+
       /* Content area styling */
       .wikiterm-content-area {
         width: 100%;
-        border-top: 1px solid #eaecf0;
+        border-top: 1px solid var(--border-color-muted, #dadde3);
         padding-top: 10px;
       }
-      
+
       /* Results scrollable container */
       .wikiterm-results-container {
         max-height: 60vh;
@@ -624,69 +620,83 @@ mw.loader.using([
         padding-right: 10px;
         margin-bottom: 20px;
       }
+
       .wikiterm-no-results {
         padding: 16px;
         text-align: center;
-        color: #72777d;
+        color: var(--color-placeholder, #72777d);
       }
+
       .wikiterm-results-list {
         display: flex;
         flex-direction: column;
         gap: 12px;
       }
+
       .wikiterm-result-card {
-        border: 1px solid #eaecf0;
+        border: 1px solid var(--border-color-muted, #dadde3);
         border-radius: 4px;
         overflow: hidden;
       }
+
       .wikiterm-result-highlighted {
-        border-color: #36c;
-        box-shadow: 0 0 0 1px #36c;
+        border-color: var(--border-color-progressive--focus, #36c);
+        box-shadow: 0 0 0 1px var(--border-color-progressive--focus, #36c);
       }
+
       .wikiterm-result-header {
         padding: 12px;
-        background-color: #f8f9fa;
+        background-color: var(--background-color-neutral-subtle, #f8f9fa);
         cursor: pointer;
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         gap: 8px;
       }
+
       .wikiterm-result-highlighted .wikiterm-result-header {
-        background-color: #eaf3ff;
+        background-color: var(--background-color-progressive-subtle, #f1f4fd);
       }
+
       .wikiterm-arabic-term {
         font-size: 16px;
         font-weight: bold;
         margin-right: 12px;
       }
+
       .wikiterm-translations {
         flex-grow: 1;
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
       }
+
       .wikiterm-translation {
         font-size: 14px;
       }
+
       .wikiterm-lang-tag {
-        color: #72777d;
+        color: var(--color-placeholder, #72777d);
         font-size: 12px;
         font-weight: bold;
       }
+
       .wikiterm-dictionary-count {
-        color: #72777d;
+        color: var(--color-placeholder, #72777d);
         font-size: 12px;
         margin-left: auto;
       }
+
       .wikiterm-result-details {
         padding: 16px;
-        border-top: 1px solid #eaecf0;
-        background-color: #fff;
+        border-top: 1px solid var(--border-color-muted, #dadde3);
+        background-color: var(--background-color-base, #fff);
       }
+
       .wikiterm-hidden {
         display: none;
       }
+
       .wikiterm-variants-list {
         list-style: none;
         margin: 0;
@@ -695,48 +705,58 @@ mw.loader.using([
         flex-direction: column;
         gap: 16px;
       }
+
       .wikiterm-variant-item {
         padding: 8px;
-        border-bottom: 1px solid #eaecf0;
+        border-bottom: 1px solid var(--border-color-muted, #dadde3);
       }
+
       .wikiterm-variant-item:last-child {
         border-bottom: none;
       }
+
       .wikiterm-term-info {
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
         margin-bottom: 8px;
       }
+
       .wikiterm-term-arabic {
         font-weight: bold;
         margin-right: 8px;
       }
+
       .wikiterm-term-translation {
-        color: #222;
+        color: var(--color-base, #202122);
       }
+
       .wikiterm-dictionary-info {
         display: flex;
         align-items: center;
         gap: 8px;
         margin-bottom: 8px;
       }
+
       .wikiterm-dictionary-name {
-        color: #36c;
+        color: var(--color-progressive--focus, #36c);
         font-size: 13px;
       }
+
       .wikiterm-description {
         margin-top: 8px;
         font-size: 13px;
-        color: #54595d;
+        color: var(--color-subtle, #54595d);
       }
+
       .wikiterm-description h5 {
         margin: 0 0 4px 0;
         font-size: 13px;
-        color: #222;
+        color: var(--color-base, #202122);
       }
+
       .wikiterm-description-toggle {
-        color: #36c;
+        color: var(--color-progressive--focus, #36c);
         background: none;
         border: none;
         padding: 0;
@@ -744,6 +764,7 @@ mw.loader.using([
         cursor: pointer;
         margin-top: 4px;
       }
+
       .wikiterm-description-toggle:hover {
         text-decoration: underline;
       }
@@ -761,15 +782,30 @@ mw.loader.using([
 
       .wikiterm-citation-text textarea,
       .oo-ui-textInputWidget.wikiterm-citation-text textarea.oo-ui-inputWidget-input {
-        font-family: 'Courier New', Courier, monospace !important; /* Using !important to override OOUI styles */
+        font-family: 'Courier New', Courier, monospace !important;
+        /* Using !important to override OOUI styles */
         direction: rtl;
-        background-color: #f8f9fa;
-        color: #000;
+        background-color: var(--background-color-neutral-subtle, #f8f9fa);
+        color: var(--color-base, #202122);
         padding: 8px;
-        border: 1px solid #a2a9b1;
+        border: 1px solid var(--border-color-base, #a2a9b1);
         border-radius: 2px;
         font-size: 13px;
         line-height: 1.4;
+      }
+
+      .mobile-wiki-dictionary-button {
+        margin: 0.5em auto;
+        padding: 8px;
+        display: block;
+        text-align: center;
+        background-color: var(--background-color-base, #fff);
+        border-bottom: 1px solid var(--border-color-muted, #dadde3);
+      }
+
+      .mobile-wiki-dictionary-button .oo-ui-buttonElement-button {
+        width: 90%;
+        max-width: 300px;
       }
     `);
   };

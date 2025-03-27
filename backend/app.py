@@ -7,8 +7,6 @@ import sentry_sdk
 from arabterm.mariadb_models import Dictionary as MariaDBDictionary
 from arabterm.mariadb_models import Term as MariaDBTerm
 from flask import Flask, render_template, request, send_from_directory
-
-# from sinatools.morphology import morph_analyzer
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -193,11 +191,14 @@ def normalise_french(text: str) -> str:
 
 def aggregate_terms(results: list[dict]) -> list[dict]:
     """Aggregate terms by arabic term (after cleaning it)."""
-    for term in results:
+    # Normalise arabic terms
+    results_with_arabic = [term for term in results if "arabic" in term]
+
+    for term in results_with_arabic:
         term["arabic_normalised"] = normalise_arabic(term["arabic"])
 
     groups_dict = dict()
-    for term in results:
+    for term in results_with_arabic:
         arabic_normalised = term["arabic_normalised"]
         if arabic_normalised not in groups_dict:
             groups_dict[arabic_normalised] = []
@@ -207,6 +208,10 @@ def aggregate_terms(results: list[dict]) -> list[dict]:
         {"arabic_normalised": key, "occurences": value}
         for key, value in groups_dict.items()
     ]
+
+    # Add terms without arabic as separate groups with one occurence
+    results_without_arabic = [term for term in results if "arabic" not in term]
+    groups.extend([{"occurences": [term]} for term in results_without_arabic])
 
     for group in groups:
         # Add unique dictionaries ids
@@ -312,16 +317,3 @@ def get_stats():
         200,
         RESPONSE_HEADERS,
     )
-
-
-# @app.route("/api/v1/morph_analyzer")
-# def morph_analyzer_handler():
-#     if "q" not in request.args:
-#         return {"error": "Missing 'q' parameter"}, 400
-#     q = request.args["q"]
-#     results = morph_analyzer.analyze(q)
-#     return (
-#         {"q": q, "number_results": len(results), "results": results},
-#         200,
-#         RESPONSE_HEADERS,
-#     )

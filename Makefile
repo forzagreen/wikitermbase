@@ -10,13 +10,15 @@ build_frontend:
 	cd backend/frontend && npm install && npm run build
 
 download_dump:
-	@echo "Downloading arabterm.sql..."
+	@echo "Downloading arabterm.sql.gz ..."
 	@if command -v wget > /dev/null; then \
-		wget -q https://github.com/forzagreen/arabterm/raw/refs/heads/feature/arabterm_v2/db/mariadb/arabterm.sql -O db/arabterm.sql; \
+		wget -q https://github.com/forzagreen/arabterm/raw/refs/heads/feature/arabterm_v2/db/mariadb/arabterm.sql.gz -O db/arabterm.sql.gz; \
 	else \
-		curl -s https://github.com/forzagreen/arabterm/raw/refs/heads/feature/arabterm_v2/db/mariadb/arabterm.sql -o db/arabterm.sql; \
+		curl -s https://github.com/forzagreen/arabterm/raw/refs/heads/feature/arabterm_v2/db/mariadb/arabterm.sql.gz -o db/arabterm.sql.gz; \
 	fi
-	@echo "Download complete: db/arabterm.sql"
+	@echo "Download complete: db/arabterm.sql.gz"
+	gunzip --force db/arabterm.sql.gz
+	@echo "Unzipping complete: db/arabterm.sql"
 
 # Detect OS for sed compatibility
 UNAME := $(shell uname)

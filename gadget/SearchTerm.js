@@ -536,7 +536,7 @@ mw.loader.using([
       document.execCommand('copy');
 
       // Show copied message
-      copyBtn.setLabel('تم النسخ!');
+      copyBtn.setLabel('نُسِخت!');
       setTimeout(() => {
         copyBtn.setLabel('نسخ');
       }, 2000);
@@ -828,37 +828,80 @@ mw.loader.using([
 
     const button = new OO.ui.ButtonWidget({
       label: 'مسرد الويكي',
+      invisibleLabel: true,
       icon: 'articlesSearch',
-      flags: ['progressive'],
-      framed: true
+      framed: false
     });
 
     // Different integration points based on skin
     if (mw.config.get('skin') === 'minerva') {
       console.log('WikiTermGadget: Mobile skin detected');
-      button.$element.addClass('mobile-wiki-dictionary-button');
+
+      button.$element.addClass(
+        'cdx-button cdx-button--size-large cdx-button--fake-button--enabled ' + 
+        'cdx-button--icon-only cdx-button--weight-quiet'
+      );
+
+      // Create a wrapper similar to the notifications element
+      const $navButtonWrapper = $('<div class="minerva-dictionary">').append(
+        $('<ul>').append($('<li>').append(button.$element))
+      );
+
+      // Add to navigation next to notifications
+      $('.minerva-user-navigation .minerva-notifications').before($navButtonWrapper);
+
+      // Add custom styles
       mw.util.addCSS(`
-        .mobile-wiki-dictionary-button {
-          margin: 0.5em auto;
-          padding: 8px;
-          display: block;
-          text-align: center;
-          background: #fff;
-          border-bottom: 1px solid #eaecf0;
+        .minerva-dictionary {
+          display: inline-block;
         }
-        .mobile-wiki-dictionary-button .oo-ui-buttonElement-button {
-          width: 90%;
-          max-width: 300px;
+        .minerva-dictionary ul {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+        }
+        .minerva-dictionary li {
+          display: inline-block;
+        }
+        .minerva-dictionary .oo-ui-buttonElement-button {
+          min-height: 44px;
+          min-width: 44px;
         }
       `);
-      $('.header-container').after(button.$element);
     } else if ($('.vector-search-box').length) {
       // Vector 2
-      $('.vector-search-box').after(button.$element);
+      $('#p-vector-user-menu-userpage').after(button.$element);
+
+      // Create a second identical button for the sticky header
+      const stickyButton = new OO.ui.ButtonWidget({
+        label: 'مسرد الويكي',
+        invisibleLabel: true,
+        icon: 'articlesSearch',
+        framed: false
+      });
+
+      // Add the same click handler
+      stickyButton.on('click', function () {
+        windowManager.openWindow(dialog);
+      });
+
+      // Add button to sticky header when page is scrolled
+      $(window).on('scroll', function () {
+        if ($('.vector-sticky-header-icons').length &&
+          !$('.vector-sticky-header-icons .wiki-term-sticky-button').length) {
+          stickyButton.$element.addClass('wiki-term-sticky-button');
+          $('.vector-sticky-header-icons').prepend(stickyButton.$element);
+          console.log('WikiTermGadget: Button added to sticky header');
+
+          // Remove this scroll handler once we've added the button
+          $(window).off('scroll');
+        }
+      });
+
       console.log('WikiTermGadget: Button added to Vector 2');
     } else {
       // Vector legacy
-      $('#p-search').after(button.$element);
+      $('#p-personal').after(button.$element);
       console.log('WikiTermGadget: Button added to Vector legacy');
     }
 

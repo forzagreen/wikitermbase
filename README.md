@@ -175,7 +175,7 @@ make search term="telescope"
 make dump
 ```
 
-Commit and push `arabterm.db` and `db/` to arabterm GitHub repository:
+Commit and push `arabterm.db.gz` and `db/` to arabterm GitHub repository:
 
 Then, from [wikitermbase](https://github.com/forzagreen/wikitermbase) repository:
 
@@ -220,3 +220,10 @@ All these issues are fixed by running `make fix_dump`
   - https://jira.mariadb.org/browse/MDEV-34183 drop the line `/*!999999\- enable the sandbox mode */` or `/*M!999999\- enable the sandbox mode */`
   - `ERROR 1273 (HY000) at line 25: Unknown collation: 'utf8mb4_uca1400_ai_ci'`, replace it with `utf8mb4_unicode_520_ci`
 
+## References
+
+- Project description at Wikipedia: [مسرد الويكي](https://ar.wikipedia.org/wiki/ويكيبيديا:مسرد_الويكي)
+- Database from [forzagreen/arabterm](https://github.com/forzagreen/arabterm/tree/feature/arabterm_v2)
+- [ويكيبيديا:مصادر موثوقة/معاجم وقواميس وأطالس](https://ar.wikipedia.org/wiki/%D9%88%D9%8A%D9%83%D9%8A%D8%A8%D9%8A%D8%AF%D9%8A%D8%A7:%D9%85%D8%B5%D8%A7%D8%AF%D8%B1_%D9%85%D9%88%D8%AB%D9%88%D9%82%D8%A9/%D9%85%D8%B9%D8%A7%D8%AC%D9%85_%D9%88%D9%82%D9%88%D8%A7%D9%85%D9%8A%D8%B3_%D9%88%D8%A3%D8%B7%D8%A7%D9%84%D8%B3)
+- Java client for the API: [wiki-connect/WikiTermBaseAPI](https://github.com/wiki-connect/WikiTermBaseAPI)
+ 

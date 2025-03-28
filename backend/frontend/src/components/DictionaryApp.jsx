@@ -1,6 +1,6 @@
 // src/components/DictionaryApp.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, ExternalLink, ChevronDown, ChevronUp, Moon, Sun, Quote, Copy, Check } from 'lucide-react';
+import { Search, ExternalLink, ChevronDown, ChevronUp, Moon, Sun, Quote, Copy, Check, HelpCircle } from 'lucide-react';
 
 const ExpandableText = ({ text, charLimit = 200 }) => {
   const [expanded, setExpanded] = useState(false);
@@ -261,12 +261,22 @@ const DictionaryApp = () => {
             <h1 className="text-3xl font-bold text-center flex-1">
               مسرد الويكي
             </h1>
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-            >
-              {darkMode ? <Sun size={24} /> : <Moon size={24} />}
-            </button>
+            <div className="flex items-center">
+              <a href="https://ar.wikipedia.org/wiki/ويكيبيديا:مسرد_الويكي"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 mr-2 flex items-center"
+                title="للمزيد، ندعوك للاطلاع على صفحة الأداة"
+              >
+                <HelpCircle size={24} />
+              </a>
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+              >
+                {darkMode ? <Sun size={24} /> : <Moon size={24} />}
+              </button>
+            </div>
           </div>
         </div>
       </header>

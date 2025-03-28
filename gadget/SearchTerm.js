@@ -95,19 +95,31 @@ mw.loader.using([
     });
     this.errorMessage.$element.hide();
 
+    this.toolPageLink = new OO.ui.HtmlSnippet(
+      'للمزيد، ندعوك للاطلاع على ' +
+      '<a href="https://ar.wikipedia.org/wiki/ويكيبيديا:مسرد_الويكي" target="_blank">صفحة الأداة</a>'
+    );
+
+    this.toolPageMessage = new OO.ui.MessageWidget({
+      type: 'notice',
+      inline: true,
+      label: this.toolPageLink,
+      classes: ['wikiterm-tool-page-message']
+    });
+
     // Create search form
     const searchForm = new OO.ui.ActionFieldLayout(
       this.searchInput,
       this.searchButton,
       {
         align: 'top',
-        label: 'ابحث عن مصطلح عربي أو إنكليزي أو فرنسي',
         classes: ['wikiterm-search-form']
       }
     );
 
     // Append search form to top section
     this.$body.append(
+      this.toolPageMessage.$element,
       searchForm.$element,
       this.loadingIndicator.$element,
       this.errorMessage.$element
@@ -604,6 +616,23 @@ mw.loader.using([
 
       .wikiterm-search-input {
         width: 100%;
+      }
+
+      .wikiterm-tool-page-message {
+        margin: 12px 12px 0 12px;
+      }
+
+      .wikiterm-tool-page-message .oo-ui-inline-notice {
+        justify-content: center;
+      }
+
+      .wikiterm-tool-page-message a {
+        color: var(--color-progressive--focus, #36c);
+        text-decoration: none;
+      }
+
+      .wikiterm-tool-page-message a:hover {
+        text-decoration: underline;
       }
 
       /* Content area styling */

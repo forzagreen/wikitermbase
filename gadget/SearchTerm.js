@@ -863,7 +863,8 @@ mw.loader.using([
     });
 
     // Different integration points based on skin
-    if (mw.config.get('skin') === 'minerva') {
+    const skinName = mw.config.get('skin');
+    if (skinName === 'minerva') {
       console.log('WikiTermGadget: Mobile skin detected');
 
       button.$element.addClass(
@@ -897,7 +898,7 @@ mw.loader.using([
           min-width: 44px;
         }
       `);
-    } else if ($('.vector-search-box').length) {
+    } else if (skinName === 'vector-2022') {
       // Vector 2
       $('#p-vector-user-menu-userpage').after(button.$element);
 
@@ -928,10 +929,12 @@ mw.loader.using([
       });
 
       console.log('WikiTermGadget: Button added to Vector 2');
-    } else {
+    } else if (skinName === 'vector') {
       // Vector legacy
       $('#p-personal').after(button.$element);
       console.log('WikiTermGadget: Button added to Vector legacy');
+    } else {
+      console.warn('WikiTermGadget: unsupported skin: ' + skinName);
     }
 
     button.on('click', function () {

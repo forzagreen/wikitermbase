@@ -330,25 +330,25 @@ const DictionaryApp = () => {
             {/* Card Header */}
             <div className="flex items-center mb-4">
               <span className="text-lg font-semibold text-blue-600 ml-4">{index + 1}</span>
-              <div className="flex-1 flex items-start gap-8">
-                <div className="text-right flex-shrink-0">
+              <div className="flex-1 flex flex-col sm:flex-row sm:items-start gap-4">
+                <div className="text-right">
                   <span className="text-xl font-bold">{group.arabic_normalised}</span>
                 </div>
                 {isTopResult && (
-                  <span className="bg-blue-100 text-blue-800 text-xs font-semibold mr-2 px-2.5 py-0.5 rounded dark:bg-blue-200 dark:text-blue-800">
+                  <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded dark:bg-blue-200 dark:text-blue-800 mb-2 sm:mb-0 self-center sm:self-auto">
                     الترجمة المقترحة
                   </span>
                 )}
-                <div dir="ltr" className="flex-1 text-left">
-                  <div className="flex-1 flex flex-col gap-2">
+                <div dir="ltr" className="text-left overflow-hidden">
+                  <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2">
                       <LanguageLabel lang="en" />
-                      <span className="text-xl font-bold">{group.english_normalised}</span>
+                      <span className="text-xl font-bold break-words">{group.english_normalised}</span>
                     </div>
                     {group.french_normalised && (
                       <div className="flex items-center gap-2">
                         <LanguageLabel lang="fr" />
-                        <span className="text-lg text-gray-600 dark:text-gray-300 italic">
+                        <span className="text-lg text-gray-600 dark:text-gray-300 italic break-words">
                           {group.french_normalised}
                         </span>
                       </div>
@@ -379,28 +379,25 @@ const DictionaryApp = () => {
                       <p className="text-sm text-gray-500 mb-1">
                         {formatDictionaryInfo(occurrence)}
                       </p>
-                      <div className="mt-2 flex items-start gap-8">
-                        <div className="text-right flex-shrink-0">
+                      <div className="mt-2 flex flex-col sm:flex-row sm:items-start gap-4">
+                        <div className="text-right">
                           <span>{occurrence.arabic}</span>
                         </div>
-                        <div dir="ltr" className="flex-1 text-left">
-                          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-                            <div className="inline-flex items-center gap-2">
+                        <div dir="ltr" className="text-left overflow-hidden">
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-2">
                               <LanguageLabel lang="en" />
-                              <span className="text-gray-700 dark:text-gray-300">
+                              <span className="text-gray-700 dark:text-gray-300 break-words">
                                 {occurrence.english}
                               </span>
                             </div>
                             {occurrence.french && (
-                              <>
-                                <span className="hidden sm:inline text-gray-400">•</span>
-                                <div className="inline-flex items-center gap-2">
-                                  <LanguageLabel lang="fr" />
-                                  <span className="text-gray-600 dark:text-gray-400 italic">
-                                    {occurrence.french}
-                                  </span>
-                                </div>
-                              </>
+                              <div className="flex items-center gap-2">
+                                <LanguageLabel lang="fr" />
+                                <span className="text-gray-600 dark:text-gray-400 italic break-words">
+                                  {occurrence.french}
+                                </span>
+                              </div>
                             )}
                           </div>
                         </div>

@@ -10,6 +10,23 @@
   width: 100%;
 }
 
+.wikiterm-tool-page-message {
+  margin: 12px 12px 0 12px;
+}
+
+.wikiterm-tool-page-message .oo-ui-inline-notice {
+  justify-content: center;
+}
+
+.wikiterm-tool-page-message a {
+  color: var(--color-progressive--focus, #36c);
+  text-decoration: none;
+}
+
+.wikiterm-tool-page-message a:hover {
+  text-decoration: underline;
+}
+
 /* Content area styling */
 .wikiterm-content-area {
   width: 100%;
@@ -198,16 +215,21 @@
   line-height: 1.4;
 }
 
-.mobile-wiki-dictionary-button {
-  margin: 0.5em auto;
-  padding: 8px;
-  display: block;
-  text-align: center;
-  background-color: var(--background-color-base, #fff);
-  border-bottom: 1px solid var(--border-color-muted, #dadde3);
+.minerva-dictionary {
+  display: inline-block;
 }
 
-.mobile-wiki-dictionary-button .oo-ui-buttonElement-button {
-  width: 90%;
-  max-width: 300px;
+.minerva-dictionary ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.minerva-dictionary li {
+  display: inline-block;
+}
+
+.minerva-dictionary .oo-ui-buttonElement-button {
+  min-height: 44px;
+  min-width: 44px;
 }

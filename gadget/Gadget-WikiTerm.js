@@ -1,6 +1,6 @@
 // <nowiki>
 /**
- * SearchTerm.js - MediaWiki gadget for dictionary term lookup
+ * Gadget-WikiTerm.js - MediaWiki gadget for dictionary term lookup
  * 
  * This gadget provides Arabic-English-French dictionary functionality directly
  * within MediaWiki pages without using an iframe. It uses the Wikitermbase API
@@ -82,6 +82,18 @@ WikiTermDialog.prototype.initialize = function () {
   });
   this.errorMessage.$element.hide();
 
+  this.toolPageLink = new OO.ui.HtmlSnippet(
+    'للمزيد، ندعوك للاطلاع على ' +
+    '<a href="https://ar.wikipedia.org/wiki/ويكيبيديا:مسرد_الويكي" target="_blank">صفحة الأداة</a>'
+  );
+
+  this.toolPageMessage = new OO.ui.MessageWidget({
+    type: 'notice',
+    inline: true,
+    label: this.toolPageLink,
+    classes: ['wikiterm-tool-page-message']
+  });
+
   // Create search form
   const searchForm = new OO.ui.ActionFieldLayout(
     this.searchInput,
@@ -95,6 +107,7 @@ WikiTermDialog.prototype.initialize = function () {
 
   // Append search form to top section
   this.$body.append(
+    this.toolPageMessage.$element,
     searchForm.$element,
     this.loadingIndicator.$element,
     this.errorMessage.$element
@@ -521,7 +534,7 @@ WikiTermDialog.prototype.showCitationPopup = function ($target, term) {
     document.execCommand('copy');
 
     // Show copied message
-    copyBtn.setLabel('تم النسخ!');
+    copyBtn.setLabel('نُسِخت!');
     setTimeout(() => {
       copyBtn.setLabel('نسخ');
     }, 2000);
@@ -595,25 +608,65 @@ function initialize() {
 
   const button = new OO.ui.ButtonWidget({
     label: 'مسرد الويكي',
+    invisibleLabel: true,
     icon: 'articlesSearch',
-    flags: ['progressive'],
-    framed: true
+    framed: false
   });
 
   // Different integration points based on skin
-  if (mw.config.get('skin') === 'minerva') {
+  const skinName = mw.config.get('skin');
+  if (skinName === 'minerva') {
     console.log('WikiTermGadget: Mobile skin detected');
-    button.$element.addClass('mobile-wiki-dictionary-button');
+    button.$element.addClass(
+      'cdx-button cdx-button--size-large cdx-button--fake-button--enabled ' +
+      'cdx-button--icon-only cdx-button--weight-quiet'
+    );
 
-    $('.header-container').after(button.$element);
-  } else if ($('.vector-search-box').length) {
+    // Create a wrapper similar to the notifications element
+    const $navButtonWrapper = $('<div class="minerva-dictionary">').append(
+      $('<ul>').append($('<li>').append(button.$element))
+    );
+
+    // Add to navigation next to notifications
+    $('.minerva-user-navigation .minerva-notifications').before($navButtonWrapper);
+
+  } else if (skinName === 'vector-2022') {
     // Vector 2
-    $('.vector-search-box').after(button.$element);
+    $('#p-vector-user-menu-userpage').after(button.$element);
+
+    // Create a second identical button for the sticky header
+    const stickyButton = new OO.ui.ButtonWidget({
+      label: 'مسرد الويكي',
+      invisibleLabel: true,
+      icon: 'articlesSearch',
+      framed: false
+    });
+
+    // Add the same click handler
+    stickyButton.on('click', function () {
+      windowManager.openWindow(dialog);
+    });
+
+    // Add button to sticky header when page is scrolled
+    $(window).on('scroll', function () {
+      if ($('.vector-sticky-header-icons').length &&
+        !$('.vector-sticky-header-icons .wiki-term-sticky-button').length) {
+        stickyButton.$element.addClass('wiki-term-sticky-button');
+        $('.vector-sticky-header-icons').prepend(stickyButton.$element);
+        console.log('WikiTermGadget: Button added to sticky header');
+
+        // Remove this scroll handler once we've added the button
+        $(window).off('scroll');
+      }
+    });
+
     console.log('WikiTermGadget: Button added to Vector 2');
-  } else {
+  } else if (skinName === 'vector') {
     // Vector legacy
-    $('#p-search').after(button.$element);
+    $('#p-personal').after(button.$element);
     console.log('WikiTermGadget: Button added to Vector legacy');
+  } else {
+    console.warn('WikiTermGadget: unsupported skin: ' + skinName);
   }
 
   button.on('click', function () {

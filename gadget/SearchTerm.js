@@ -175,7 +175,7 @@ mw.loader.using([
     // Fetch results from API
     $.ajax({
       url: API_ENDPOINT,
-      data: { q: searchTerm },
+      data: { q: `"${searchTerm}"` },
       method: 'GET',
       dataType: 'json'
     })

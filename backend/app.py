@@ -75,6 +75,9 @@ def setup_db_engine():
         user = config["client"]["user"]
         password = config["client"]["password"]
         database = f"{user}__arabterm"
+    elif HOME == "/home/runner":  # Github Actions
+        print("We are on Github Actions")
+        user, password = "test", "test"
     else:  # localhost
         print("We are on localhost")
         config.read("./var/local.cnf")
@@ -161,8 +164,8 @@ def normalise_arabic(text: str) -> str:
     # Remove AL prefix for all words
     text = re.sub(r"\bال", "", text)
 
-    # # [DISABLED] Replace أ and إ and آ with ا
-    # text = re.sub(r"[\u0623\u0625\u0622]", "\u0627", text)
+    # Replace أ and إ and آ with ا
+    text = re.sub(r"[\u0623\u0625\u0622]", "\u0627", text)
 
     # Remove anything inside parentheses
     text = re.sub(r"\(.*?\)", "", text)
@@ -215,14 +218,20 @@ def aggregate_terms(results: list[dict]) -> list[dict]:
 
     for group in groups:
         # Add unique dictionaries ids
-        group["dictionary_ids"] = list(
-            set(term["dictionary_id"] for term in group["occurences"])
+        group["dictionary_ids"] = sorted(
+            list(set(term["dictionary_id"] for term in group["occurences"]))
         )
 
         # Elect an english term (normalised), the most used one.
         # Attention: we assume all entries have an english term.
         english_terms = [normalise_english(x["english"]) for x in group["occurences"]]
         group["english_normalised"] = Counter(english_terms).most_common(1)[0][0]
+
+        # Change arabic_normalised by electing it from existing occurences.
+        # The original arabic_normalised is useful for groupping, but sometimes produces incorrect terms.
+        if "arabic_normalised" in group:
+            arabic_terms = [x["arabic"] for x in group["occurences"]]
+            group["arabic_normalised"] = Counter(arabic_terms).most_common(1)[0][0]
 
         # Elect a french term (normalised) among entries with french.
         french_terms = [

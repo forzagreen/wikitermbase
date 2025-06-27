@@ -6,6 +6,12 @@ format:
 	ruff check --select I --fix backend
 	ruff format backend
 
+check:
+	ruff check --select I --fix backend
+
+test:
+	pytest -vvv backend/tests
+
 build_frontend:
 	cd backend/frontend && npm install && npm run build
 

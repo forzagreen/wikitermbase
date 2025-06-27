@@ -75,6 +75,9 @@ def setup_db_engine():
         user = config["client"]["user"]
         password = config["client"]["password"]
         database = f"{user}__arabterm"
+    elif HOME == "/home/runner":  # Github Actions
+        print("We are on Github Actions")
+        user, password = "test", "test"
     else:  # localhost
         print("We are on localhost")
         config.read("./var/local.cnf")

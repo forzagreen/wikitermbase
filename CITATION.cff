@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use this project, please cite our paper:"
+title: "WikiTermBase: An AI‑Augmented Term Base to Standardize Arabic Translation on Wikipedia"
+authors:
+  - family-names: Bakni
+    given-names: Michel
+  - family-names: Diraneyya
+    given-names: Abbad
+  - family-names: Tellat
+    given-names: Wael
+date-released: "2025-05-26"
+url: "https://arxiv.org/abs/2505.20369"
+preferred-citation:
+  type: article
+  title: "WikiTermBase: An AI‑Augmented Term Base to Standardize Arabic Translation on Wikipedia"
+  authors:
+    - family-names: Bakni
+      given-names: Michel
+    - family-names: Diraneyya
+      given-names: Abbad
+    - family-names: Tellat
+      given-names: Wael
+  year: 2025
+  doi: "10.48550/arXiv.2505.20369"
+  url: "https://arxiv.org/abs/2505.20369"

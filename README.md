@@ -175,7 +175,7 @@ make search term="telescope"
 make dump
 ```
 
-Commit and push `arabterm.db.gz` and `db/` to arabterm GitHub repository:
+Commit and push `arabterm.db` and `db/` to arabterm GitHub repository:
 
 Then, from [wikitermbase](https://github.com/forzagreen/wikitermbase) repository:
 

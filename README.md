@@ -49,7 +49,7 @@ The [user script](https://en.wikipedia.org/wiki/Wikipedia:User_scripts), availab
 
 ## Local Setup
 
-Please note that the database content is managed in the project [arabterm](https://github.com/forzagreen/arabterm/tree/feature/arabterm_v2), (currently still on beta at branch `feature/arabterm_v2`)
+Please note that the database content is managed in the project [arabterm](https://github.com/forzagreen/arabterm).
 
 Clone the arabterm repository, and start the MariaDB database in a Docker container:
 
@@ -159,7 +159,7 @@ For the initial setup of the repository in Toolforge:
 
 Ref: https://mariadb.com/kb/en/backup-and-restore-overview/
 
-Prerequisite: SQLite arabterm.db is up to date in arabterm repository (currently on branch feature/arabterm_v2).
+Prerequisite: SQLite arabterm.db is up to date in [arabterm](https://github.com/forzagreen/arabterm) repository (`main` branch).
 
 From [arabterm](https://github.com/forzagreen/arabterm) repository, generate MariaDB database:
 
@@ -184,7 +184,7 @@ Then, from [wikitermbase](https://github.com/forzagreen/wikitermbase) repository
 pip uninstall arabterm
 make init
 
-# Download dump from arabterm repository, branch feature/arabterm_v2
+# Download dump from arabterm repository, branch main
 make download_dump
 make fix_dump
 ```
@@ -223,7 +223,7 @@ All these issues are fixed by running `make fix_dump`
 ## References
 
 - Project description at Wikipedia: [مسرد الويكي](https://ar.wikipedia.org/wiki/ويكيبيديا:مسرد_الويكي)
-- Database from [forzagreen/arabterm](https://github.com/forzagreen/arabterm/tree/feature/arabterm_v2)
+- Database from [forzagreen/arabterm](https://github.com/forzagreen/arabterm)
 - [ويكيبيديا:مصادر موثوقة/معاجم وقواميس وأطالس](https://ar.wikipedia.org/wiki/%D9%88%D9%8A%D9%83%D9%8A%D8%A8%D9%8A%D8%AF%D9%8A%D8%A7:%D9%85%D8%B5%D8%A7%D8%AF%D8%B1_%D9%85%D9%88%D8%AB%D9%88%D9%82%D8%A9/%D9%85%D8%B9%D8%A7%D8%AC%D9%85_%D9%88%D9%82%D9%88%D8%A7%D9%85%D9%8A%D8%B3_%D9%88%D8%A3%D8%B7%D8%A7%D9%84%D8%B3)
 - Java client for the API: [wiki-connect/WikiTermBaseAPI](https://github.com/wiki-connect/WikiTermBaseAPI)
  

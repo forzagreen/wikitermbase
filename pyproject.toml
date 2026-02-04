@@ -1,0 +1,19 @@
+[project]
+name = "wikitermbase"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "arabterm @ git+https://github.com/forzagreen/arabterm.git",
+    "flask",
+    "pandas",
+    "pymysql",
+    "sentry-sdk[flask]",
+    "sqlalchemy",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel",
+    "pytest",
+    "ruff",
+]

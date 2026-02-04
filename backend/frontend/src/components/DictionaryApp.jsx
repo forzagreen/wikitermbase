@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
 import { Search, ExternalLink, ChevronDown, ChevronUp, Moon, Sun, Quote, Copy, Check, HelpCircle, BookOpen } from 'lucide-react';
+import Logo from './Logo';
 
 const ExpandableText = ({ text, charLimit = 200 }) => {
   const [expanded, setExpanded] = useState(false);
@@ -265,9 +266,10 @@ const DictionaryApp = () => {
       <header className={cardClasses}>
         <div className="max-w-7xl mx-auto py-6 px-4">
           <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-center flex-1">
-              مسرد الويكي
-            </h1>
+            <Link to="/" title="الصفحة الرئيسية">
+              <Logo className="h-10" />
+            </Link>
+            <h1 className="text-3xl font-bold">مسرد الويكي</h1>
             <div className="flex items-center gap-1">
               <Link
                 to="/dictionaries"

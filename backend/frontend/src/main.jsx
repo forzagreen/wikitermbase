@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router'
 import App from './App'
 import RawSearch from './components/RawSearch'
+import Dictionaries from './components/Dictionaries'
 import './index.css'
 
 const router = createBrowserRouter([
@@ -14,6 +15,10 @@ const router = createBrowserRouter([
   {
     path: "/ui/search/raw",
     element: <RawSearch />,
+  },
+  {
+    path: "/dictionaries",
+    element: <Dictionaries />,
   },
 ]);
 

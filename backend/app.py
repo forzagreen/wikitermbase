@@ -146,7 +146,7 @@ def search_terms_mariadb(
     results = result.mappings().all()
 
     # Remove excluded fields
-    excluded_fields = {"created_at", "updated_at", "german"}
+    excluded_fields = {"created_at", "updated_at"}
     if (not include_descriptions) or DISABLE_DESCRIPTIONS:
         excluded_fields.add("description")
     return [

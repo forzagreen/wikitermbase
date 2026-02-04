@@ -1,6 +1,6 @@
 
 init:
-	pip install -r backend/requirements-dev.txt
+	uv pip install -r backend/requirements-dev.txt
 
 format:
 	ruff check --select I --fix backend

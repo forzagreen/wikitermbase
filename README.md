@@ -60,7 +60,7 @@ make delete_mariadb  # delete database if exists
 make migrate_to_mariadb  # migrate the SQLite content to MariaDB
 ```
 
-Then from wikitermbase repository, install python dependencies:
+Then from wikitermbase repository, install python dependencies (requires [uv](https://docs.astral.sh/uv/)):
 
 ```sh
 make init
@@ -77,7 +77,7 @@ password = MyTestPassword
 Start the Flask application:
 
 ```sh
-FLASK_APP=backend/app.py python -m flask run --port=5001
+make run
 ```
 
 You can then open the web application at `http://127.0.0.1:5001/`

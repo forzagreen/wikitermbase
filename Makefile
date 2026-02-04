@@ -1,16 +1,19 @@
 
 init:
-	uv pip install -r backend/requirements-dev.txt
+	uv sync --dev
 
 format:
-	ruff check --select I --fix backend
-	ruff format backend
+	uv run ruff check --select I --fix backend
+	uv run ruff format backend
 
 check:
-	ruff check --select I --fix backend
+	uv run ruff check --select I --fix backend
 
 test:
-	pytest -vvv backend/tests
+	uv run pytest -vvv backend/tests
+
+run:
+	FLASK_APP=backend/app.py uv run flask run --port=5001
 
 build_frontend:
 	cd backend/frontend && npm install && npm run build

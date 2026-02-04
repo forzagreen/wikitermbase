@@ -129,7 +129,7 @@ For the initial setup of the repository in Toolforge:
   - `pip install -r $HOME/www/python/src/requirements.txt`
 - Exit out of webservice shell (Ctrl + D or `exit`)
 - `toolforge webservice --backend=kubernetes python3.11 start`
-- To test, go to: `https://wikitermbase.toolforge.org/search?q=telescope`
+- To test, go to: `https://wikitermbase.toolforge.org/api/v1/search?q=telescope`
 - Check logs in `/data/project/wikitermbase/uwsgi.log`
 
 #### Updating the Codebase
@@ -145,11 +145,11 @@ For the initial setup of the repository in Toolforge:
     pip install -r $HOME/www/python/src/requirements.txt
     ```
   - Exit the webservice shell (`exit`)
-- If npm dependencies changed (or to rebuild javascript/html/css code):
+- If you want to reinstall npm dependencies or to rebuild javascript/html/css code:
   - Enter Node.js shell: `toolforge webservice node18 shell`
   - `cd wikitermbase`, `make build_frontend`, and exit the shell.
 - `toolforge webservice --backend=kubernetes python3.11 restart`
-- To test, go to: `https://wikitermbase.toolforge.org/search?q=telescope`
+- To test, go to: `https://wikitermbase.toolforge.org/api/v1/search?q=telescope`
 - Make sure the gadget in Wikipedia is still working.
 
 

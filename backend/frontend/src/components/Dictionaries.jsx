@@ -1,7 +1,8 @@
 // src/components/Dictionaries.jsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
-import { Moon, Sun, Home, ExternalLink, BookOpen } from 'lucide-react';
+import { Moon, Sun, ExternalLink, BookOpen } from 'lucide-react';
+import Logo from './Logo';
 
 const Dictionaries = () => {
   const [dictionaries, setDictionaries] = useState([]);
@@ -61,24 +62,16 @@ const Dictionaries = () => {
       <header className={cardClasses}>
         <div className="max-w-7xl mx-auto py-6 px-4">
           <div className="flex justify-between items-center">
-            <h1 className="text-3xl font-bold text-center flex-1">
-              قائمة المعاجم
-            </h1>
-            <div className="flex items-center gap-2">
-              <Link
-                to="/"
-                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center"
-                title="الصفحة الرئيسية"
-              >
-                <Home size={24} />
-              </Link>
-              <button
-                onClick={toggleDarkMode}
-                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-              >
-                {darkMode ? <Sun size={24} /> : <Moon size={24} />}
-              </button>
-            </div>
+            <Link to="/" title="الصفحة الرئيسية">
+              <Logo className="h-10" />
+            </Link>
+            <h1 className="text-3xl font-bold">قائمة المعاجم</h1>
+            <button
+              onClick={toggleDarkMode}
+              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+            >
+              {darkMode ? <Sun size={24} /> : <Moon size={24} />}
+            </button>
           </div>
         </div>
       </header>

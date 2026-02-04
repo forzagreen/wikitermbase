@@ -49,6 +49,7 @@ app = Flask(
 )
 
 
+@app.route("/dictionaries")
 @app.route("/ui/search/raw")
 @app.route("/")
 def index():

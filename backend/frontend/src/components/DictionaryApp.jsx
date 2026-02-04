@@ -1,6 +1,7 @@
 // src/components/DictionaryApp.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, ExternalLink, ChevronDown, ChevronUp, Moon, Sun, Quote, Copy, Check, HelpCircle } from 'lucide-react';
+import { Link } from 'react-router';
+import { Search, ExternalLink, ChevronDown, ChevronUp, Moon, Sun, Quote, Copy, Check, HelpCircle, BookOpen } from 'lucide-react';
 
 const ExpandableText = ({ text, charLimit = 200 }) => {
   const [expanded, setExpanded] = useState(false);
@@ -31,7 +32,11 @@ const DictionaryApp = () => {
   const [results, setResults] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    const saved = localStorage.getItem('darkMode');
+    if (saved !== null) return saved === 'true';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
   const [openPopupId, setOpenPopupId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const searchInputRef = useRef(null);
@@ -42,12 +47,14 @@ const DictionaryApp = () => {
     searchInputRef.current?.focus();
   }, []);
 
-  // Initialize dark mode from system preference
-  useEffect(() => {
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setDarkMode(true);
-    }
-  }, []);
+  // Save dark mode preference to localStorage
+  const toggleDarkMode = () => {
+    setDarkMode(prev => {
+      const newValue = !prev;
+      localStorage.setItem('darkMode', String(newValue));
+      return newValue;
+    });
+  };
 
   // Handle click outside citation popup
   useEffect(() => {
@@ -261,17 +268,24 @@ const DictionaryApp = () => {
             <h1 className="text-3xl font-bold text-center flex-1">
               مسرد الويكي
             </h1>
-            <div className="flex items-center">
+            <div className="flex items-center gap-1">
+              <Link
+                to="/dictionaries"
+                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center"
+                title="قائمة المعاجم"
+              >
+                <BookOpen size={24} />
+              </Link>
               <a href="https://ar.wikipedia.org/wiki/ويكيبيديا:مسرد_الويكي"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 mr-2 flex items-center"
+                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center"
                 title="للمزيد، ندعوك للاطلاع على صفحة الأداة"
               >
                 <HelpCircle size={24} />
               </a>
               <button
-                onClick={() => setDarkMode(!darkMode)}
+                onClick={toggleDarkMode}
                 className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
               >
                 {darkMode ? <Sun size={24} /> : <Moon size={24} />}

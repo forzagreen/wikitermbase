@@ -169,7 +169,7 @@ make delete_mariadb
 make migrate_to_mariadb
 
 # Make sure search works in MariaDB:
-make search term="telescope"
+make search_mariadb term="telescope"
 
 # Generate database dumps, SQLite and MariaDB:
 make dump

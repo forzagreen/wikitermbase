@@ -186,7 +186,7 @@ const DictionaryApp = () => {
 
   // Search function with debouncing
   const handleSearch = async (term) => {
-    if (!term.trim()) {
+    if (term.trim().length < 3) {
       setResults([]);
       return;
     }
@@ -330,7 +330,7 @@ const DictionaryApp = () => {
 
       {/* Results Section */}
       <div className="max-w-4xl mx-auto mt-8 px-4 pb-12">
-        {!loading && !error && results.length === 0 && searchTerm && (
+        {!loading && !error && results.length === 0 && searchTerm.trim().length >= 3 && (
           <div className={`${cardClasses} rounded-lg p-6 text-center`}>
             <p className="text-lg">عذرًا، لم نعثر على أي نتائج.</p>
           </div>

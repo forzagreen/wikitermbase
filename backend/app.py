@@ -65,6 +65,24 @@ app = Flask(
 )
 
 
+@app.before_request
+def tag_referer():
+    if request.endpoint != "search_aggregated":
+        return
+    # Tag the request's origin to split arwiki gadget vs Toolforge UI traffic.
+    referer = request.headers.get("Referer", "")
+    if referer.startswith("https://ar.wikipedia.org/"):
+        referer_source = "arwiki"
+    elif referer.startswith("https://wikitermbase.toolforge.org/"):
+        referer_source = "toolforge"
+    elif referer:
+        referer_source = "other"
+    else:
+        referer_source = "none"
+    sentry_sdk.set_tag("referer.source", referer_source)
+    sentry_sdk.set_tag("referer", referer[:200])
+
+
 @app.route("/dictionaries")
 @app.route("/ui/search/raw")
 @app.route("/")

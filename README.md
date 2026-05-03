@@ -85,7 +85,7 @@ You can then open the web application at `http://127.0.0.1:5001/`
 
 ## Backend
 
-Python version: 3.11
+Python version: 3.13
 
 ### Flask API
 
@@ -119,7 +119,7 @@ For the initial setup of the repository in Toolforge:
 - `ssh toolforge` and `become wikitermbase`
 - Generate a token in Github
 - Clone the repository `git clone https://github.com/forzagreen/wikitermbase`
-- Enter webservice shell: `toolforge webservice --backend=kubernetes python3.11 shell`
+- Enter webservice shell: `toolforge webservice --backend=kubernetes python3.13 shell`
 - `mkdir -p $HOME/www/python`
 - Create a symlink from `$HOME/www/python/src` to the folder `backend` of the cloned repo:
   - `ln -s /data/project/wikitermbase/wikitermbase/backend /data/project/wikitermbase/www/python/src`
@@ -128,7 +128,7 @@ For the initial setup of the repository in Toolforge:
   - `source $HOME/www/python/venv/bin/activate`
   - `pip install -r $HOME/www/python/src/requirements.txt`
 - Exit out of webservice shell (Ctrl + D or `exit`)
-- `toolforge webservice --backend=kubernetes python3.11 start`
+- `toolforge webservice --backend=kubernetes python3.13 start`
 - To test, go to: `https://wikitermbase.toolforge.org/api/v1/search?q=telescope`
 - Check logs in `/data/project/wikitermbase/uwsgi.log`
 
@@ -137,7 +137,7 @@ For the initial setup of the repository in Toolforge:
 - `ssh toolforge` and `become wikitermbase`
 - `cd wikitermbase` and `git pull origin main` (supply username and token)
 - If python code changed:
-  - Enter webservice shell: `toolforge webservice --backend=kubernetes python3.11 shell`
+  - Enter webservice shell: `toolforge webservice --backend=kubernetes python3.13 shell`
   - Enter python virtual environment and update dependencies:
     ```sh
     source $HOME/www/python/venv/bin/activate
@@ -148,7 +148,7 @@ For the initial setup of the repository in Toolforge:
 - If you want to reinstall npm dependencies or to rebuild javascript/html/css code:
   - Enter Node.js shell: `toolforge webservice node18 shell`
   - `cd wikitermbase`, `make build_frontend`, and exit the shell.
-- `toolforge webservice --backend=kubernetes python3.11 restart`
+- `toolforge webservice --backend=kubernetes --cpu=1 --mem=1Gi python3.13 restart`
 - To test, go to: `https://wikitermbase.toolforge.org/api/v1/search?q=telescope`
 - Make sure the gadget in Wikipedia is still working.
 

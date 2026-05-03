@@ -52,7 +52,7 @@ password = MyTestPassword
 - Search uses MariaDB `MATCH...AGAINST` full-text search with natural language mode
 - Results aggregation groups terms by normalized Arabic, electing most common English/French translations
 - Environment detection in `setup_db_engine()` and `setup_sentry()`: Toolforge is detected via the `TOOL_REPLICA_USER` env var (works on both legacy uWSGI webservice and Build Service — `$HOME` differs between the two but the env var is constant). DB credentials are read from `TOOL_REPLICA_USER` / `TOOL_REPLICA_PASSWORD`. GitHub Actions uses `HOME=/home/runner` and stub creds; localhost reads `./var/local.cnf`.
-- When new Python deps are added, regenerate `requirements.txt` via `make requirements` (the Build Service Python buildpack uses pip and reads `requirements.txt`, not `pyproject.toml`/`uv.lock`)
+- The Build Service Python buildpack auto-detects `uv.lock` and runs `uv sync`. Don't add a `requirements.txt` — the buildpack errors out if both `uv.lock` and `requirements.txt` are present.
 - Frontend `backend/frontend/dist/` is **committed to git** (intentionally — `.gitignore` line is commented out). After UI changes run `make build_frontend && git add backend/frontend/dist && git commit` before deploying.
 
 ## Testing

@@ -148,7 +148,7 @@ toolforge build show   # wait until status is ok(Succeeded)
 toolforge webservice buildservice restart
 ```
 
-If python dependencies were added/removed, regenerate `requirements.txt` locally first (`make requirements`) and commit it — the Python buildpack uses pip, not uv.
+The Python buildpack auto-detects `uv.lock` and installs deps with `uv sync`, so committing changes to `pyproject.toml` + `uv.lock` is all that's needed when adding dependencies.
 
 Verify the gadget on Arabic Wikipedia still works after each deploy.
 

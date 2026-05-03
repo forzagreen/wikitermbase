@@ -1,0 +1,5 @@
+-r requirements.txt
+ipykernel
+pytest
+ruff
+pip

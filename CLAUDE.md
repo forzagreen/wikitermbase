@@ -10,7 +10,7 @@ Wikitermbase is a terminology standardization tool for Arabic Wikipedia, providi
 
 ```bash
 make init          # Install Python dependencies with uv
-make run           # Start uvicorn (FastAPI) on port 5001
+make run           # Start Flask server on port 5001
 make test          # Run pytest tests
 make format        # Format code with ruff
 make check         # Lint check with ruff
@@ -26,16 +26,15 @@ make fix_dump         # Fix SQL dump compatibility issues
 
 ## Architecture
 
-**Backend** ([backend/app.py](backend/app.py)): FastAPI app with SQLAlchemy connecting to MariaDB. Served on Toolforge via uWSGI through an ASGI→WSGI shim ([`a2wsgi`](https://github.com/abersheeran/a2wsgi)) — module exposes `fastapi_app` (ASGI, used by uvicorn locally) and `app` (WSGI-wrapped, picked up by Toolforge's uWSGI).
+**Backend** ([backend/app.py](backend/app.py)): Flask API with SQLAlchemy connecting to MariaDB
 - `/api/v1/search?q=<term>` - Raw search results
 - `/api/v1/search/aggregated?q=<term>` - Results grouped by normalized Arabic term
 - `/api/v1/dicts` - List all dictionaries
 - `/api/v1/stats` - Database statistics
-- `/docs` and `/redoc` - Auto-generated OpenAPI docs
 
-**Frontend**: React 19 app built with Vite in [backend/frontend/](backend/frontend/), served by FastAPI from `backend/frontend/dist/` (`/assets/*` mounted as `StaticFiles`; SPA shell served via `FileResponse` for known routes)
+**Frontend**: React 19 app built with Vite in [backend/frontend/](backend/frontend/), served by Flask from `backend/frontend/dist/`
 - Routes defined in [main.jsx](backend/frontend/src/main.jsx): `/`, `/ui/search/raw`, `/dictionaries`
-- **Important**: When adding new frontend routes, register them in both FastAPI ([app.py](backend/app.py)) and React Router ([main.jsx](backend/frontend/src/main.jsx))
+- **Important**: When adding new frontend routes, register them in both Flask ([app.py](backend/app.py)) and React Router ([main.jsx](backend/frontend/src/main.jsx))
 
 **Wikipedia Gadget** ([gadget/](gadget/)): OOUI-based MediaWiki gadget for in-wiki term lookup. [SearchTerm.js](gadget/SearchTerm.js) is the main file; deployed to Arabic Wikipedia as Gadget-WikiTerm.js
 

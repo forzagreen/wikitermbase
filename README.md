@@ -5,8 +5,8 @@
 - [Overview](#overview)
 - [Wiki Gadget](#wiki-gadget)
 - [Backend](#backend)
-  - [Flask API](#flask-api)
-  - [Flask API on Toolforge](#flask-api-on-toolforge)
+  - [API](#api)
+  - [API on Toolforge](#api-on-toolforge)
     - [Initial Setup](#initial-setup)
     - [Updating the Codebase](#updating-the-codebase)
 - [Database: MariaDB](#database-mariadb)
@@ -26,7 +26,7 @@ Wiki Term Base is a tool designed to standardise terminology used on Arabic Wiki
 
 🌐 The website is available at: [https://wikitermbase.toolforge.org](https://wikitermbase.toolforge.org/)
 
-It is hosted on [Toolforge](https://wikitech.wikimedia.org/wiki/Help:Toolforge), as a [Python web](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Web/Python) application built with the Flask framework, using a [MariaDB](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Database) relational database.
+It is hosted on [Toolforge](https://wikitech.wikimedia.org/wiki/Help:Toolforge), as a [Python web](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Web/Python) application built with the FastAPI framework (served via Toolforge's uWSGI through an ASGI→WSGI shim), using a [MariaDB](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Database) relational database.
 
 The website's frontend is built with [React](https://react.dev/) framework.
 
@@ -74,7 +74,7 @@ user = MyUserName
 password = MyTestPassword
 ```
 
-Start the Flask application:
+Start the application:
 
 ```sh
 make run
@@ -87,7 +87,9 @@ You can then open the web application at `http://127.0.0.1:5001/`
 
 Python version: 3.13
 
-### Flask API
+### API
+
+Interactive OpenAPI docs are available at `/docs` (Swagger UI) and `/redoc` when running locally.
 
 - Aggregated search (results are groupped by the arabic term):
 
@@ -106,7 +108,7 @@ GET /api/v1/search?q=اشتقاق
 ```
 
 
-### Flask API on Toolforge
+### API on Toolforge
 
 #### Initial Setup
 

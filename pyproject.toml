@@ -3,11 +3,12 @@ name = "wikitermbase"
 version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
+    "a2wsgi",
     "arabterm @ git+https://github.com/forzagreen/arabterm.git",
-    "flask",
+    "fastapi",
     "pandas",
     "pymysql",
-    "sentry-sdk[flask]",
+    "sentry-sdk[fastapi]",
     "sqlalchemy",
 ]
 
@@ -16,4 +17,5 @@ dev = [
     "ipykernel",
     "pytest",
     "ruff",
+    "uvicorn[standard]",
 ]

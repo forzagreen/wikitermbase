@@ -113,7 +113,6 @@ GET /api/v1/search?q=اشتقاق
 #### Initial Setup
 
 Refs:
-- https://wikitech.wikimedia.org/wiki/Help:Toolforge/My_first_Flask_OAuth_tool
 - https://wikitech.wikimedia.org/wiki/Help:Toolforge/Python
 - https://wikitech.wikimedia.org/wiki/Help:Toolforge/Web/Python
 
@@ -128,7 +127,7 @@ For the initial setup of the repository in Toolforge:
 - Create a virtual environment, activate it, and install dependencies:
   - `python3 -m venv $HOME/www/python/venv`
   - `source $HOME/www/python/venv/bin/activate`
-  - `pip install -r $HOME/www/python/src/requirements.txt`
+  - `make init_prod`  # runs `uv sync --active`
 - Exit out of webservice shell (Ctrl + D or `exit`)
 - `toolforge webservice --backend=kubernetes python3.13 start`
 - To test, go to: `https://wikitermbase.toolforge.org/api/v1/search?q=telescope`

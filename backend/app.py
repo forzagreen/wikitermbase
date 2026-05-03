@@ -5,7 +5,6 @@ import re
 from collections import Counter
 
 import sentry_sdk
-from a2wsgi import ASGIMiddleware
 from arabterm.mariadb_models import Dictionary as MariaDBDictionary
 from arabterm.mariadb_models import Term as MariaDBTerm
 from fastapi import FastAPI, Request
@@ -42,8 +41,7 @@ logger = logging.getLogger(__name__)
 
 def setup_sentry():
     """Setup Sentry (only in Toolforge)."""
-    HOME = os.environ.get("HOME")
-    if HOME != "/data/project/wikitermbase":  # Toolforge only
+    if "TOOL_REPLICA_USER" not in os.environ:  # Toolforge only
         return
 
     def traces_sampler(sampling_context):
@@ -64,9 +62,9 @@ def setup_sentry():
 
 setup_sentry()
 
-fastapi_app = FastAPI()
+app = FastAPI()
 
-fastapi_app.add_middleware(
+app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
@@ -74,7 +72,7 @@ fastapi_app.add_middleware(
 )
 
 
-@fastapi_app.middleware("http")
+@app.middleware("http")
 async def tag_referer(request: Request, call_next):
     if request.url.path == "/api/v1/search/aggregated":
         # Tag the request's origin to split arwiki gadget vs Toolforge UI traffic.
@@ -93,24 +91,26 @@ async def tag_referer(request: Request, call_next):
 
 
 def setup_db_engine():
-    config = configparser.ConfigParser()
     hostname = "localhost"
     port = 3306
     database = "arabterm"
-    HOME = os.environ.get("HOME")
 
-    if HOME == "/data/project/wikitermbase":  # Toolforge
-        print("We are on Toolforge")
-        config.read(f"{HOME}/replica.my.cnf")
+    if "TOOL_REPLICA_USER" in os.environ:
+        # Toolforge — works for both the legacy python3.13 uWSGI webservice
+        # (which used to read $HOME/replica.my.cnf) and the Build Service
+        # backend (where $HOME is not the tool data dir, but TOOL_REPLICA_USER
+        # / TOOL_REPLICA_PASSWORD are still injected as env vars).
+        logger.info("We are on Toolforge")
+        user = os.environ["TOOL_REPLICA_USER"]
+        password = os.environ["TOOL_REPLICA_PASSWORD"]
         hostname = "tools.db.svc.wikimedia.cloud"
-        user = config["client"]["user"]
-        password = config["client"]["password"]
         database = f"{user}__arabterm"
-    elif HOME == "/home/runner":  # Github Actions
-        print("We are on Github Actions")
+    elif os.environ.get("HOME") == "/home/runner":  # Github Actions
+        logger.info("We are on Github Actions")
         user, password = "test", "test"
     else:  # localhost
-        print("We are on localhost")
+        logger.info("We are on localhost")
+        config = configparser.ConfigParser()
         config.read("./var/local.cnf")
         user = config["client"]["user"]
         password = config["client"]["password"]
@@ -303,13 +303,13 @@ def aggregate_terms(results: list[dict]) -> list[dict]:
     return groups
 
 
-@fastapi_app.get("/api/v1/search")
+@app.get("/api/v1/search")
 def search(q: str, include_descriptions: bool = True):
     results = search_terms_mariadb(q, include_descriptions)
     return {"q": q, "number_results": len(results), "results": results}
 
 
-@fastapi_app.get("/api/v1/search/aggregated")
+@app.get("/api/v1/search/aggregated")
 def search_aggregated(q: str, include_descriptions: bool = True):
     sentry_sdk.set_tag("search.q", q[:200])  # Sentry caps tag values at 200 chars
 
@@ -331,14 +331,14 @@ def search_aggregated(q: str, include_descriptions: bool = True):
     return {"q": q, "number_groups": number_groups, "groups": groups}
 
 
-@fastapi_app.get("/api/v1/dicts")
+@app.get("/api/v1/dicts")
 def list_dicts():
     result = execute_with_retry(text("SELECT * FROM dictionary"))
     dictionaries = [dict(row) for row in result.mappings().all()]
     return {"number": len(dictionaries), "dictionaries": dictionaries}
 
 
-@fastapi_app.get("/api/v1/stats")
+@app.get("/api/v1/stats")
 def get_stats():
     terms_count = execute_with_retry(text("SELECT COUNT(*) as count FROM term"))
     dicts_count = execute_with_retry(text("SELECT COUNT(*) as count FROM dictionary"))
@@ -348,17 +348,11 @@ def get_stats():
     }
 
 
-@fastapi_app.get("/")
-@fastapi_app.get("/dictionaries")
-@fastapi_app.get("/ui/search/raw")
+@app.get("/")
+@app.get("/dictionaries")
+@app.get("/ui/search/raw")
 def index():
     return FileResponse(INDEX_HTML)
 
 
-fastapi_app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
-
-
-# uWSGI entry point: Toolforge's python3.13 webservice expects a WSGI callable
-# named `app`. Wrap the ASGI FastAPI app so the existing uWSGI deploy works
-# unchanged. For local dev, run `uvicorn backend.app:fastapi_app` directly.
-app = ASGIMiddleware(fastapi_app)
+app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")

@@ -5,6 +5,11 @@ init:
 init_prod:
 	uv sync --active
 
+# Regenerate requirements.txt from pyproject.toml — needed by Toolforge's
+# Build Service Python buildpack (which uses pip, not uv).
+requirements:
+	uv export --no-dev --no-hashes --format requirements-txt -o requirements.txt
+
 format:
 	uv run ruff check --select I --fix backend
 	uv run ruff format backend

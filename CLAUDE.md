@@ -26,7 +26,7 @@ make fix_dump         # Fix SQL dump compatibility issues
 
 ## Architecture
 
-**Backend** ([backend/app.py](backend/app.py)): FastAPI app with SQLAlchemy connecting to MariaDB. Served on Toolforge via uWSGI through an ASGI→WSGI shim ([`a2wsgi`](https://github.com/abersheeran/a2wsgi)) — module exposes `fastapi_app` (ASGI, used by uvicorn locally) and `app` (WSGI-wrapped, picked up by Toolforge's uWSGI).
+**Backend** ([backend/app.py](backend/app.py)): FastAPI app with SQLAlchemy connecting to MariaDB. Module exposes a single ASGI callable `app`. Deployed on Toolforge via the **Build Service** backend (`toolforge webservice buildservice`) — Cloud Native Buildpacks build the image from the GitHub repo, the [Procfile](Procfile) runs `gunicorn backend.app:app -k uvicorn.workers.UvicornWorker`. The legacy `python3.13` uWSGI webservice cannot run ASGI apps; see https://wikitech.wikimedia.org/wiki/Help:Toolforge/My_first_Python_ASGI_tool.
 - `/api/v1/search?q=<term>` - Raw search results
 - `/api/v1/search/aggregated?q=<term>` - Results grouped by normalized Arabic term
 - `/api/v1/dicts` - List all dictionaries
@@ -51,7 +51,9 @@ password = MyTestPassword
 - Arabic text normalization in `normalise_arabic()` removes diacritics, tatweel, AL prefix, and normalizes hamza
 - Search uses MariaDB `MATCH...AGAINST` full-text search with natural language mode
 - Results aggregation groups terms by normalized Arabic, electing most common English/French translations
-- Environment detection: Toolforge (`/data/project/wikitermbase`), GitHub Actions (`/home/runner`), or localhost
+- Environment detection in `setup_db_engine()` and `setup_sentry()`: Toolforge is detected via the `TOOL_REPLICA_USER` env var (works on both legacy uWSGI webservice and Build Service — `$HOME` differs between the two but the env var is constant). DB credentials are read from `TOOL_REPLICA_USER` / `TOOL_REPLICA_PASSWORD`. GitHub Actions uses `HOME=/home/runner` and stub creds; localhost reads `./var/local.cnf`.
+- When new Python deps are added, regenerate `requirements.txt` via `make requirements` (the Build Service Python buildpack uses pip and reads `requirements.txt`, not `pyproject.toml`/`uv.lock`)
+- Frontend `backend/frontend/dist/` is **committed to git** (intentionally — `.gitignore` line is commented out). After UI changes run `make build_frontend && git add backend/frontend/dist && git commit` before deploying.
 
 ## Testing
 

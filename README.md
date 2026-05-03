@@ -26,7 +26,7 @@ Wiki Term Base is a tool designed to standardise terminology used on Arabic Wiki
 
 🌐 The website is available at: [https://wikitermbase.toolforge.org](https://wikitermbase.toolforge.org/)
 
-It is hosted on [Toolforge](https://wikitech.wikimedia.org/wiki/Help:Toolforge), as a [Python web](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Web/Python) application built with the FastAPI framework (served via Toolforge's uWSGI through an ASGI→WSGI shim), using a [MariaDB](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Database) relational database.
+It is hosted on [Toolforge](https://wikitech.wikimedia.org/wiki/Help:Toolforge), as a [Python ASGI](https://wikitech.wikimedia.org/wiki/Help:Toolforge/My_first_Python_ASGI_tool) application built with the FastAPI framework (served by `gunicorn` with `uvicorn` workers via the Toolforge [Build Service](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Build_Service)), using a [MariaDB](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Database) relational database.
 
 The website's frontend is built with [React](https://react.dev/) framework.
 
@@ -108,49 +108,52 @@ GET /api/v1/search?q=اشتقاق
 ```
 
 
-### API on Toolforge
+### API on Toolforge (Build Service)
+
+ASGI applications cannot run on Toolforge's legacy `python3.13` uWSGI webservice — they require the **Build Service** backend, which uses Cloud Native Buildpacks to build a container image directly from the public GitHub repo and runs it according to the [Procfile](Procfile). Frontend assets (`backend/frontend/dist/`) are committed to git so the Python buildpack alone is sufficient — no Node.js step in the build pipeline.
+
+Refs:
+- https://wikitech.wikimedia.org/wiki/Help:Toolforge/My_first_Python_ASGI_tool
+- https://wikitech.wikimedia.org/wiki/Help:Toolforge/Build_Service
 
 #### Initial Setup
 
-Refs:
-- https://wikitech.wikimedia.org/wiki/Help:Toolforge/Python
-- https://wikitech.wikimedia.org/wiki/Help:Toolforge/Web/Python
+```sh
+ssh toolforge
+become wikitermbase
 
-For the initial setup of the repository in Toolforge:
-- `ssh toolforge` and `become wikitermbase`
-- Generate a token in Github
-- Clone the repository `git clone https://github.com/forzagreen/wikitermbase`
-- Enter webservice shell: `toolforge webservice --backend=kubernetes python3.13 shell`
-- `mkdir -p $HOME/www/python`
-- Create a symlink from `$HOME/www/python/src` to the folder `backend` of the cloned repo:
-  - `ln -s /data/project/wikitermbase/wikitermbase/backend /data/project/wikitermbase/www/python/src`
-- Create a virtual environment, activate it, and install dependencies:
-  - `python3 -m venv $HOME/www/python/venv`
-  - `source $HOME/www/python/venv/bin/activate`
-  - `make init_prod`  # runs `uv sync --active`
-- Exit out of webservice shell (Ctrl + D or `exit`)
-- `toolforge webservice --backend=kubernetes python3.13 start`
-- To test, go to: `https://wikitermbase.toolforge.org/api/v1/search?q=telescope`
-- Check logs in `/data/project/wikitermbase/uwsgi.log`
+# DB credentials. Toolforge legacy webservices used to read these from
+# $HOME/replica.my.cnf; Build Service expects them as envvars.
+toolforge envvars create TOOL_REPLICA_USER       # paste user from $HOME/replica.my.cnf
+toolforge envvars create TOOL_REPLICA_PASSWORD   # paste password from $HOME/replica.my.cnf
+
+# Stop the legacy webservice if it was previously running on python3.13
+toolforge webservice --backend=kubernetes python3.13 stop || true
+
+# Build the image from the public GitHub repo
+toolforge build start https://github.com/forzagreen/wikitermbase
+toolforge build show   # wait until status is ok(Succeeded)
+
+# Start the Build Service webservice
+toolforge webservice buildservice start
+```
+
+Test: `https://wikitermbase.toolforge.org/api/v1/stats`. Logs: `toolforge webservice buildservice logs -f`.
 
 #### Updating the Codebase
 
-- `ssh toolforge` and `become wikitermbase`
-- `cd wikitermbase` and `git pull origin main` (supply username and token)
-- If python code changed:
-  - Enter webservice shell: `toolforge webservice --backend=kubernetes python3.13 shell`
-  - Enter python virtual environment and update dependencies:
-    ```sh
-    source $HOME/www/python/venv/bin/activate
-    make init_prod
-    ```
-  - Exit the webservice shell (`exit`)
-- If you want to reinstall npm dependencies or to rebuild javascript/html/css code:
-  - Enter Node.js shell: `toolforge webservice node18 shell`
-  - `cd wikitermbase`, `make build_frontend`, and exit the shell.
-- `toolforge webservice --backend=kubernetes --cpu=1 --mem=1Gi python3.13 restart`
-- To test, go to: `https://wikitermbase.toolforge.org/api/v1/search?q=telescope`
-- Make sure the gadget in Wikipedia is still working.
+After pushing changes to `main` on GitHub (including any frontend rebuild — `make build_frontend && git add backend/frontend/dist && git commit`):
+
+```sh
+ssh toolforge && become wikitermbase
+toolforge build start https://github.com/forzagreen/wikitermbase
+toolforge build show   # wait until status is ok(Succeeded)
+toolforge webservice buildservice restart
+```
+
+If python dependencies were added/removed, regenerate `requirements.txt` locally first (`make requirements`) and commit it — the Python buildpack uses pip, not uv.
+
+Verify the gadget on Arabic Wikipedia still works after each deploy.
 
 
 ## Database: MariaDB

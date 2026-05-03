@@ -8,7 +8,7 @@ import sentry_sdk
 from arabterm.mariadb_models import Dictionary as MariaDBDictionary
 from arabterm.mariadb_models import Term as MariaDBTerm
 from flask import Flask, render_template, request, send_from_directory
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.pool import QueuePool
@@ -134,6 +134,19 @@ def setup_db_engine():
 
 # Create the engine and session factory
 mariadb_engine = setup_db_engine()
+
+
+@event.listens_for(mariadb_engine, "connect")
+def _force_read_only_session(dbapi_connection, connection_record):
+    # MariaDB rejects DML/DDL on non-temp tables for the rest of the session.
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute("SET SESSION TRANSACTION READ ONLY")
+        dbapi_connection.commit()
+    finally:
+        cursor.close()
+
+
 Session = scoped_session(sessionmaker(bind=mariadb_engine))
 
 

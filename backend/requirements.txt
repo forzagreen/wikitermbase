@@ -1,6 +1,0 @@
-git+https://github.com/forzagreen/arabterm.git
-flask
-pandas
-pymysql
-sentry-sdk[flask]
-sqlalchemy

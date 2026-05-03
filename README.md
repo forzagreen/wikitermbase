@@ -89,7 +89,7 @@ Python version: 3.13
 
 ### API
 
-Interactive OpenAPI docs are available at `/docs` (Swagger UI) and `/redoc` when running locally.
+Interactive OpenAPI docs (Swagger UI) are available at [/docs](https://wikitermbase.toolforge.org/docs) — and at `/redoc` for the ReDoc rendering. These are auto-generated from the FastAPI route signatures and let you try every endpoint from the browser.
 
 - Aggregated search (results are groupped by the arabic term):
 

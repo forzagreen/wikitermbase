@@ -1,4 +1,5 @@
 import configparser
+import logging
 import os
 import re
 from collections import Counter
@@ -26,18 +27,29 @@ DISABLE_ARABTERM_URIS = False
 # Disable descriptions in all results
 DISABLE_DESCRIPTIONS = False
 
+logger = logging.getLogger(__name__)
+
 
 def setup_sentry():
     """Setup Sentry (only in Toolforge)."""
     HOME = os.environ.get("HOME")
-    if HOME == "/data/project/wikitermbase":  # Toolforge
-        sentry_sdk.init(
-            dsn="https://8b5085bb300d843114fe9414af77ed76@o91475.ingest.us.sentry.io/4508865550286848",
-            # Do not track PII (Personally Identifiable Information)
-            send_default_pii=False,
-            # Set traces_sample_rate to 1.0 to capture 100% of transactions for tracing.
-            traces_sample_rate=1.0,
-        )
+    if HOME != "/data/project/wikitermbase":  # Toolforge only
+        return
+
+    def traces_sampler(sampling_context):
+        # Capture only /api/v1/search/aggregated transactions so the shared
+        # quota isn't burned on static assets and lower-value endpoints.
+        wsgi_environ = sampling_context.get("wsgi_environ") or {}
+        if wsgi_environ.get("PATH_INFO") == "/api/v1/search/aggregated":
+            return 1.0
+        return 0.0
+
+    sentry_sdk.init(
+        dsn="https://8b5085bb300d843114fe9414af77ed76@o91475.ingest.us.sentry.io/4508865550286848",
+        # Do not track PII (Personally Identifiable Information)
+        send_default_pii=False,
+        traces_sampler=traces_sampler,
+    )
 
 
 setup_sentry()
@@ -288,6 +300,8 @@ def search_aggregated():
     )
 
     q = request.args["q"]
+    sentry_sdk.set_tag("search.q", q[:200])  # Sentry caps tag values at 200 chars
+
     results = search_terms_mariadb(q, include_descriptions)
 
     # Disable arabterm URIs as it's disabled in their website
@@ -297,8 +311,14 @@ def search_aggregated():
                 del result["uri"]
 
     groups = aggregate_terms(results)
+    number_groups = len(groups)
+
+    sentry_sdk.set_tag("search.number_groups", str(number_groups))
+    sentry_sdk.set_measurement("search.number_groups", number_groups)
+    logger.info("search_aggregated q=%r number_groups=%d", q, number_groups)
+
     return (
-        {"q": q, "number_groups": len(groups), "groups": groups},
+        {"q": q, "number_groups": number_groups, "groups": groups},
         200,
         RESPONSE_HEADERS,
     )

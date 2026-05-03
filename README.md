@@ -5,8 +5,8 @@
 - [Overview](#overview)
 - [Wiki Gadget](#wiki-gadget)
 - [Backend](#backend)
-  - [Flask API](#flask-api)
-  - [Flask API on Toolforge](#flask-api-on-toolforge)
+  - [API](#api)
+  - [API on Toolforge](#api-on-toolforge)
     - [Initial Setup](#initial-setup)
     - [Updating the Codebase](#updating-the-codebase)
 - [Database: MariaDB](#database-mariadb)
@@ -26,7 +26,7 @@ Wiki Term Base is a tool designed to standardise terminology used on Arabic Wiki
 
 🌐 The website is available at: [https://wikitermbase.toolforge.org](https://wikitermbase.toolforge.org/)
 
-It is hosted on [Toolforge](https://wikitech.wikimedia.org/wiki/Help:Toolforge), as a [Python web](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Web/Python) application built with the Flask framework, using a [MariaDB](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Database) relational database.
+It is hosted on [Toolforge](https://wikitech.wikimedia.org/wiki/Help:Toolforge), as a [Python web](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Web/Python) application built with the FastAPI framework (served via Toolforge's uWSGI through an ASGI→WSGI shim), using a [MariaDB](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Database) relational database.
 
 The website's frontend is built with [React](https://react.dev/) framework.
 
@@ -74,7 +74,7 @@ user = MyUserName
 password = MyTestPassword
 ```
 
-Start the Flask application:
+Start the application:
 
 ```sh
 make run
@@ -87,7 +87,9 @@ You can then open the web application at `http://127.0.0.1:5001/`
 
 Python version: 3.13
 
-### Flask API
+### API
+
+Interactive OpenAPI docs (Swagger UI) are available at [/docs](https://wikitermbase.toolforge.org/docs) — and at `/redoc` for the ReDoc rendering. These are auto-generated from the FastAPI route signatures and let you try every endpoint from the browser.
 
 - Aggregated search (results are groupped by the arabic term):
 
@@ -106,12 +108,11 @@ GET /api/v1/search?q=اشتقاق
 ```
 
 
-### Flask API on Toolforge
+### API on Toolforge
 
 #### Initial Setup
 
 Refs:
-- https://wikitech.wikimedia.org/wiki/Help:Toolforge/My_first_Flask_OAuth_tool
 - https://wikitech.wikimedia.org/wiki/Help:Toolforge/Python
 - https://wikitech.wikimedia.org/wiki/Help:Toolforge/Web/Python
 
@@ -126,7 +127,7 @@ For the initial setup of the repository in Toolforge:
 - Create a virtual environment, activate it, and install dependencies:
   - `python3 -m venv $HOME/www/python/venv`
   - `source $HOME/www/python/venv/bin/activate`
-  - `pip install -r $HOME/www/python/src/requirements.txt`
+  - `make init_prod`  # runs `uv sync --active`
 - Exit out of webservice shell (Ctrl + D or `exit`)
 - `toolforge webservice --backend=kubernetes python3.13 start`
 - To test, go to: `https://wikitermbase.toolforge.org/api/v1/search?q=telescope`

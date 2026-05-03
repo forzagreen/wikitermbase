@@ -5,17 +5,18 @@ import re
 from collections import Counter
 
 import sentry_sdk
+from a2wsgi import ASGIMiddleware
 from arabterm.mariadb_models import Dictionary as MariaDBDictionary
 from arabterm.mariadb_models import Term as MariaDBTerm
-from flask import Flask, render_template, request, send_from_directory
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.pool import QueuePool
 
-RESPONSE_HEADERS = {
-    "Access-Control-Allow-Origin": "*",
-}
 POOL_SIZE = 10
 POOL_RECYCLE = 3600  # Recycle connections after 1 hour
 MAX_OVERFLOW = 20
@@ -26,6 +27,11 @@ RETRY_COUNT = 3
 DISABLE_ARABTERM_URIS = False
 # Disable descriptions in all results
 DISABLE_DESCRIPTIONS = False
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_DIST = os.path.join(BASE_DIR, "frontend", "dist")
+INDEX_HTML = os.path.join(FRONTEND_DIST, "index.html")
+ASSETS_DIR = os.path.join(FRONTEND_DIST, "assets")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,8 +49,8 @@ def setup_sentry():
     def traces_sampler(sampling_context):
         # Capture only /api/v1/search/aggregated transactions so the shared
         # quota isn't burned on static assets and lower-value endpoints.
-        wsgi_environ = sampling_context.get("wsgi_environ") or {}
-        if wsgi_environ.get("PATH_INFO") == "/api/v1/search/aggregated":
+        asgi_scope = sampling_context.get("asgi_scope") or {}
+        if asgi_scope.get("path") == "/api/v1/search/aggregated":
             return 1.0
         return 0.0
 
@@ -58,42 +64,32 @@ def setup_sentry():
 
 setup_sentry()
 
-app = Flask(
-    __name__,
-    static_folder="frontend/dist",  # Where your React built files will be
-    template_folder="frontend/dist",  # Where your index.html will be
+fastapi_app = FastAPI()
+
+fastapi_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
-@app.before_request
-def tag_referer():
-    if request.endpoint != "search_aggregated":
-        return
-    # Tag the request's origin to split arwiki gadget vs Toolforge UI traffic.
-    referer = request.headers.get("Referer", "")
-    if referer.startswith("https://ar.wikipedia.org/"):
-        referer_source = "arwiki"
-    elif referer.startswith("https://wikitermbase.toolforge.org/"):
-        referer_source = "toolforge"
-    elif referer:
-        referer_source = "other"
-    else:
-        referer_source = "none"
-    sentry_sdk.set_tag("referer.source", referer_source)
-    sentry_sdk.set_tag("referer", referer[:200])
-
-
-@app.route("/dictionaries")
-@app.route("/ui/search/raw")
-@app.route("/")
-def index():
-    return render_template("index.html")
-
-
-# Serve static files for React app
-@app.route("/assets/<path:path>")
-def serve_static(path):
-    return send_from_directory("frontend/dist/assets", path)
+@fastapi_app.middleware("http")
+async def tag_referer(request: Request, call_next):
+    if request.url.path == "/api/v1/search/aggregated":
+        # Tag the request's origin to split arwiki gadget vs Toolforge UI traffic.
+        referer = request.headers.get("referer", "")
+        if referer.startswith("https://ar.wikipedia.org/"):
+            referer_source = "arwiki"
+        elif referer.startswith("https://wikitermbase.toolforge.org/"):
+            referer_source = "toolforge"
+        elif referer:
+            referer_source = "other"
+        else:
+            referer_source = "none"
+        sentry_sdk.set_tag("referer.source", referer_source)
+        sentry_sdk.set_tag("referer", referer[:200])
+    return await call_next(request)
 
 
 def setup_db_engine():
@@ -307,34 +303,14 @@ def aggregate_terms(results: list[dict]) -> list[dict]:
     return groups
 
 
-@app.route("/api/v1/search")
-def search():
-    if "q" not in request.args:
-        return {"error": "Missing 'q' parameter"}, 400
-
-    include_descriptions: bool = (
-        request.args.get("include_descriptions", "true").lower() == "true"
-    )
-
-    q = request.args["q"]
+@fastapi_app.get("/api/v1/search")
+def search(q: str, include_descriptions: bool = True):
     results = search_terms_mariadb(q, include_descriptions)
-    return (
-        {"q": q, "number_results": len(results), "results": results},
-        200,
-        RESPONSE_HEADERS,
-    )
+    return {"q": q, "number_results": len(results), "results": results}
 
 
-@app.route("/api/v1/search/aggregated", methods=["GET"])
-def search_aggregated():
-    if "q" not in request.args:
-        return {"error": "Missing 'q' parameter"}, 400
-
-    include_descriptions: bool = (
-        request.args.get("include_descriptions", "true").lower() == "true"
-    )
-
-    q = request.args["q"]
+@fastapi_app.get("/api/v1/search/aggregated")
+def search_aggregated(q: str, include_descriptions: bool = True):
     sentry_sdk.set_tag("search.q", q[:200])  # Sentry caps tag values at 200 chars
 
     results = search_terms_mariadb(q, include_descriptions)
@@ -352,33 +328,37 @@ def search_aggregated():
     sentry_sdk.set_measurement("search.number_groups", number_groups)
     logger.info("search_aggregated q=%r number_groups=%d", q, number_groups)
 
-    return (
-        {"q": q, "number_groups": number_groups, "groups": groups},
-        200,
-        RESPONSE_HEADERS,
-    )
+    return {"q": q, "number_groups": number_groups, "groups": groups}
 
 
-@app.route("/api/v1/dicts")
+@fastapi_app.get("/api/v1/dicts")
 def list_dicts():
     result = execute_with_retry(text("SELECT * FROM dictionary"))
     dictionaries = [dict(row) for row in result.mappings().all()]
-    return (
-        {"number": len(dictionaries), "dictionaries": dictionaries},
-        200,
-        RESPONSE_HEADERS,
-    )
+    return {"number": len(dictionaries), "dictionaries": dictionaries}
 
 
-@app.route("/api/v1/stats")
+@fastapi_app.get("/api/v1/stats")
 def get_stats():
     terms_count = execute_with_retry(text("SELECT COUNT(*) as count FROM term"))
     dicts_count = execute_with_retry(text("SELECT COUNT(*) as count FROM dictionary"))
-    return (
-        {
-            "number_terms": terms_count.scalar(),
-            "number_dictionaries": dicts_count.scalar(),
-        },
-        200,
-        RESPONSE_HEADERS,
-    )
+    return {
+        "number_terms": terms_count.scalar(),
+        "number_dictionaries": dicts_count.scalar(),
+    }
+
+
+@fastapi_app.get("/")
+@fastapi_app.get("/dictionaries")
+@fastapi_app.get("/ui/search/raw")
+def index():
+    return FileResponse(INDEX_HTML)
+
+
+fastapi_app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
+
+
+# uWSGI entry point: Toolforge's python3.13 webservice expects a WSGI callable
+# named `app`. Wrap the ASGI FastAPI app so the existing uWSGI deploy works
+# unchanged. For local dev, run `uvicorn backend.app:fastapi_app` directly.
+app = ASGIMiddleware(fastapi_app)

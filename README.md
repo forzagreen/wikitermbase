@@ -132,7 +132,7 @@ toolforge build start https://github.com/forzagreen/wikitermbase
 toolforge build show   # wait until status is ok(Succeeded)
 
 # Start the Build Service webservice
-toolforge webservice buildservice start
+toolforge webservice buildservice start --mount=none
 ```
 
 Test: `https://wikitermbase.toolforge.org/api/v1/stats`. Logs: `toolforge webservice buildservice logs -f`.

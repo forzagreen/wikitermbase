@@ -2,6 +2,9 @@
 init:
 	uv sync --dev
 
+init_prod:
+	uv sync --active
+
 format:
 	uv run ruff check --select I --fix backend
 	uv run ruff format backend

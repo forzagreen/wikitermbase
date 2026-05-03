@@ -27,6 +27,10 @@ DISABLE_ARABTERM_URIS = False
 # Disable descriptions in all results
 DISABLE_DESCRIPTIONS = False
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 

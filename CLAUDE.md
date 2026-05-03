@@ -61,6 +61,6 @@ uv run pytest -vvv backend/tests/test_app.py::test_normalise_arabic
 
 ## Python/Node Requirements
 
-- Python 3.11 with uv for dependency management
+- Python 3.13 with uv for dependency management
 - Node.js for frontend build
 - `arabterm` package is installed from git (database models come from there)

@@ -141,8 +141,7 @@ For the initial setup of the repository in Toolforge:
   - Enter python virtual environment and update dependencies:
     ```sh
     source $HOME/www/python/venv/bin/activate
-    pip uninstall arabterm
-    pip install -r $HOME/www/python/src/requirements.txt
+    make init_prod
     ```
   - Exit the webservice shell (`exit`)
 - If you want to reinstall npm dependencies or to rebuild javascript/html/css code:

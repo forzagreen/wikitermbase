@@ -118,14 +118,11 @@ Refs:
 
 #### Initial Setup
 
+DB credentials don't need to be configured: Toolforge auto-injects `TOOL_REPLICA_USER` and `TOOL_REPLICA_PASSWORD` into Build Service containers (same as for the legacy uWSGI webservice). The app reads them directly from `os.environ`.
+
 ```sh
 ssh toolforge
 become wikitermbase
-
-# DB credentials. Toolforge legacy webservices used to read these from
-# $HOME/replica.my.cnf; Build Service expects them as envvars.
-toolforge envvars create TOOL_REPLICA_USER       # paste user from $HOME/replica.my.cnf
-toolforge envvars create TOOL_REPLICA_PASSWORD   # paste password from $HOME/replica.my.cnf
 
 # Stop the legacy webservice if it was previously running on python3.13
 toolforge webservice --backend=kubernetes python3.13 stop || true

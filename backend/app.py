@@ -3,12 +3,14 @@ import logging
 import os
 import re
 from collections import Counter
+from typing import Literal
 
 import sentry_sdk
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -60,7 +62,47 @@ def setup_sentry():
 
 setup_sentry()
 
-app = FastAPI()
+APP_DESCRIPTION = """
+Read-only, public, unauthenticated API powering [WikiTermBase](https://wikitermbase.toolforge.org)
+— a multilingual (Arabic / English / French) terminology lookup service designed to
+standardise vocabulary on [Arabic Wikipedia](https://ar.wikipedia.org/wiki/ويكيبيديا:مسرد_الويكي).
+
+Backed by a MariaDB full-text search (`MATCH ... AGAINST` in natural-language mode) over a
+dataset curated in the [arabterm](https://github.com/forzagreen/arabterm) repository.
+
+Source code: [github.com/forzagreen/wikitermbase](https://github.com/forzagreen/wikitermbase).
+""".strip()
+
+TAGS_METADATA = [
+    {
+        "name": "Search",
+        "description": "Full-text lookup over the term database.",
+    },
+    {
+        "name": "Metadata",
+        "description": "Information about dictionaries and dataset statistics.",
+    },
+    {
+        "name": "Health",
+        "description": "Liveness and readiness probes for monitoring.",
+    },
+]
+
+app = FastAPI(
+    title="WikiTermBase API",
+    summary="Multilingual (Arabic / English / French) terminology lookup for Arabic Wikipedia.",
+    description=APP_DESCRIPTION,
+    version="1.0.0",
+    contact={
+        "name": "forzagreen",
+        "url": "https://github.com/forzagreen/wikitermbase",
+    },
+    license_info={
+        "name": "MIT",
+        "url": "https://github.com/forzagreen/wikitermbase/blob/main/LICENSE",
+    },
+    openapi_tags=TAGS_METADATA,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -301,14 +343,136 @@ def aggregate_terms(results: list[dict]) -> list[dict]:
     return groups
 
 
-@app.get("/api/v1/search")
-def search(q: str, include_descriptions: bool = True):
+class TermResult(BaseModel):
+    """A term row joined with its dictionary metadata.
+
+    Extra fields from the underlying ``term`` and ``dictionary`` tables flow through
+    transparently — the schema documents the stable subset only.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    id: int
+    dictionary_id: int
+    arabic: str | None = None
+    english: str | None = None
+    french: str | None = None
+    description: str | None = None
+    relevance: float
+    dictionary_name_arabic: str
+    dictionary_wikidata_id: str | None = None
+
+
+class SearchResponse(BaseModel):
+    q: str
+    number_results: int
+    results: list[TermResult]
+
+
+class TermGroup(BaseModel):
+    """A cluster of `TermResult`s sharing the same normalised Arabic term."""
+
+    model_config = ConfigDict(extra="allow")
+
+    arabic_normalised: str | None = None
+    english_normalised: str
+    french_normalised: str | None = None
+    dictionary_ids: list[int]
+    total_relevance: float
+    occurences: list[TermResult]
+
+
+class AggregatedSearchResponse(BaseModel):
+    q: str
+    number_groups: int
+    groups: list[TermGroup]
+
+
+class Dictionary(BaseModel):
+    """A row from the ``dictionary`` table. Extra columns flow through."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: int
+    name_arabic: str
+    wikidata_id: str | None = None
+
+
+class DictionariesResponse(BaseModel):
+    number: int
+    dictionaries: list[Dictionary]
+
+
+class StatsResponse(BaseModel):
+    number_terms: int
+    number_dictionaries: int
+
+
+class HealthResponse(BaseModel):
+    status: Literal["ok", "degraded"]
+    database: Literal["ok", "unreachable"]
+
+
+@app.get(
+    "/api/v1/search",
+    tags=["Search"],
+    summary="Raw full-text search",
+    response_model=SearchResponse,
+    response_model_exclude_none=True,
+    response_description="Matching terms ordered by full-text relevance (highest first).",
+)
+def search(
+    q: str = Query(
+        ...,
+        description="Free-text query. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode.",
+        examples=["telescope", "اشتقاق"],
+    ),
+    include_descriptions: bool = Query(
+        True,
+        description="Include each term's `description` field in the response. Set to `false` to slim the payload.",
+    ),
+):
+    """Search across all dictionaries and return individual matching terms.
+
+    Each result includes the term's columns plus its parent dictionary's
+    `name_arabic` and `wikidata_id`, ordered by full-text relevance.
+    For grouped/de-duplicated results, prefer `/api/v1/search/aggregated`.
+    """
     results = search_terms_mariadb(q, include_descriptions)
     return {"q": q, "number_results": len(results), "results": results}
 
 
-@app.get("/api/v1/search/aggregated")
-def search_aggregated(q: str, include_descriptions: bool = True):
+@app.get(
+    "/api/v1/search/aggregated",
+    tags=["Search"],
+    summary="Search results aggregated by normalised Arabic term",
+    response_model=AggregatedSearchResponse,
+    response_model_exclude_none=True,
+    response_description="Term groups, ordered by number of distinct dictionaries (desc), then by total relevance (desc).",
+)
+def search_aggregated(
+    q: str = Query(
+        ...,
+        description="Free-text query. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode.",
+        examples=["telescope", "اشتقاق"],
+    ),
+    include_descriptions: bool = Query(
+        True,
+        description="Include each term's `description` field within every occurrence. Set to `false` to slim the payload.",
+    ),
+):
+    """Search and group results by normalised Arabic term.
+
+    Raw matches are clustered by `normalise_arabic(arabic)` (diacritics, tatweel
+    and the `ال` prefix stripped, hamza forms unified). Each group elects the
+    most common original Arabic spelling, the most common normalised English
+    translation, and — when present — the most common normalised French
+    translation. Within a group, occurrences with a Wikidata ID come first.
+
+    Groups are sorted by the number of distinct dictionaries that contain the
+    term (desc), then by the sum of relevance scores within the group (desc).
+    This is the endpoint used by the on-wiki gadget.
+    """
     sentry_sdk.set_tag("search.q", q[:200])  # Sentry caps tag values at 200 chars
 
     results = search_terms_mariadb(q, include_descriptions)
@@ -329,15 +493,33 @@ def search_aggregated(q: str, include_descriptions: bool = True):
     return {"q": q, "number_groups": number_groups, "groups": groups}
 
 
-@app.get("/api/v1/dicts")
+@app.get(
+    "/api/v1/dicts",
+    tags=["Metadata"],
+    summary="List dictionaries",
+    response_model=DictionariesResponse,
+    response_description="Every dictionary indexed by the service.",
+)
 def list_dicts():
+    """Return every dictionary in the database with its full metadata.
+
+    Use the `id` of a dictionary to map `dictionary_id` values returned by the
+    search endpoints back to a human-readable source name.
+    """
     result = execute_with_retry(text("SELECT * FROM dictionary"))
     dictionaries = [dict(row) for row in result.mappings().all()]
     return {"number": len(dictionaries), "dictionaries": dictionaries}
 
 
-@app.get("/api/v1/stats")
+@app.get(
+    "/api/v1/stats",
+    tags=["Metadata"],
+    summary="Dataset statistics",
+    response_model=StatsResponse,
+    response_description="Total counts of terms and dictionaries.",
+)
 def get_stats():
+    """Return the total number of terms and dictionaries currently indexed."""
     terms_count = execute_with_retry(text("SELECT COUNT(*) as count FROM term"))
     dicts_count = execute_with_retry(text("SELECT COUNT(*) as count FROM dictionary"))
     return {
@@ -346,9 +528,36 @@ def get_stats():
     }
 
 
-@app.get("/")
-@app.get("/dictionaries")
-@app.get("/ui/search/raw")
+@app.get(
+    "/healthz",
+    tags=["Health"],
+    summary="Health check",
+    response_model=HealthResponse,
+    responses={503: {"model": HealthResponse, "description": "Database unreachable"}},
+    response_description="Application and database status.",
+)
+def healthz():
+    """Liveness + readiness probe.
+
+    Returns `200` with `status: ok` when the app is up and the MariaDB replica
+    answers a trivial `SELECT 1`. Returns `503` with `status: degraded` if the
+    database round-trip fails. Safe to poll from uptime monitors and Toolforge
+    / Kubernetes readiness probes.
+    """
+    try:
+        execute_with_retry(text("SELECT 1")).scalar()
+        return {"status": "ok", "database": "ok"}
+    except Exception:
+        # Probes must always return a structured response — never a 500.
+        return JSONResponse(
+            status_code=503,
+            content={"status": "degraded", "database": "unreachable"},
+        )
+
+
+@app.get("/", include_in_schema=False)
+@app.get("/dictionaries", include_in_schema=False)
+@app.get("/ui/search/raw", include_in_schema=False)
 def index():
     return FileResponse(INDEX_HTML)
 

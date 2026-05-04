@@ -139,10 +139,10 @@ toolforge webservice buildservice stop || true
 toolforge components config create toolforge.yaml
 
 # First deploy (also starts the web component)
-toolforge components deploy
+toolforge components deployment create --force-build --force-run
 ```
 
-Test: `https://wikitermbase.toolforge.org/api/v1/stats`. Logs: `toolforge components logs -f web`.
+Watch progress: `toolforge components deployment show`. Test: `https://wikitermbase.toolforge.org/api/v1/stats`. Logs: `toolforge components logs -f web`.
 
 Then create the deploy token used by GitHub Actions:
 
@@ -161,7 +161,7 @@ Token management:
 
 #### Updating the Codebase
 
-Push to `main`. After `make check && make test` pass on GitHub Actions, the `deploy` job calls the Toolforge components API, which rebuilds the image and rolls out the new revision. Watch progress under the repo's Actions tab and on Toolforge with `toolforge components show`.
+Push to `main`. After `make check && make test` pass on GitHub Actions, the `deploy` job calls the Toolforge components API, which rebuilds the image and rolls out the new revision. Watch progress under the repo's Actions tab and on Toolforge with `toolforge components deployment show`.
 
 The Python buildpack auto-detects `uv.lock` and installs deps with `uv sync`, so committing changes to `pyproject.toml` + `uv.lock` is all that's needed when adding dependencies. Frontend changes still require `make build_frontend && git add backend/frontend/dist && git commit` before pushing — `dist/` is committed intentionally.
 
@@ -180,7 +180,7 @@ Or from a Toolforge SSH session:
 
 ```sh
 ssh toolforge && become wikitermbase
-toolforge components deploy
+toolforge components deployment create --force-build --force-run
 ```
 
 

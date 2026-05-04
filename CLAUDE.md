@@ -26,7 +26,7 @@ make fix_dump         # Fix SQL dump compatibility issues
 
 ## Architecture
 
-**Backend** ([backend/app.py](backend/app.py)): FastAPI app with SQLAlchemy connecting to MariaDB. Module exposes a single ASGI callable `app`. Deployed on Toolforge via the **Build Service** backend (`toolforge webservice buildservice`) — Cloud Native Buildpacks build the image from the GitHub repo, the [Procfile](Procfile) runs `gunicorn backend.app:app -k uvicorn.workers.UvicornWorker`. The legacy `python3.13` uWSGI webservice cannot run ASGI apps; see https://wikitech.wikimedia.org/wiki/Help:Toolforge/My_first_Python_ASGI_tool.
+**Backend** ([backend/app.py](backend/app.py)): FastAPI app with SQLAlchemy connecting to MariaDB. Module exposes a single ASGI callable `app`. Deployed on Toolforge via the **Components Service** declared in [toolforge.yaml](toolforge.yaml) — Cloud Native Buildpacks build the image from the GitHub repo, the [Procfile](Procfile) runs `gunicorn backend.app:app -k uvicorn.workers.UvicornWorker`. Pushes to `main` auto-deploy: GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs tests, then `POST`s to the components API (`https://api.svc.toolforge.org/components/v1/tool/wikitermbase/deployment`) with the `TOOLS_DEPLOY_TOKEN` repo secret. The legacy `python3.13` uWSGI webservice cannot run ASGI apps; see https://wikitech.wikimedia.org/wiki/Help:Toolforge/My_first_Python_ASGI_tool and https://wikitech.wikimedia.org/wiki/Help:Toolforge/Deploy_your_tool.
 - `/api/v1/search?q=<term>` - Raw search results
 - `/api/v1/search/aggregated?q=<term>` - Results grouped by normalized Arabic term
 - `/api/v1/dicts` - List all dictionaries

@@ -301,11 +301,6 @@ def aggregate_terms(results: list[dict]) -> list[dict]:
     return groups
 
 
-@app.get("/healthz")
-def healthz():
-    return {"status": "ok"}
-
-
 @app.get("/api/v1/search")
 def search(q: str, include_descriptions: bool = True):
     results = search_terms_mariadb(q, include_descriptions)

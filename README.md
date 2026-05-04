@@ -108,22 +108,17 @@ GET /api/v1/search?q=اشتقاق
 ```
 
 
-### API on Toolforge (Components Service)
+### API on Toolforge (Build Service)
 
-ASGI applications cannot run on Toolforge's legacy `python3.13` uWSGI webservice — they require the **Build Service** stack, which uses Cloud Native Buildpacks to build a container image directly from the public GitHub repo and runs it according to the [Procfile](Procfile). Frontend assets (`backend/frontend/dist/`) are committed to git so the Python buildpack alone is sufficient — no Node.js step in the build pipeline.
-
-The tool runs as a [Components Service](https://wikitech.wikimedia.org/wiki/Help:Toolforge/Deploy_your_tool) component declared in [toolforge.yaml](toolforge.yaml). Pushes to `main` auto-deploy via GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)): the workflow runs tests, then `POST`s to the Toolforge components API to rebuild and roll out.
+ASGI applications cannot run on Toolforge's legacy `python3.13` uWSGI webservice — they require the **Build Service** backend, which uses Cloud Native Buildpacks to build a container image directly from the public GitHub repo and runs it according to the [Procfile](Procfile). Frontend assets (`backend/frontend/dist/`) are committed to git so the Python buildpack alone is sufficient — no Node.js step in the build pipeline.
 
 Refs:
 - https://wikitech.wikimedia.org/wiki/Help:Toolforge/My_first_Python_ASGI_tool
 - https://wikitech.wikimedia.org/wiki/Help:Toolforge/Build_Service
-- https://wikitech.wikimedia.org/wiki/Help:Toolforge/Deploy_your_tool
 
 #### Initial Setup
 
-DB credentials don't need to be configured: Toolforge auto-injects `TOOL_REPLICA_USER` and `TOOL_REPLICA_PASSWORD` into Build Service containers. The app reads them directly from `os.environ`.
-
-One-time migration to the Components Service (only needed when first switching, or after a rebuild from scratch):
+DB credentials don't need to be configured: Toolforge auto-injects `TOOL_REPLICA_USER` and `TOOL_REPLICA_PASSWORD` into Build Service containers (same as for the legacy uWSGI webservice). The app reads them directly from `os.environ`.
 
 ```sh
 ssh toolforge
@@ -132,56 +127,30 @@ become wikitermbase
 # Stop the legacy webservice if it was previously running on python3.13
 toolforge webservice --backend=kubernetes python3.13 stop || true
 
-# Stop the standalone buildservice webservice — Components Service takes over
-toolforge webservice buildservice stop || true
+# Build the image from the public GitHub repo
+toolforge build start https://github.com/forzagreen/wikitermbase
+toolforge build show   # wait until status is ok(Succeeded)
 
-# Apply the components config (reads toolforge.yaml from the repo via source_url)
-toolforge components config create toolforge.yaml
-
-# First deploy (also starts the web component)
-toolforge components deployment create --force-build --force-run
+# Start the Build Service webservice
+toolforge webservice buildservice start --mount=none
 ```
 
-Watch progress: `toolforge components deployment show`. Test: `https://wikitermbase.toolforge.org/api/v1/stats`. Logs: `toolforge webservice logs -f`.
-
-Then create the deploy token used by GitHub Actions:
-
-```sh
-toolforge components deploy-token create   # copy the printed token
-```
-
-In GitHub, add the token as a repository secret:
-**Settings → Secrets and variables → Actions → New repository secret**
-- Name: `TOOLS_DEPLOY_TOKEN`
-- Value: the token printed above
-
-Token management:
-- View: `toolforge components deploy-token show`
-- Rotate: `toolforge components deploy-token refresh` (then update the GitHub secret)
+Test: `https://wikitermbase.toolforge.org/api/v1/stats`. Logs: `toolforge webservice buildservice logs -f`.
 
 #### Updating the Codebase
 
-Push to `main`. After `make check && make test` pass on GitHub Actions, the `deploy` job calls the Toolforge components API, which rebuilds the image and rolls out the new revision. Watch progress under the repo's Actions tab and on Toolforge with `toolforge components deployment show`.
-
-The Python buildpack auto-detects `uv.lock` and installs deps with `uv sync`, so committing changes to `pyproject.toml` + `uv.lock` is all that's needed when adding dependencies. Frontend changes still require `make build_frontend && git add backend/frontend/dist && git commit` before pushing — `dist/` is committed intentionally.
-
-Verify the gadget on Arabic Wikipedia still works after each deploy.
-
-##### Manual deploy (fallback)
-
-If GitHub Actions is down or you need to force a deploy from your laptop:
-
-```sh
-curl --fail-with-body -X POST \
-  "https://api.svc.toolforge.org/components/v1/tool/wikitermbase/deployment?token=$TOOLS_DEPLOY_TOKEN&force-build=true"
-```
-
-Or from a Toolforge SSH session:
+After pushing changes to `main` on GitHub (including any frontend rebuild — `make build_frontend && git add backend/frontend/dist && git commit`):
 
 ```sh
 ssh toolforge && become wikitermbase
-toolforge components deployment create --force-build --force-run
+toolforge build start https://github.com/forzagreen/wikitermbase
+toolforge build show   # wait until status is ok(Succeeded)
+toolforge webservice buildservice restart
 ```
+
+The Python buildpack auto-detects `uv.lock` and installs deps with `uv sync`, so committing changes to `pyproject.toml` + `uv.lock` is all that's needed when adding dependencies.
+
+Verify the gadget on Arabic Wikipedia still works after each deploy.
 
 
 ## Database: MariaDB

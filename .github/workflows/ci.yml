@@ -6,7 +6,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-
+    
     steps:
     - uses: actions/checkout@v6
     - uses: astral-sh/setup-uv@v7
@@ -15,18 +15,3 @@ jobs:
     - run: make init
     - run: make check
     - run: make test
-
-  deploy:
-    needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    concurrency:
-      group: toolforge-deploy
-      cancel-in-progress: false
-    steps:
-    - name: Trigger Toolforge deploy
-      env:
-        TOOLS_DEPLOY_TOKEN: ${{ secrets.TOOLS_DEPLOY_TOKEN }}
-      run: |
-        curl --fail-with-body -sS -X POST \
-          "https://api.svc.toolforge.org/components/v1/tool/wikitermbase/deployment?token=${TOOLS_DEPLOY_TOKEN}&force-build=true"

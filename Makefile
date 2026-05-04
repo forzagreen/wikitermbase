@@ -16,7 +16,7 @@ test:
 	uv run pytest -vvv backend/tests
 
 run:
-	uv run uvicorn backend.app:fastapi_app --reload --port 5001
+	uv run uvicorn backend.app:app --reload --port 5001
 
 build_frontend:
 	cd backend/frontend && npm install && npm run build

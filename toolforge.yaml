@@ -10,4 +10,4 @@ components:
       port: 8000
       mount: none
       replicas: 1
-      health_check_http: /api/v1/stats
+      health_check_http: /healthz

@@ -5,8 +5,6 @@ import re
 from collections import Counter
 
 import sentry_sdk
-from arabterm.mariadb_models import Dictionary as MariaDBDictionary
-from arabterm.mariadb_models import Term as MariaDBTerm
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse

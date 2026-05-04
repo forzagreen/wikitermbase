@@ -6,7 +6,6 @@ dependencies = [
     "arabterm @ git+https://github.com/forzagreen/arabterm.git",
     "fastapi",
     "gunicorn",
-    "pandas",
     "pymysql",
     "sentry-sdk[fastapi]",
     "sqlalchemy",

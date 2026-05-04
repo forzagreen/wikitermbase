@@ -142,7 +142,7 @@ toolforge components config create toolforge.yaml
 toolforge components deployment create --force-build --force-run
 ```
 
-Watch progress: `toolforge components deployment show`. Test: `https://wikitermbase.toolforge.org/api/v1/stats`. Logs: `toolforge components logs -f web`.
+Watch progress: `toolforge components deployment show`. Test: `https://wikitermbase.toolforge.org/api/v1/stats`. Logs: `toolforge webservice logs -f`.
 
 Then create the deploy token used by GitHub Actions:
 

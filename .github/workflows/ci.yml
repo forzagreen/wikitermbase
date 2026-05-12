@@ -2,11 +2,12 @@ name: CI
 
 on:
   push:
+  workflow_dispatch:
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v6
     - uses: astral-sh/setup-uv@v7
@@ -15,3 +16,84 @@ jobs:
     - run: make init
     - run: make check
     - run: make test
+
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+      data: ${{ steps.filter.outputs.data }}
+    steps:
+    - uses: actions/checkout@v6
+    - uses: dorny/paths-filter@v3
+      id: filter
+      with:
+        filters: |
+          data:
+            - 'db/arabterm.sql'
+          code:
+            - '!db/arabterm.sql'
+            - '!**/*.md'
+
+  deploy-code:
+    needs: [test, changes]
+    if: |
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'push' && needs.changes.outputs.code == 'true'))
+    runs-on: ubuntu-latest
+    concurrency:
+      group: toolforge-deploy-code
+      cancel-in-progress: false
+    steps:
+    - uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ secrets.TOOLFORGE_SSH_HOST }}
+        username: ${{ secrets.TOOLFORGE_SSH_USER }}
+        key: ${{ secrets.TOOLFORGE_SSH_PRIVATE_KEY }}
+        fingerprint: ${{ secrets.TOOLFORGE_KNOWN_HOSTS }}
+        request_pty: true
+        command_timeout: 15m
+        script: |
+          set -e
+          become wikitermbase bash -lc '
+            set -e
+            toolforge build start https://github.com/forzagreen/wikitermbase
+            sleep 5
+            for i in $(seq 1 90); do
+              out=$(toolforge build show 2>/dev/null || true)
+              printf "%s\n" "$out" | tail -3
+              if printf "%s" "$out" | grep -Eq "ok\(Succeeded\)|Succeeded"; then break; fi
+              if printf "%s" "$out" | grep -Eiq "failed|error"; then echo "BUILD FAILED"; exit 1; fi
+              sleep 10
+            done
+            toolforge webservice buildservice restart
+          '
+
+  deploy-db:
+    needs: [test, changes]
+    if: |
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' &&
+      needs.changes.outputs.data == 'true'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: toolforge-deploy-db
+      cancel-in-progress: false
+    steps:
+    - uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ secrets.TOOLFORGE_SSH_HOST }}
+        username: ${{ secrets.TOOLFORGE_SSH_USER }}
+        key: ${{ secrets.TOOLFORGE_SSH_PRIVATE_KEY }}
+        fingerprint: ${{ secrets.TOOLFORGE_KNOWN_HOSTS }}
+        request_pty: true
+        command_timeout: 30m
+        script: |
+          set -e
+          become wikitermbase bash -lc '
+            set -e
+            cd ~/wikitermbase
+            git pull --ff-only origin main
+            mariadb --defaults-file=$HOME/replica.my.cnf -h tools.db.svc.wikimedia.cloud s55953__arabterm < db/arabterm.sql
+            echo "DB import complete."
+          '

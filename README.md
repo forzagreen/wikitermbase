@@ -139,7 +139,13 @@ Test: `https://wikitermbase.toolforge.org/api/v1/stats`. Logs: `toolforge webser
 
 #### Updating the Codebase
 
-After pushing changes to `main` on GitHub (including any frontend rebuild — `make build_frontend && git add backend/frontend/dist && git commit`):
+Code deploys are automated. On push to `main`, the `deploy-code` job in [.github/workflows/ci.yml](.github/workflows/ci.yml) SSHs into the bastion and runs `toolforge build start` + `toolforge webservice buildservice restart`. Markdown-only and data-only changes skip the rebuild. Manual re-deploy: Actions tab → "CI" → "Run workflow" on `main`.
+
+Include any frontend rebuild in the commit (`make build_frontend && git add backend/frontend/dist && git commit`). The Python buildpack auto-detects `uv.lock` and installs deps with `uv sync`, so committing changes to `pyproject.toml` + `uv.lock` is all that's needed when adding dependencies.
+
+Verify the gadget on Arabic Wikipedia still works after each deploy.
+
+Manual fallback (if GitHub Actions is down):
 
 ```sh
 ssh toolforge && become wikitermbase
@@ -147,10 +153,6 @@ toolforge build start https://github.com/forzagreen/wikitermbase
 toolforge build show   # wait until status is ok(Succeeded)
 toolforge webservice buildservice restart
 ```
-
-The Python buildpack auto-detects `uv.lock` and installs deps with `uv sync`, so committing changes to `pyproject.toml` + `uv.lock` is all that's needed when adding dependencies.
-
-Verify the gadget on Arabic Wikipedia still works after each deploy.
 
 
 ## Database: MariaDB
@@ -206,12 +208,21 @@ Ref: https://wikitech.wikimedia.org/wiki/Help:Toolforge/Database#User_databases
 
 #### Updating the Database
 
-To update/restore the database:
+DB imports are automated. The flow is:
 
-- `ssh toolforge` and `become wikitermbase`
-- `cd wikitermbase` and `git pull origin main` (supply username and token)
-- `cd ~/wikitermbase/db`
-- `mariadb --defaults-file=$HOME/replica.my.cnf -h tools.db.svc.wikimedia.cloud s55953__arabterm < arabterm.sql`
+1. Update data in [forzagreen/arabterm](https://github.com/forzagreen/arabterm) and merge to `main`. When `db/mariadb/arabterm.sql.gz` changes, arabterm's `notify-wikitermbase.yml` dispatches an event to this repo.
+2. wikitermbase's `refresh-dump.yml` runs `make download_dump && make fix_dump` and opens a PR titled `chore: refresh DB dump from arabterm@<sha>`.
+3. Review the diff to `db/arabterm.sql` and merge. CI's `deploy-db` job SSHs into the bastion and runs `mariadb ... < db/arabterm.sql` automatically.
+
+Manual triggers:
+- **Re-run the dump regeneration:** Actions tab → "Refresh DB dump from arabterm" → "Run workflow".
+- **Re-import without a code change:**
+
+  ```sh
+  ssh toolforge && become wikitermbase
+  cd ~/wikitermbase
+  mariadb --defaults-file=$HOME/replica.my.cnf -h tools.db.svc.wikimedia.cloud s55953__arabterm < db/arabterm.sql
+  ```
 
 
 #### Troubleshooting

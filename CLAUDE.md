@@ -19,7 +19,7 @@ make check         # Lint check with ruff
 make build_frontend   # Build React app (cd backend/frontend && npm install && npm run build)
 cd backend/frontend && npm run dev   # Start Vite dev server with hot reload
 
-# Database
+# Database (normally invoked by CI; useful for local debugging only)
 make download_dump    # Download MariaDB dump from arabterm repo
 make fix_dump         # Fix SQL dump compatibility issues
 ```
@@ -45,6 +45,19 @@ make fix_dump         # Fix SQL dump compatibility issues
 user = MyUserName
 password = MyTestPassword
 ```
+
+## Deployment automation
+
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) classifies pushed paths via `dorny/paths-filter` and runs one of two SSH-based deploy jobs into the Toolforge bastion (as personal user `forzagreen`, then `become wikitermbase`):
+- `deploy-code` runs on code changes: `toolforge build start` → poll `toolforge build show --json` for `status: ok` → `toolforge webservice buildservice restart`.
+- `deploy-db` runs when `db/arabterm.sql` changed: `git pull --ff-only origin main` then `mariadb ... < db/arabterm.sql`.
+- Markdown-only changes skip both deploys.
+
+Data sync is cross-repo. When `db/mariadb/arabterm.sql.gz` changes on `forzagreen/arabterm` main, that repo's `notify-wikitermbase.yml` sends a `repository_dispatch` to this repo; [.github/workflows/refresh-dump.yml](.github/workflows/refresh-dump.yml) then runs `make download_dump && make fix_dump` and opens a PR via `peter-evans/create-pull-request`. Maintainer reviews and merges, which triggers `deploy-db`.
+
+Required secrets: `TOOLFORGE_SSH_PRIVATE_KEY` (deploy ed25519 key registered on the maintainer's [toolsadmin](https://toolsadmin.wikimedia.org/profile/settings/ssh-keys/) profile — NOT in the bastion's `~/.ssh/authorized_keys`), and `WIKITERMBASE_REFRESH_PAT` (fine-grained PAT scoped to this repo with Contents+PR write; the same value lives in arabterm as `WIKITERMBASE_DISPATCH_PAT` for the dispatch call). Host (`login.toolforge.org`), username (`forzagreen`), and ECDSA host-key fingerprint (`SHA256:BOuOp0PJ...`) are inlined in the workflow since they're not secret.
+
+CI script gotchas: `appleboy/ssh-action` wraps `appleboy/drone-ssh`, which (a) substitutes bare `$VAR` references in the script as if they were env vars (escape with `$$VAR` or wrap in a `bash << 'EOF'` heredoc), and (b) requires `request_pty: true` for `become` to work over non-interactive SSH (sudo/PAM needs a tty).
 
 ## Key Implementation Details
 

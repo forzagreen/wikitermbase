@@ -50,6 +50,7 @@ jobs:
         host: login.toolforge.org
         username: forzagreen
         key: ${{ secrets.TOOLFORGE_SSH_PRIVATE_KEY }}
+        # SSH fingerprints: https://wikitech.wikimedia.org/wiki/Help:SSH_Fingerprints/login.toolforge.org
         fingerprint: SHA256:BOuOp0PJ5hHLM5YD30nCLAETdO6VpzCPvTqOU/dKNTc
         request_pty: true
         command_timeout: 15m
@@ -101,6 +102,7 @@ jobs:
         host: login.toolforge.org
         username: forzagreen
         key: ${{ secrets.TOOLFORGE_SSH_PRIVATE_KEY }}
+        # SSH fingerprints: https://wikitech.wikimedia.org/wiki/Help:SSH_Fingerprints/login.toolforge.org
         fingerprint: SHA256:BOuOp0PJ5hHLM5YD30nCLAETdO6VpzCPvTqOU/dKNTc
         request_pty: true
         command_timeout: 30m

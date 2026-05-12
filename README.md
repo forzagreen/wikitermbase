@@ -157,42 +157,7 @@ toolforge webservice buildservice restart
 
 ## Database: MariaDB
 
-### Updating data
-
-Ref: https://mariadb.com/kb/en/backup-and-restore-overview/
-
-Prerequisite: SQLite arabterm.db is up to date in [arabterm](https://github.com/forzagreen/arabterm) repository (`main` branch).
-
-From [arabterm](https://github.com/forzagreen/arabterm) repository, generate MariaDB database:
-
-```sh
-make init_mariadb  # start or create container
-make delete_mariadb
-make migrate_to_mariadb
-
-# Make sure search works in MariaDB:
-make search_mariadb term="telescope"
-
-# Generate database dumps, SQLite and MariaDB:
-make dump
-```
-
-Commit and push `arabterm.db` and `db/` to arabterm GitHub repository:
-
-Then, from [wikitermbase](https://github.com/forzagreen/wikitermbase) repository:
-
-```sh
-# If python dependencies changed (including arabterm python package):
-pip uninstall arabterm
-make init
-
-# Download dump from arabterm repository, branch main
-make download_dump
-make fix_dump
-```
-
-Commit changes to git. Then go to ToolForge and update the database.
-
+Data lives in [forzagreen/arabterm](https://github.com/forzagreen/arabterm) — that's the source of truth and where dictionary edits happen. When a PR touching `db/mariadb/arabterm.sql.gz` is merged to arabterm's `main`, the cross-repo CI flow auto-opens a PR here with the regenerated `db/arabterm.sql`; merging that PR triggers the production DB import (see "Updating the Database" below). For the upstream dump-generation workflow (`make init_mariadb`, `make migrate_to_mariadb`, `make dump`), see arabterm's README.
 
 ### MariaDB on Toolforge
 

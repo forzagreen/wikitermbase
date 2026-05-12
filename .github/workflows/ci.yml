@@ -59,13 +59,30 @@ jobs:
             set -e
             toolforge build start https://github.com/forzagreen/wikitermbase
             sleep 5
+            ok=0
             for i in $(seq 1 90); do
-              out=$(toolforge build show 2>/dev/null || true)
-              printf "%s\n" "$out" | tail -3
-              if printf "%s" "$out" | grep -Eq "ok\(Succeeded\)|Succeeded"; then break; fi
-              if printf "%s" "$out" | grep -Eiq "failed|error"; then echo "BUILD FAILED"; exit 1; fi
-              sleep 10
+              status=$(toolforge build show --json 2>/dev/null | jq -r ".build.status // \"unknown\"")
+              echo "[$i/90] status: $status"
+              case "$status" in
+                ok)
+                  ok=1
+                  break
+                  ;;
+                failed|error|cancelled|timeout)
+                  echo "BUILD FAILED with status: $status"
+                  toolforge build show
+                  exit 1
+                  ;;
+                running|unknown|"")
+                  sleep 10
+                  ;;
+                *)
+                  echo "Unexpected build status: $status"
+                  sleep 10
+                  ;;
+              esac
             done
+            [ "$ok" = "1" ] || { echo "Build poll timed out after 15 minutes"; exit 1; }
             toolforge webservice buildservice restart
           '
 

@@ -10,7 +10,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
-    - uses: astral-sh/setup-uv@v7
+    - uses: astral-sh/setup-uv@v8
       with:
         python-version: '3.13'
     - run: make init
@@ -24,7 +24,7 @@ jobs:
       data: ${{ steps.filter.outputs.data }}
     steps:
     - uses: actions/checkout@v6
-    - uses: dorny/paths-filter@v3
+    - uses: dorny/paths-filter@v4
       id: filter
       with:
         filters: |
@@ -47,44 +47,43 @@ jobs:
     steps:
     - uses: appleboy/ssh-action@v1
       with:
-        host: ${{ secrets.TOOLFORGE_SSH_HOST }}
-        username: ${{ secrets.TOOLFORGE_SSH_USER }}
+        host: login.toolforge.org
+        username: forzagreen
         key: ${{ secrets.TOOLFORGE_SSH_PRIVATE_KEY }}
-        fingerprint: ${{ secrets.TOOLFORGE_KNOWN_HOSTS }}
+        fingerprint: SHA256:BOuOp0PJ5hHLM5YD30nCLAETdO6VpzCPvTqOU/dKNTc
         request_pty: true
         command_timeout: 15m
         script: |
-          set -e
-          become wikitermbase bash -lc '
-            set -e
-            toolforge build start https://github.com/forzagreen/wikitermbase
-            sleep 5
-            ok=0
-            for i in $(seq 1 90); do
-              status=$(toolforge build show --json 2>/dev/null | jq -r ".build.status // \"unknown\"")
-              echo "[$i/90] status: $status"
-              case "$status" in
-                ok)
-                  ok=1
-                  break
-                  ;;
-                failed|error|cancelled|timeout)
-                  echo "BUILD FAILED with status: $status"
-                  toolforge build show
-                  exit 1
-                  ;;
-                running|unknown|"")
-                  sleep 10
-                  ;;
-                *)
-                  echo "Unexpected build status: $status"
-                  sleep 10
-                  ;;
-              esac
-            done
-            [ "$ok" = "1" ] || { echo "Build poll timed out after 15 minutes"; exit 1; }
-            toolforge webservice buildservice restart
-          '
+          become wikitermbase bash << 'EOF'
+          set -euo pipefail
+
+          echo "[DEPLOY] Starting build"
+          toolforge build start https://github.com/forzagreen/wikitermbase
+          sleep 5
+
+          echo "[DEPLOY] Polling build status..."
+          ok=0
+          for i in $(seq 1 90); do
+            status=$(toolforge build show --json 2>/dev/null | jq -r '.build.status // "unknown"')
+            echo "  [$i/90] status: $status"
+            case "$status" in
+              ok) ok=1; break ;;
+              failed|error|cancelled|timeout)
+                echo "[DEPLOY] BUILD FAILED with status: $status"
+                toolforge build show
+                exit 1
+                ;;
+              running|unknown|"") sleep 10 ;;
+              *) sleep 10 ;;
+            esac
+          done
+
+          [ "$ok" = "1" ] || { echo "[DEPLOY] Build poll timed out after 15 minutes"; exit 1; }
+
+          echo "[DEPLOY] Build succeeded; restarting webservice"
+          toolforge webservice buildservice restart
+          echo "[DEPLOY] Done"
+          EOF
 
   deploy-db:
     needs: [test, changes]
@@ -99,18 +98,22 @@ jobs:
     steps:
     - uses: appleboy/ssh-action@v1
       with:
-        host: ${{ secrets.TOOLFORGE_SSH_HOST }}
-        username: ${{ secrets.TOOLFORGE_SSH_USER }}
+        host: login.toolforge.org
+        username: forzagreen
         key: ${{ secrets.TOOLFORGE_SSH_PRIVATE_KEY }}
-        fingerprint: ${{ secrets.TOOLFORGE_KNOWN_HOSTS }}
+        fingerprint: SHA256:BOuOp0PJ5hHLM5YD30nCLAETdO6VpzCPvTqOU/dKNTc
         request_pty: true
         command_timeout: 30m
         script: |
-          set -e
-          become wikitermbase bash -lc '
-            set -e
-            cd ~/wikitermbase
-            git pull --ff-only origin main
-            mariadb --defaults-file=$HOME/replica.my.cnf -h tools.db.svc.wikimedia.cloud s55953__arabterm < db/arabterm.sql
-            echo "DB import complete."
-          '
+          become wikitermbase bash << 'EOF'
+          set -euo pipefail
+
+          echo "[DB] Pulling latest code from main"
+          cd ~/wikitermbase
+          git pull --ff-only origin main
+
+          echo "[DB] Importing db/arabterm.sql"
+          mariadb --defaults-file="$HOME/replica.my.cnf" -h tools.db.svc.wikimedia.cloud s55953__arabterm < db/arabterm.sql
+
+          echo "[DB] Import complete"
+          EOF

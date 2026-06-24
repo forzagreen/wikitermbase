@@ -1,8 +1,9 @@
 // src/components/DictionaryApp.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
-import { Search, ExternalLink, ChevronDown, ChevronUp, Moon, Sun, Quote, Copy, Check, HelpCircle, BookOpen } from 'lucide-react';
+import { Search, ExternalLink, ChevronDown, ChevronUp, Quote, Copy, Check, HelpCircle, BookOpen } from 'lucide-react';
 import Logo from './Logo';
+import ThemeToggle from './ThemeToggle';
 
 const ExpandableText = ({ text, charLimit = 200 }) => {
   const [expanded, setExpanded] = useState(false);
@@ -33,11 +34,6 @@ const DictionaryApp = () => {
   const [results, setResults] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    if (saved !== null) return saved === 'true';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
   const [openPopupId, setOpenPopupId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const searchInputRef = useRef(null);
@@ -47,15 +43,6 @@ const DictionaryApp = () => {
   useEffect(() => {
     searchInputRef.current?.focus();
   }, []);
-
-  // Save dark mode preference to localStorage
-  const toggleDarkMode = () => {
-    setDarkMode(prev => {
-      const newValue = !prev;
-      localStorage.setItem('darkMode', String(newValue));
-      return newValue;
-    });
-  };
 
   // Handle click outside citation popup
   useEffect(() => {
@@ -117,7 +104,7 @@ const DictionaryApp = () => {
         <div key="wikidata" className="inline-flex items-center">
           <span className="relative mr-2">
             <button
-              className="inline-flex items-center text-gray-600 hover:text-blue-600 transition-colors citation-popup"
+              className="inline-flex items-center text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 transition-colors citation-popup"
               onClick={(e) => {
                 e.stopPropagation();
                 setOpenPopupId(openPopupId === occurrence.id ? null : occurrence.id);
@@ -234,28 +221,18 @@ const DictionaryApp = () => {
     }, 600);
   };
 
-  const themeClasses = darkMode ? 
-    'bg-gray-900 text-white' : 
-    'bg-gray-50 text-gray-900';
+  const themeClasses = 'bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white';
 
-  const cardClasses = darkMode ?
-    'bg-gray-800 shadow-md' :
-    'bg-white shadow-md';
+  const cardClasses = 'bg-white shadow-md dark:bg-gray-800';
 
-  const inputClasses = darkMode ?
-    'bg-gray-800 border-gray-600 text-white placeholder-gray-400' :
-    'bg-white border-gray-300 text-gray-900 placeholder-gray-500';
+  const inputClasses =
+    'bg-white border-gray-300 text-gray-900 placeholder-gray-500 ' +
+    'dark:bg-gray-800 dark:border-gray-600 dark:text-white dark:placeholder-gray-400';
 
-  const occurrenceClasses = darkMode ?
-    'bg-gray-700' :
-    'bg-gray-50';
+  const occurrenceClasses = 'bg-gray-50 dark:bg-gray-700';
 
   const LanguageLabel = ({ lang }) => (
-    <span className={`text-xs px-1.5 py-0.5 rounded ${
-      darkMode 
-        ? 'bg-gray-700 text-gray-300' 
-        : 'bg-gray-200 text-gray-600'
-    }`}>
+    <span className="text-xs px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
       {lang}
     </span>
   );
@@ -286,12 +263,7 @@ const DictionaryApp = () => {
               >
                 <HelpCircle size={24} />
               </a>
-              <button
-                onClick={toggleDarkMode}
-                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-              >
-                {darkMode ? <Sun size={24} /> : <Moon size={24} />}
-              </button>
+              <ThemeToggle />
             </div>
           </div>
         </div>
@@ -375,14 +347,14 @@ const DictionaryApp = () => {
             </div>
 
             {/* Dictionary entries section */}
-            <div className="border-t pt-4">
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
               <div className="flex justify-between items-center mb-2">
                 <p className="text-gray-500">
                   {formatDictionaryCount(group.occurences.length)}
                 </p>
-                <button 
+                <button
                   onClick={() => toggleGroup(index)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                 >
                   {expandedGroups[index] ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                 </button>

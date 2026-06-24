@@ -1,27 +1,14 @@
 // src/components/Dictionaries.jsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
-import { Moon, Sun, ExternalLink, BookOpen } from 'lucide-react';
+import { ExternalLink, BookOpen } from 'lucide-react';
 import Logo from './Logo';
+import ThemeToggle from './ThemeToggle';
 
 const Dictionaries = () => {
   const [dictionaries, setDictionaries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [darkMode, setDarkMode] = useState(() => {
-    const saved = localStorage.getItem('darkMode');
-    if (saved !== null) return saved === 'true';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
-
-  // Save dark mode preference to localStorage
-  const toggleDarkMode = () => {
-    setDarkMode(prev => {
-      const newValue = !prev;
-      localStorage.setItem('darkMode', String(newValue));
-      return newValue;
-    });
-  };
 
   // Fetch dictionaries on mount
   useEffect(() => {
@@ -43,13 +30,9 @@ const Dictionaries = () => {
     fetchDictionaries();
   }, []);
 
-  const themeClasses = darkMode ?
-    'bg-gray-900 text-white' :
-    'bg-gray-50 text-gray-900';
+  const themeClasses = 'bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white';
 
-  const cardClasses = darkMode ?
-    'bg-gray-800 shadow-md' :
-    'bg-white shadow-md';
+  const cardClasses = 'bg-white shadow-md dark:bg-gray-800';
 
   const formatNumber = (num) => {
     if (num === null || num === undefined) return '-';
@@ -66,12 +49,7 @@ const Dictionaries = () => {
               <Logo className="h-10" />
             </Link>
             <h1 className="text-3xl font-bold">قائمة المعاجم</h1>
-            <button
-              onClick={toggleDarkMode}
-              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-            >
-              {darkMode ? <Sun size={24} /> : <Moon size={24} />}
-            </button>
+            <ThemeToggle />
           </div>
         </div>
       </header>

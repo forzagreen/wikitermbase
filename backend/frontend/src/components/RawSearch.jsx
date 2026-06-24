@@ -1,6 +1,7 @@
 // src/components/RawSearch.jsx
 import React, { useState, useEffect } from 'react';
-import { Search, ExternalLink, ChevronDown, ChevronUp, Link2, Loader2, Quote, Check, Copy, Moon, Sun } from 'lucide-react';
+import { Search, ExternalLink, ChevronDown, ChevronUp, Link2, Loader2, Quote, Check, Copy } from 'lucide-react';
+import ThemeToggle from './ThemeToggle';
 
 const RawSearch = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -11,14 +12,6 @@ const RawSearch = () => {
   const [error, setError] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [openPopupId, setOpenPopupId] = useState(null);
-  const [darkMode, setDarkMode] = useState(false);
-
-  // Initialize dark mode from system preference
-  useEffect(() => {
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setDarkMode(true);
-    }
-  }, []);
 
   // Previous useEffect handlers remain the same...
   useEffect(() => {
@@ -99,23 +92,13 @@ const RawSearch = () => {
   };
 
   return (
-    <div className={`min-h-screen bg-white dark:bg-gray-900 transition-colors duration-200 ${darkMode ? 'dark' : ''}`}>
+    <div className="min-h-screen bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200">
       <div className="max-w-4xl mx-auto p-4" dir="rtl">
-        {/* Header with Dark Mode Toggle */}
+        {/* Header with theme switcher */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-3xl font-bold text-right dark:text-white">قاموس المصطلحات التقنية</h1>
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-            >
-              {darkMode ? (
-                <Sun className="text-yellow-400" size={24} />
-              ) : (
-                <Moon className="text-gray-600" size={24} />
-              )}
-            </button>
+            <ThemeToggle />
           </div>
           <div className="relative">
             <input

@@ -27,7 +27,7 @@ const RawSearch = () => {
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
-      if (searchQuery.trim()) {
+      if (searchQuery.trim().length >= 3) {
         performSearch(searchQuery);
         if (isArabic(searchQuery)) {
           performMorphAnalysis(searchQuery);
@@ -159,7 +159,7 @@ const RawSearch = () => {
             لا توجد نتائج للبحث عن "{searchQuery}"
           </div>
         )}
-        {!isLoading && searchQuery.trim().length > 0 && searchQuery.trim().length < 3 && !error && (
+        {!isLoading && searchQuery.trim().length > 0 && searchQuery.trim().length < 3 && results.length === 0 && !error && (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
             يرجى إدخال 3 أحرف على الأقل للبحث.
           </div>

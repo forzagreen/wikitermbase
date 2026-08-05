@@ -168,6 +168,17 @@ mw.loader.using([
       return;
     }
 
+    if (searchTerm.length < 3) {
+      this.loadingIndicator.$element.hide();
+      this.errorMessage.$element.hide();
+      const minLengthMsg = $('<div>')
+        .addClass('wikiterm-no-results')
+        .text('يرجى إدخال 3 أحرف على الأقل للبحث.');
+
+      this.resultsContainer.$element.empty().append(minLengthMsg);
+      return;
+    }
+
     // Show loading indicator
     this.loadingIndicator.$element.show();
     this.errorMessage.$element.hide();

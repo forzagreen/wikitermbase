@@ -307,6 +307,11 @@ const DictionaryApp = () => {
             <p className="text-lg">عذرًا، لم نعثر على أي نتائج.</p>
           </div>
         )}
+        {!loading && !error && results.length === 0 && searchTerm.trim().length > 0 && searchTerm.trim().length < 3 && (
+          <div className={`${cardClasses} rounded-lg p-6 text-center`}>
+            <p className="text-lg">يرجى إدخال 3 أحرف على الأقل للبحث.</p>
+          </div>
+        )}
         {results.map((group, index) => {
           const occurrencesCounts = results.map(g => g.occurences.length);
           const maxOccurrences = Math.max(...occurrencesCounts);

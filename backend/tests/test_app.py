@@ -1,5 +1,12 @@
 import pytest
-from app import aggregate_terms, normalise_arabic, normalise_english, normalise_french
+from app import (
+    aggregate_terms,
+    normalise_arabic,
+    normalise_english,
+    normalise_french,
+    query_matches_term,
+    split_translations,
+)
 
 
 @pytest.mark.parametrize(
@@ -259,3 +266,110 @@ def test_aggregate_terms_orders_occurences_by_dict_type_then_tier():
     )
 
     assert [o["dictionary_id"] for o in groups[0]["occurences"]] == [4, 3, 2, 1, 5]
+
+
+@pytest.mark.parametrize(
+    "input_text, expected_output",
+    [
+        ("تلسكوب، مِقْراب", ["تلسكوب", "مِقْراب"]),
+        ("مُشترِك، مستهلِك، مستعمِل", ["مُشترِك", "مستهلِك", "مستعمِل"]),
+        ("مِقراب؛ راصدة", ["مِقراب", "راصدة"]),
+        ("landslide; landslip", ["landslide", "landslip"]),
+        ("ordinateur; calculatrice", ["ordinateur", "calculatrice"]),
+        ("container/dumpster", ["container", "dumpster"]),
+        ("  a  ;  b  /c", ["a", "b", "c"]),
+        ("مقراب", ["مقراب"]),
+        # A plain ',' is NOT a separator: this dataset also uses it for
+        # headword inversion ("profile, hydraulic") and gender/POS
+        # annotations ("vitesse commerciale, f"), so splitting on it would
+        # fabricate bogus translations.
+        ("profile, hydraulic", ["profile, hydraulic"]),
+    ],
+)
+def test_split_translations(input_text, expected_output):
+    assert split_translations(input_text) == expected_output
+
+
+def test_query_matches_term_exact_arabic_part():
+    term = {"arabic": "تلسكوب، مِقْراب", "english": "telescope"}
+    assert query_matches_term(term, "مقراب") is True
+    assert query_matches_term(term, "تلسكوب") is True
+    assert query_matches_term(term, "مرصد") is False
+
+
+def test_query_matches_term_exact_translation_part_case_insensitive():
+    term = {
+        "arabic": "انزلاق التربة",
+        "english": "landslide; landslip",
+        "french": "éboulement",
+    }
+    assert query_matches_term(term, "Landslide") is True
+    assert query_matches_term(term, "landslip") is True
+    assert query_matches_term(term, "landslides") is False
+
+
+def test_query_matches_term_strips_quoted_query():
+    # The frontend and gadget both send q=`"${term}"` (literal quotes).
+    term = {"english": "telescope"}
+    assert query_matches_term(term, '"telescope"') is True
+
+
+def test_query_matches_term_not_fooled_by_compound_phrase():
+    term = {"english": "reflecting telescope"}
+    assert query_matches_term(term, "telescope") is False
+
+
+def test_query_matches_term_empty_query():
+    assert query_matches_term({"english": "telescope"}, "") is False
+
+
+def test_aggregate_terms_merges_rows_via_separator_packed_translations():
+    # id=140327-like row: a plain, single-spelling entry.
+    plain_telescope = {
+        "arabic": "مقراب",
+        "english": "telescope",
+        "dictionary_id": 1,
+        "relevance": 1.0,
+    }
+    # id=208889: packs two synonymous Arabic spellings in one field, one of
+    # which ("مقراب") matches the plain entry above.
+    packed = {
+        "arabic": "تلسكوب، مِقْراب",
+        "english": "telescope",
+        "dictionary_id": 2,
+        "relevance": 1.0,
+    }
+    groups = aggregate_terms([plain_telescope, packed])
+
+    assert len(groups) == 1
+    assert groups[0]["dictionary_ids"] == [1, 2]
+    assert {o["dictionary_id"] for o in groups[0]["occurences"]} == {1, 2}
+
+
+def test_aggregate_terms_bubbles_exact_match_to_top():
+    # id=134457-like: a single-dictionary exact match for "telescope".
+    exact_match = {
+        "arabic": "مرقب",
+        "english": "telescope",
+        "dictionary_id": 1,
+        "relevance": 10.0,
+    }
+    # A compound phrase spread across two dictionaries -- more supporting
+    # dictionaries than the exact match, but not itself an exact match.
+    compound_a = {
+        "arabic": "مقراب عاكس",
+        "english": "reflecting telescope",
+        "dictionary_id": 2,
+        "relevance": 10.0,
+    }
+    compound_b = {
+        "arabic": "مقراب عاكس",
+        "english": "reflecting telescope",
+        "dictionary_id": 3,
+        "relevance": 10.0,
+    }
+
+    groups = aggregate_terms([exact_match, compound_a, compound_b], "telescope")
+
+    assert groups[0]["arabic_normalised"] == "مرقب"
+    assert groups[1]["arabic_normalised"] == "مقراب عاكس"

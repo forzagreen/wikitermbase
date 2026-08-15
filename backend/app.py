@@ -396,6 +396,8 @@ class Dictionary(BaseModel):
     id: int
     name_arabic: str
     wikidata_id: str | None = None
+    dict_type: str | None = None
+    tier: int | None = None
 
 
 class DictionariesResponse(BaseModel):

@@ -72,12 +72,37 @@ const DictionaryApp = () => {
     }));
   };
 
-  const formatDictionaryCount = (count) => {
-    if (count === 0) return 'لم يرد في أي معجم';
-    if (count === 1) return 'ورد في معجم واحد:';
-    if (count === 2) return 'ورد في معجمين:';
-    if (count >= 11) return `ورد في ${count} معجماً:`;
-    return `ورد في ${count} معاجم:`;
+  // Arabic count agreement (1 = bare singular, 2 = dual, 3-10 = plural,
+  // 11+ = singular tamyiz) for each dictionary-type bucket.
+  const TERMINOLOGY_FORMS = { one: 'معجم مصطلحات واحد', two: 'معجمي مصطلحات', few: 'معاجم مصطلحات', many: 'معجم مصطلحات' };
+  const LANGUAGE_FORMS = { one: 'معجم لغوي واحد', two: 'معجمين لغويين', few: 'معاجم لغوية', many: 'معجم لغوي' };
+  const THESAURUS_FORMS = { one: 'مسرد وب واحد', two: 'مسردي وب', few: 'مسارد وب', many: 'مسرد وب' };
+  // Fallback for dictionaries not yet classified with a dict_type.
+  const GENERIC_FORMS = { one: 'معجم واحد', two: 'معجمين', few: 'معاجم', many: 'معجما' };
+
+  const formatCountClause = (count, forms) => {
+    if (count === 1) return forms.one;
+    if (count === 2) return forms.two;
+    if (count <= 10) return `${count} ${forms.few}`;
+    return `${count} ${forms.many}`;
+  };
+
+  const formatDictionaryCount = (occurences) => {
+    if (occurences.length === 0) return 'لم يرد في أي معجم';
+
+    const countByType = { terminology: 0, language: 0, thesaurus: 0, other: 0 };
+    occurences.forEach((o) => {
+      const type = o.dictionary_dict_type;
+      countByType[type in countByType ? type : 'other'] += 1;
+    });
+
+    const clauses = [];
+    if (countByType.terminology > 0) clauses.push(formatCountClause(countByType.terminology, TERMINOLOGY_FORMS));
+    if (countByType.language > 0) clauses.push(formatCountClause(countByType.language, LANGUAGE_FORMS));
+    if (countByType.thesaurus > 0) clauses.push(formatCountClause(countByType.thesaurus, THESAURUS_FORMS));
+    if (countByType.other > 0) clauses.push(formatCountClause(countByType.other, GENERIC_FORMS));
+
+    return `ورد في ${clauses.join(' و ')}:`;
   };
 
   const formatDictionaryInfo = (occurrence) => {
@@ -355,7 +380,7 @@ const DictionaryApp = () => {
             <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
               <div className="flex justify-between items-center mb-2">
                 <p className="text-gray-500">
-                  {formatDictionaryCount(group.occurences.length)}
+                  {formatDictionaryCount(group.occurences)}
                 </p>
                 <button
                   onClick={() => toggleGroup(index)}

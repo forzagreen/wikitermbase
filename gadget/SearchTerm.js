@@ -25,6 +25,37 @@ mw.loader.using([
   // API endpoint configuration
   const API_ENDPOINT = 'https://wikitermbase.toolforge.org/api/v1/search/aggregated';
 
+  // Arabic count agreement (1 = bare singular, 2 = dual, 3-10 = plural,
+  // 11+ = singular tamyiz) for each dictionary-type bucket.
+  const TERMINOLOGY_COUNT_FORMS = { one: 'معجم مصطلحات واحد', two: 'معجما مصطلحات', few: 'معاجم مصطلحات', many: 'معجم مصطلحات' };
+  const LANGUAGE_COUNT_FORMS = { one: 'معجم لغوي واحد', two: 'معجمان لغويان', few: 'معاجم لغوية', many: 'معجم لغوي' };
+  const THESAURUS_COUNT_FORMS = { one: 'مسرد وب واحد', two: 'مسردا وب', few: 'مسارد وب', many: 'مسرد وب' };
+  // Fallback for dictionaries not yet classified with a dict_type.
+  const GENERIC_COUNT_FORMS = { one: 'معجم واحد', two: 'معجمان', few: 'معاجم', many: 'معجما' };
+
+  function formatCountClause(count, forms) {
+    if (count === 1) return forms.one;
+    if (count === 2) return forms.two;
+    if (count <= 10) return `${count} ${forms.few}`;
+    return `${count} ${forms.many}`;
+  }
+
+  function formatDictionaryCount(occurences) {
+    const countByType = { terminology: 0, language: 0, thesaurus: 0, other: 0 };
+    occurences.forEach((o) => {
+      const type = o.dictionary_dict_type;
+      countByType[type in countByType ? type : 'other'] += 1;
+    });
+
+    const clauses = [];
+    if (countByType.terminology > 0) clauses.push(formatCountClause(countByType.terminology, TERMINOLOGY_COUNT_FORMS));
+    if (countByType.language > 0) clauses.push(formatCountClause(countByType.language, LANGUAGE_COUNT_FORMS));
+    if (countByType.thesaurus > 0) clauses.push(formatCountClause(countByType.thesaurus, THESAURUS_COUNT_FORMS));
+    if (countByType.other > 0) clauses.push(formatCountClause(countByType.other, GENERIC_COUNT_FORMS));
+
+    return clauses.join(' و ');
+  }
+
   function createCitationTemplate(term) {
     const wikidataId = term.dictionary_wikidata_id || '';
 
@@ -282,18 +313,9 @@ mw.loader.using([
     header.append(translations);
 
     // Dictionary count
-    const dictCount = group.dictionary_ids.length;
-    const dictCountText = dictCount === 1
-      ? 'معجم واحد'
-      : (dictCount === 2
-        ? 'معجمان'
-        : (dictCount <= 10
-          ? `${dictCount} معاجم`
-          : `${dictCount} معجما`));
-
     const dictCountEl = $('<div>')
       .addClass('wikiterm-dictionary-count')
-      .text(dictCountText);
+      .text(formatDictionaryCount(group.occurences));
 
     // Toggle button
     const toggleButton = new OO.ui.ButtonWidget({

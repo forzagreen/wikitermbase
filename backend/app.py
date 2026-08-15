@@ -365,51 +365,47 @@ def aggregate_terms(results: list[dict], query: str = "") -> list[dict]:
     exact_match_by_id = {id(term): query_matches_term(term, query) for term in results}
 
     # Normalise arabic terms. A single field may pack several synonymous
-    # spellings/terms (see split_translations); each part is a grouping
-    # candidate, and any two rows sharing a part end up in the same group.
+    # spellings/terms (see split_translations); each part independently
+    # looks for (or starts) its own group by exact normalised match. A
+    # packed row therefore contributes a separate virtual occurrence to
+    # every group its parts belong to -- e.g. "مِقراب؛ راصدة" adds one
+    # occurrence to the (pre-existing) "مقراب" group and another to a
+    # standalone "راصدة" group, without merging those two groups together.
     results_with_arabic = [term for term in results if "arabic" in term]
 
-    variants_by_id = {}
+    # For each term: list of (normalised_variant, raw_part) pairs, one per
+    # distinct part of its arabic field (deduplicated, order preserved).
+    memberships_by_id = {}
     for term in results_with_arabic:
-        variants = [
-            v
-            for v in (
-                normalise_arabic(part) for part in split_translations(term["arabic"])
-            )
-            if v
+        seen_variants = set()
+        pairs = []
+        for raw_part in split_translations(term["arabic"]):
+            variant = normalise_arabic(raw_part)
+            if variant and variant not in seen_variants:
+                seen_variants.add(variant)
+                pairs.append((variant, raw_part))
+        memberships_by_id[id(term)] = pairs or [
+            (normalise_arabic(term["arabic"]), term["arabic"])
         ]
-        variants_by_id[id(term)] = variants or [normalise_arabic(term["arabic"])]
 
-    # Union-find over normalised arabic variants: any two terms sharing a
-    # variant end up in the same connected component/group.
-    parent = {}
-
-    def find(x):
-        parent.setdefault(x, x)
-        while parent[x] != x:
-            parent[x] = parent[parent[x]]
-            x = parent[x]
-        return x
-
-    def union(a, b):
-        root_a, root_b = find(a), find(b)
-        if root_a != root_b:
-            parent[root_a] = root_b
-
-    for term in results_with_arabic:
-        variants = variants_by_id[id(term)]
-        for variant in variants[1:]:
-            union(variants[0], variant)
-
+    # variant -> list of (term, raw_part) contributed by that variant.
     groups_dict = dict()
     for term in results_with_arabic:
-        key = find(variants_by_id[id(term)][0])
-        groups_dict.setdefault(key, []).append(term)
+        for variant, raw_part in memberships_by_id[id(term)]:
+            groups_dict.setdefault(variant, []).append((term, raw_part))
 
-    groups = [
-        {"arabic_normalised": key, "occurences": value}
-        for key, value in groups_dict.items()
-    ]
+    groups = []
+    for entries in groups_dict.values():
+        raw_parts = [raw_part for _term, raw_part in entries]
+        groups.append(
+            {
+                # Elect the raw (unnormalised) spelling used most often to
+                # reach this group, so a packed field like "تلسكوب، مِقْراب"
+                # doesn't become the displayed headline for either group.
+                "arabic_normalised": Counter(raw_parts).most_common(1)[0][0],
+                "occurences": [term for term, _raw_part in entries],
+            }
+        )
 
     # Add terms without arabic as separate groups with one occurence
     results_without_arabic = [term for term in results if "arabic" not in term]
@@ -425,12 +421,6 @@ def aggregate_terms(results: list[dict], query: str = "") -> list[dict]:
         # Attention: we assume all entries have an english term.
         english_terms = [normalise_english(x["english"]) for x in group["occurences"]]
         group["english_normalised"] = Counter(english_terms).most_common(1)[0][0]
-
-        # Change arabic_normalised by electing it from existing occurences.
-        # The original arabic_normalised is useful for groupping, but sometimes produces incorrect terms.
-        if "arabic_normalised" in group:
-            arabic_terms = [x["arabic"] for x in group["occurences"]]
-            group["arabic_normalised"] = Counter(arabic_terms).most_common(1)[0][0]
 
         # Elect a french term (normalised) among entries with french.
         french_terms = [
@@ -595,15 +585,17 @@ def search_aggregated(
     Raw matches are clustered by `normalise_arabic(arabic)` (diacritics, tatweel
     and the `ال` prefix stripped, hamza forms unified). A field packing several
     synonymous translations (separated by `;`, `/`, or the Arabic `،` / `؛`) is
-    split into its parts first, so e.g. an Arabic field of `"تلسكوب، مقراب"`
-    joins the groups for both `تلسكوب` and `مقراب` instead of forming an
-    isolated group of its own. Each group elects the most common original
-    Arabic spelling, the most common normalised English translation, and —
-    when present — the most common normalised French translation. Within a
-    group, occurrences are ordered by dictionary type (`terminology`, then
-    `language`, then `thesaurus`; unclassified last), then by `tier` ascending
-    (1 = most reliable), then bubbling entries without a Wikidata ID to the
-    end.
+    split into its parts first, and each part independently joins (or starts)
+    its own group by exact normalised match — e.g. an Arabic field of
+    `"مِقراب؛ راصدة"` contributes a virtual occurrence to the (pre-existing)
+    `مقراب` group and another to a standalone `راصدة` group, without merging
+    those two groups together. Each group elects the most common original
+    Arabic spelling among the parts that reached it, the most common
+    normalised English translation, and — when present — the most common
+    normalised French translation. Within a group, occurrences are ordered by
+    dictionary type (`terminology`, then `language`, then `thesaurus`;
+    unclassified last), then by `tier` ascending (1 = most reliable), then
+    bubbling entries without a Wikidata ID to the end.
 
     Groups are sorted with exact matches first — a group where some
     occurrence's Arabic/English/French translation (or one part of a

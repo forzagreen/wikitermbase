@@ -323,7 +323,7 @@ def test_query_matches_term_empty_query():
     assert query_matches_term({"english": "telescope"}, "") is False
 
 
-def test_aggregate_terms_merges_rows_via_separator_packed_translations():
+def test_aggregate_terms_packed_row_joins_each_variants_group_separately():
     # id=140327-like row: a plain, single-spelling entry.
     plain_telescope = {
         "arabic": "مقراب",
@@ -331,19 +331,58 @@ def test_aggregate_terms_merges_rows_via_separator_packed_translations():
         "dictionary_id": 1,
         "relevance": 1.0,
     }
-    # id=208889: packs two synonymous Arabic spellings in one field, one of
-    # which ("مقراب") matches the plain entry above.
+    # id=504832-like: packs two synonymous Arabic spellings in one field.
+    # "مِقراب" should join the group above; "راصدة" has no other entry
+    # anywhere, but still gets its own (single-occurrence) group rather
+    # than being folded into "مقراب"'s.
     packed = {
-        "arabic": "تلسكوب، مِقْراب",
+        "arabic": "مِقراب؛ راصدة",
         "english": "telescope",
         "dictionary_id": 2,
         "relevance": 1.0,
     }
     groups = aggregate_terms([plain_telescope, packed])
+    groups_by_key = {g["arabic_normalised"]: g for g in groups}
 
-    assert len(groups) == 1
-    assert groups[0]["dictionary_ids"] == [1, 2]
-    assert {o["dictionary_id"] for o in groups[0]["occurences"]} == {1, 2}
+    assert set(groups_by_key) == {"مقراب", "راصدة"}
+
+    miqrab_group = groups_by_key["مقراب"]
+    assert miqrab_group["dictionary_ids"] == [1, 2]
+    assert {o["dictionary_id"] for o in miqrab_group["occurences"]} == {1, 2}
+
+    rasida_group = groups_by_key["راصدة"]
+    assert rasida_group["dictionary_ids"] == [2]
+    # The virtual occurrence still shows the full, original citation.
+    assert rasida_group["occurences"][0]["arabic"] == "مِقراب؛ راصدة"
+
+
+def test_aggregate_terms_does_not_transitively_merge_unrelated_groups():
+    # A row bundling two variants must NOT fuse those two variants' groups
+    # into one -- each variant's group stays independent.
+    hub = {
+        "arabic": "أ؛ ب",
+        "english": "hub",
+        "dictionary_id": 1,
+        "relevance": 1.0,
+    }
+    only_a = {
+        "arabic": "أ",
+        "english": "only a",
+        "dictionary_id": 2,
+        "relevance": 1.0,
+    }
+    only_b = {
+        "arabic": "ب",
+        "english": "only b",
+        "dictionary_id": 3,
+        "relevance": 1.0,
+    }
+    groups = aggregate_terms([hub, only_a, only_b])
+    groups_by_key = {g["arabic_normalised"]: g for g in groups}
+
+    assert set(groups_by_key) == {"أ", "ب"}
+    assert {o["dictionary_id"] for o in groups_by_key["أ"]["occurences"]} == {1, 2}
+    assert {o["dictionary_id"] for o in groups_by_key["ب"]["occurences"]} == {1, 3}
 
 
 def test_aggregate_terms_bubbles_exact_match_to_top():

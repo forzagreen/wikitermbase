@@ -39,6 +39,27 @@ const Dictionaries = () => {
     return num.toLocaleString('en-US');
   };
 
+  const DICT_TYPE_LABELS = {
+    terminology: 'معجم مصطلحات',
+    language: 'معجم لغوي',
+    thesaurus: 'مسرد وب',
+  };
+
+  const DICT_TYPE_CLASSES = {
+    terminology: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+    language: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+    thesaurus: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+  };
+
+  const DictTypeLabel = ({ dictType }) => {
+    if (!DICT_TYPE_LABELS[dictType]) return null;
+    return (
+      <span className={`text-xs font-semibold px-2 py-0.5 rounded ${DICT_TYPE_CLASSES[dictType]}`}>
+        {DICT_TYPE_LABELS[dictType]}
+      </span>
+    );
+  };
+
   return (
     <div className={`min-h-screen ${themeClasses}`} dir="rtl">
       {/* Header */}
@@ -93,6 +114,13 @@ const Dictionaries = () => {
                     className="text-blue-500 flex-shrink-0 mt-1"
                   />
                   <div className="flex-1 min-w-0">
+                    {/* Dictionary Type */}
+                    {DICT_TYPE_LABELS[dict.dict_type] && (
+                      <div className="mb-2">
+                        <DictTypeLabel dictType={dict.dict_type} />
+                      </div>
+                    )}
+
                     {/* Arabic Name */}
                     <h3 className="font-bold text-lg leading-tight mb-2">
                       {dict.name_arabic}

@@ -217,6 +217,8 @@ def search_terms_mariadb(
             t.*,
             d.name_arabic as dictionary_name_arabic,
             d.wikidata_id as dictionary_wikidata_id,
+            d.dict_type as dictionary_dict_type,
+            d.tier as dictionary_tier,
             MATCH(t.arabic, t.english, t.french, t.description)
             AGAINST(:query IN NATURAL LANGUAGE MODE) as relevance
         FROM term t
@@ -276,6 +278,22 @@ def normalise_french(text: str) -> str:
     return text
 
 
+# Display/ranking order for dictionary types within a result group.
+# Anything missing or not in this map (e.g. not-yet-classified dictionaries)
+# sorts after all known types.
+DICT_TYPE_ORDER = {"terminology": 0, "language": 1, "thesaurus": 2}
+UNRANKED_TIER = 999  # Sorts after every real tier (1..5) when tier is missing.
+
+
+def occurrence_sort_key(term: dict):
+    type_priority = DICT_TYPE_ORDER.get(
+        term.get("dictionary_dict_type"), len(DICT_TYPE_ORDER)
+    )
+    tier = term.get("dictionary_tier")
+    tier_priority = tier if tier is not None else UNRANKED_TIER
+    return (type_priority, tier_priority, term.get("dictionary_wikidata_id") is None)
+
+
 def aggregate_terms(results: list[dict]) -> list[dict]:
     """Aggregate terms by arabic term (after cleaning it)."""
     # Normalise arabic terms
@@ -326,8 +344,11 @@ def aggregate_terms(results: list[dict]) -> list[dict]:
         if french_terms:
             group["french_normalised"] = Counter(french_terms).most_common(1)[0][0]
 
-        # In occurences, keep the order, but bubble the ones without QID to the end
-        group["occurences"].sort(key=lambda x: x.get("dictionary_wikidata_id") is None)
+        # Order occurences by dictionary type (terminology, then language, then
+        # thesaurus; anything else/unclassified last), then by tier ascending
+        # (tier 1 = most reliable first, unranked last). Ties keep relevance
+        # order, but bubble entries without a QID to the end.
+        group["occurences"].sort(key=occurrence_sort_key)
 
     # Add total relevance
     groups.sort(key=lambda x: len(x["occurences"]), reverse=True)
@@ -361,6 +382,8 @@ class TermResult(BaseModel):
     relevance: float
     dictionary_name_arabic: str
     dictionary_wikidata_id: str | None = None
+    dictionary_dict_type: str | None = None
+    dictionary_tier: int | None = None
 
 
 class SearchResponse(BaseModel):
@@ -469,7 +492,10 @@ def search_aggregated(
     and the `ال` prefix stripped, hamza forms unified). Each group elects the
     most common original Arabic spelling, the most common normalised English
     translation, and — when present — the most common normalised French
-    translation. Within a group, occurrences with a Wikidata ID come first.
+    translation. Within a group, occurrences are ordered by dictionary type
+    (`terminology`, then `language`, then `thesaurus`; unclassified last),
+    then by `tier` ascending (1 = most reliable), then bubbling entries
+    without a Wikidata ID to the end.
 
     Groups are sorted by the number of distinct dictionaries that contain the
     term (desc), then by the sum of relevance scores within the group (desc).

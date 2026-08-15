@@ -204,3 +204,58 @@ OUTPUT_4 = [
 def test_aggregate_terms(input_list, output_list):
     returned_list = aggregate_terms(input_list)
     assert returned_list == output_list
+
+
+def test_aggregate_terms_orders_occurences_by_dict_type_then_tier():
+    # dictionary_id order below is deliberately scrambled relative to the
+    # expected output, so a passing test proves sorting actually happened.
+    thesaurus_tier1 = {
+        "arabic": "شجرة",
+        "english": "tree",
+        "dictionary_id": 1,
+        "dictionary_dict_type": "thesaurus",
+        "dictionary_tier": 1,
+        "relevance": 1.0,
+    }
+    language_tier2 = {
+        "arabic": "شجرة",
+        "english": "tree",
+        "dictionary_id": 2,
+        "dictionary_dict_type": "language",
+        "dictionary_tier": 2,
+        "relevance": 1.0,
+    }
+    terminology_tier3 = {
+        "arabic": "شجرة",
+        "english": "tree",
+        "dictionary_id": 3,
+        "dictionary_dict_type": "terminology",
+        "dictionary_tier": 3,
+        "relevance": 1.0,
+    }
+    terminology_tier1 = {
+        "arabic": "شجرة",
+        "english": "tree",
+        "dictionary_id": 4,
+        "dictionary_dict_type": "terminology",
+        "dictionary_tier": 1,
+        "relevance": 1.0,
+    }
+    unclassified = {
+        "arabic": "شجرة",
+        "english": "tree",
+        "dictionary_id": 5,
+        "relevance": 1.0,
+    }
+
+    groups = aggregate_terms(
+        [
+            thesaurus_tier1,
+            language_tier2,
+            terminology_tier3,
+            terminology_tier1,
+            unclassified,
+        ]
+    )
+
+    assert [o["dictionary_id"] for o in groups[0]["occurences"]] == [4, 3, 2, 1, 5]

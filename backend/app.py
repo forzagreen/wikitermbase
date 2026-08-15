@@ -278,6 +278,67 @@ def normalise_french(text: str) -> str:
     return text
 
 
+# Separator characters this dataset uses to pack multiple synonymous
+# translations into a single field: ';', '/', and the Arabic '،' / '؛'.
+# Deliberately excludes the plain ',' -- entries also use it for headword
+# inversion ("profile, hydraulic") and gender/POS annotations
+# ("vitesse commerciale, f"), so splitting on it would fabricate bogus terms.
+SEPARATOR_RE = re.compile(r"[;/،؛]")
+
+
+def split_translations(value: str) -> list[str]:
+    """Split a field that may pack multiple synonymous translations into its
+    individual parts (see SEPARATOR_RE), trimming incidental whitespace."""
+    return [part.strip() for part in SEPARATOR_RE.split(value) if part.strip()]
+
+
+def _strip_query_quotes(query: str) -> str:
+    # The frontend and gadget both send q=`"${term}"` (literal quotes) as a
+    # leftover phrase-search hint; MariaDB's NATURAL LANGUAGE MODE ignores
+    # them, but our own exact-match comparison needs the bare term.
+    query = query.strip()
+    if len(query) >= 2 and query[0] == query[-1] == '"':
+        query = query[1:-1].strip()
+    return query
+
+
+def query_matches_term(term: dict, query: str) -> bool:
+    """True when `query` exactly matches one of the term's translations.
+
+    Compares against every part of a multi-translation field (see
+    split_translations), not just the field as a whole, so a query like
+    "telescope" matches a term whose english is "reflecting telescope"
+    only if "telescope" is itself one of the listed synonyms.
+    """
+    query = _strip_query_quotes(query)
+    if not query:
+        return False
+
+    arabic = term.get("arabic")
+    if arabic:
+        query_ar = normalise_arabic(query)
+        if query_ar and any(
+            normalise_arabic(part) == query_ar for part in split_translations(arabic)
+        ):
+            return True
+
+    for field, normaliser in (
+        ("english", normalise_english),
+        ("french", normalise_french),
+    ):
+        value = term.get(field)
+        if not value:
+            continue
+        query_norm = normaliser(query).casefold()
+        if query_norm and any(
+            normaliser(part).casefold() == query_norm
+            for part in split_translations(value)
+        ):
+            return True
+
+    return False
+
+
 # Display/ranking order for dictionary types within a result group.
 # Anything missing or not in this map (e.g. not-yet-classified dictionaries)
 # sorts after all known types.
@@ -294,20 +355,56 @@ def occurrence_sort_key(term: dict):
     return (type_priority, tier_priority, term.get("dictionary_wikidata_id") is None)
 
 
-def aggregate_terms(results: list[dict]) -> list[dict]:
+def aggregate_terms(results: list[dict], query: str = "") -> list[dict]:
     """Aggregate terms by arabic term (after cleaning it)."""
-    # Normalise arabic terms
+    # Flag rows that are an exact match for the query (on any one of their
+    # possibly multiple translations), so those groups can be bubbled to the
+    # top regardless of how many dictionaries carry a merely-related phrase.
+    # Keyed by object identity rather than mutating `term`, so this internal
+    # flag never leaks into the API response.
+    exact_match_by_id = {id(term): query_matches_term(term, query) for term in results}
+
+    # Normalise arabic terms. A single field may pack several synonymous
+    # spellings/terms (see split_translations); each part is a grouping
+    # candidate, and any two rows sharing a part end up in the same group.
     results_with_arabic = [term for term in results if "arabic" in term]
 
+    variants_by_id = {}
     for term in results_with_arabic:
-        term["arabic_normalised"] = normalise_arabic(term["arabic"])
+        variants = [
+            v
+            for v in (
+                normalise_arabic(part) for part in split_translations(term["arabic"])
+            )
+            if v
+        ]
+        variants_by_id[id(term)] = variants or [normalise_arabic(term["arabic"])]
+
+    # Union-find over normalised arabic variants: any two terms sharing a
+    # variant end up in the same connected component/group.
+    parent = {}
+
+    def find(x):
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        root_a, root_b = find(a), find(b)
+        if root_a != root_b:
+            parent[root_a] = root_b
+
+    for term in results_with_arabic:
+        variants = variants_by_id[id(term)]
+        for variant in variants[1:]:
+            union(variants[0], variant)
 
     groups_dict = dict()
     for term in results_with_arabic:
-        arabic_normalised = term["arabic_normalised"]
-        if arabic_normalised not in groups_dict:
-            groups_dict[arabic_normalised] = []
-        groups_dict[arabic_normalised].append(term)
+        key = find(variants_by_id[id(term)][0])
+        groups_dict.setdefault(key, []).append(term)
 
     groups = [
         {"arabic_normalised": key, "occurences": value}
@@ -357,9 +454,16 @@ def aggregate_terms(results: list[dict]) -> list[dict]:
             variant["relevance"] for variant in group["occurences"]
         )
 
-    # Sort by: number of unique dictionaries, then total relevance:
+    # Sort by: exact match first (a group where some occurrence's translation
+    # exactly equals the query), then number of unique dictionaries, then
+    # total relevance.
     groups.sort(
-        key=lambda x: (len(x["dictionary_ids"]), x["total_relevance"]), reverse=True
+        key=lambda x: (
+            any(exact_match_by_id[id(term)] for term in x["occurences"]),
+            len(x["dictionary_ids"]),
+            x["total_relevance"],
+        ),
+        reverse=True,
     )
     return groups
 
@@ -473,7 +577,7 @@ def search(
     summary="Search results aggregated by normalised Arabic term",
     response_model=AggregatedSearchResponse,
     response_model_exclude_none=True,
-    response_description="Term groups, ordered by number of distinct dictionaries (desc), then by total relevance (desc).",
+    response_description="Term groups, exact matches for the query first, then ordered by number of distinct dictionaries (desc), then by total relevance (desc).",
 )
 def search_aggregated(
     q: str = Query(
@@ -489,17 +593,24 @@ def search_aggregated(
     """Search and group results by normalised Arabic term.
 
     Raw matches are clustered by `normalise_arabic(arabic)` (diacritics, tatweel
-    and the `ال` prefix stripped, hamza forms unified). Each group elects the
-    most common original Arabic spelling, the most common normalised English
-    translation, and — when present — the most common normalised French
-    translation. Within a group, occurrences are ordered by dictionary type
-    (`terminology`, then `language`, then `thesaurus`; unclassified last),
-    then by `tier` ascending (1 = most reliable), then bubbling entries
-    without a Wikidata ID to the end.
+    and the `ال` prefix stripped, hamza forms unified). A field packing several
+    synonymous translations (separated by `;`, `/`, or the Arabic `،` / `؛`) is
+    split into its parts first, so e.g. an Arabic field of `"تلسكوب، مقراب"`
+    joins the groups for both `تلسكوب` and `مقراب` instead of forming an
+    isolated group of its own. Each group elects the most common original
+    Arabic spelling, the most common normalised English translation, and —
+    when present — the most common normalised French translation. Within a
+    group, occurrences are ordered by dictionary type (`terminology`, then
+    `language`, then `thesaurus`; unclassified last), then by `tier` ascending
+    (1 = most reliable), then bubbling entries without a Wikidata ID to the
+    end.
 
-    Groups are sorted by the number of distinct dictionaries that contain the
-    term (desc), then by the sum of relevance scores within the group (desc).
-    This is the endpoint used by the on-wiki gadget.
+    Groups are sorted with exact matches first — a group where some
+    occurrence's Arabic/English/French translation (or one part of a
+    multi-translation field) equals the query exactly — then by the number of
+    distinct dictionaries that contain the term (desc), then by the sum of
+    relevance scores within the group (desc). This is the endpoint used by
+    the on-wiki gadget.
     """
     sentry_sdk.set_tag("search.q", q[:200])  # Sentry caps tag values at 200 chars
 
@@ -511,7 +622,7 @@ def search_aggregated(
             if "uri" in result and "arabterm.org" in result["uri"]:
                 del result["uri"]
 
-    groups = aggregate_terms(results)
+    groups = aggregate_terms(results, q)
     number_groups = len(groups)
 
     sentry_sdk.set_tag("search.number_groups", str(number_groups))

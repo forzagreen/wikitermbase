@@ -1,9 +1,62 @@
 // src/components/DictionaryApp.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
-import { Search, ExternalLink, ChevronDown, ChevronUp, Quote, Copy, Check, HelpCircle, BookOpen, Wrench } from 'lucide-react';
-import Logo from './Logo';
-import ThemeToggle from './ThemeToggle';
+import { Search, ExternalLink, ChevronDown, ChevronUp, Quote, Copy, Check, BookOpen, Wrench, ArrowLeft } from 'lucide-react';
+import SiteHeader from './SiteHeader';
+import SiteFooter from './SiteFooter';
+
+const formatNumber = (num) =>
+  num === null || num === undefined ? '…' : num.toLocaleString('en-US');
+
+// Shown under the search box while it is empty: points first-time visitors
+// to the two other pages and fills what would otherwise be a blank screen.
+const LandingCards = ({ stats }) => {
+  const cards = [
+    {
+      to: '/dictionaries',
+      icon: BookOpen,
+      title: 'تصفّح المعاجم',
+      description: 'قائمة المعاجم المصدرية بأنواعها (مصطلحات، لغوية، مسارد)، مع رابط لتصفّح محتوى كل معجم.',
+      facts: [`${formatNumber(stats?.number_dictionaries)} معجمًا`, `${formatNumber(stats?.number_terms)} مصطلح`],
+    },
+    {
+      to: '/tools',
+      icon: Wrench,
+      title: 'منظومة الأدوات',
+      description: 'مسرد الويكي جزء من منظومة مفتوحة المصدر لحوسبة المعاجم العربية: محلّل صرفي، ومصرّف أفعال، ومراجعة معاني، وغيرها.',
+      facts: ['المستوى الصرفي', 'المستوى الدلالي', 'المستوى المعجمي'],
+    },
+  ];
+
+  return (
+    <div className="max-w-3xl mx-auto mt-10 px-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {cards.map(({ to, icon: Icon, title, description, facts }) => (
+        <Link
+          key={to}
+          to={to}
+          className="group bg-white dark:bg-gray-800 shadow-md rounded-lg p-5 hover:shadow-lg hover:ring-2 hover:ring-blue-400 transition-all flex flex-col"
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <Icon size={26} className="text-blue-500 flex-shrink-0" />
+            <h2 className="text-lg font-bold flex items-center gap-1.5">
+              {title}
+              <ArrowLeft
+                size={16}
+                className="text-gray-400 transition-transform group-hover:-translate-x-1"
+              />
+            </h2>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-300 flex-1">{description}</p>
+          <ul className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+            {facts.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+        </Link>
+      ))}
+    </div>
+  );
+};
 
 const ExpandableText = ({ text, charLimit = 200 }) => {
   const [expanded, setExpanded] = useState(false);
@@ -36,12 +89,21 @@ const DictionaryApp = () => {
   const [loading, setLoading] = useState(false);
   const [openPopupId, setOpenPopupId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+  const [stats, setStats] = useState(null);
   const searchInputRef = useRef(null);
   const searchTimeoutRef = useRef(null);
 
   // Focus search input on mount
   useEffect(() => {
     searchInputRef.current?.focus();
+  }, []);
+
+  // Counts for the landing cards; failure just leaves the placeholders.
+  useEffect(() => {
+    fetch('/api/v1/stats')
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setStats)
+      .catch(() => setStats(null));
   }, []);
 
   // Handle click outside citation popup
@@ -279,43 +341,8 @@ const DictionaryApp = () => {
   );
 
   return (
-    <div className={`min-h-screen ${themeClasses}`} dir="rtl">
-      {/* Header */}
-      <header className={cardClasses}>
-        <div className="max-w-7xl mx-auto py-6 px-4">
-          <div className="flex justify-between items-center">
-            <Link to="/" title="الصفحة الرئيسية">
-              <Logo className="h-10" />
-            </Link>
-            <h1 className="text-3xl font-bold">مسرد الويكي</h1>
-            <div className="flex items-center gap-1">
-              <Link
-                to="/dictionaries"
-                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center"
-                title="قائمة المعاجم"
-              >
-                <BookOpen size={24} />
-              </Link>
-              <Link
-                to="/tools"
-                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center"
-                title="منظومة الأدوات"
-              >
-                <Wrench size={24} />
-              </Link>
-              <a href="https://ar.wikipedia.org/wiki/ويكيبيديا:مسرد_الويكي"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center"
-                title="للمزيد، ندعوك للاطلاع على صفحة الأداة"
-              >
-                <HelpCircle size={24} />
-              </a>
-              <ThemeToggle />
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className={`min-h-screen flex flex-col ${themeClasses}`} dir="rtl">
+      <SiteHeader title="مسرد الويكي" />
 
       {/* Search Bar */}
       <div className="max-w-3xl mx-auto mt-8 px-4">
@@ -348,8 +375,11 @@ const DictionaryApp = () => {
         </div>
       )}
 
+      {/* Landing cards (empty search box only) */}
+      {searchTerm.trim().length === 0 && <LandingCards stats={stats} />}
+
       {/* Results Section */}
-      <div className="max-w-4xl mx-auto mt-8 px-4 pb-12">
+      <div className="max-w-4xl mx-auto mt-8 px-4 pb-12 w-full">
         {!loading && !error && results.length === 0 && searchTerm.trim().length >= 3 && (
           <div className={`${cardClasses} rounded-lg p-6 text-center`}>
             <p className="text-lg">عذرًا، لم نعثر على أي نتائج.</p>
@@ -466,6 +496,8 @@ const DictionaryApp = () => {
           </div>
         )})}
       </div>
+
+      <SiteFooter />
     </div>
   );
 };

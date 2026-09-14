@@ -16,42 +16,40 @@ const LandingCards = ({ stats }) => {
       to: '/dictionaries',
       icon: BookOpen,
       title: 'تصفّح المعاجم',
-      description: 'قائمة المعاجم المصدرية بأنواعها (مصطلحات، لغوية، مسارد)، مع رابط لتصفّح محتوى كل معجم.',
+      description: 'المعاجم المصدرية بأنواعها، مع رابط لتصفّح كل معجم.',
       facts: [`${formatNumber(stats?.number_dictionaries)} معجمًا`, `${formatNumber(stats?.number_terms)} مصطلح`],
     },
     {
       to: '/tools',
       icon: Wrench,
       title: 'منظومة الأدوات',
-      description: 'مسرد الويكي جزء من منظومة مفتوحة المصدر لحوسبة المعاجم العربية: محلّل صرفي، ومصرّف أفعال، ومراجعة معاني، وغيرها.',
-      facts: ['المستوى الصرفي', 'المستوى الدلالي', 'المستوى المعجمي'],
+      description: 'أدوات مفتوحة المصدر لحوسبة المعاجم العربية.',
+      facts: ['صرفي', 'دلالي', 'معجمي'],
     },
   ];
 
+  // Deliberately quiet: no shadow, muted text, well below the search box,
+  // so the search bar stays the obvious primary action.
   return (
-    <div className="max-w-3xl mx-auto mt-10 px-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="max-w-3xl mx-auto mt-16 px-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
       {cards.map(({ to, icon: Icon, title, description, facts }) => (
         <Link
           key={to}
           to={to}
-          className="group bg-white dark:bg-gray-800 shadow-md rounded-lg p-5 hover:shadow-lg hover:ring-2 hover:ring-blue-400 transition-all flex flex-col"
+          className="group rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3 hover:border-blue-400 hover:bg-white dark:hover:bg-gray-800 transition-colors flex items-start gap-3"
         >
-          <div className="flex items-center gap-3 mb-2">
-            <Icon size={26} className="text-blue-500 flex-shrink-0" />
-            <h2 className="text-lg font-bold flex items-center gap-1.5">
+          <Icon size={20} className="text-gray-400 group-hover:text-blue-500 flex-shrink-0 mt-0.5 transition-colors" />
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-1">
               {title}
               <ArrowLeft
-                size={16}
+                size={14}
                 className="text-gray-400 transition-transform group-hover:-translate-x-1"
               />
             </h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{description}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{facts.join(' · ')}</p>
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-300 flex-1">{description}</p>
-          <ul className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-            {facts.map((f) => (
-              <li key={f}>{f}</li>
-            ))}
-          </ul>
         </Link>
       ))}
     </div>
@@ -350,12 +348,12 @@ const DictionaryApp = () => {
           <input
             ref={searchInputRef}
             type="text"
-            className={`w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${inputClasses}`}
+            className={`w-full px-5 py-4 text-lg rounded-xl border shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${inputClasses}`}
             placeholder="ابحث عن مصطلح (بالإنجليزية أو الفرنسية أو العربية)..."
             value={searchTerm}
             onChange={handleSearchInputChange}
           />
-          <Search className="absolute left-3 top-3 text-gray-400" size={24} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={26} />
         </div>
       </div>
 

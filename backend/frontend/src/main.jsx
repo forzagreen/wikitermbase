@@ -5,6 +5,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router'
 import App from './App'
 import RawSearch from './components/RawSearch'
 import Dictionaries from './components/Dictionaries'
+import Tools from './components/Tools'
 import './index.css'
 
 const router = createBrowserRouter([
@@ -19,6 +20,10 @@ const router = createBrowserRouter([
   {
     path: "/dictionaries",
     element: <Dictionaries />,
+  },
+  {
+    path: "/tools",
+    element: <Tools />,
   },
 ]);
 

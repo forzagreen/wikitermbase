@@ -216,6 +216,7 @@ def search_terms_mariadb(
         SELECT
             t.*,
             d.name_arabic as dictionary_name_arabic,
+            d.name_tech as dictionary_name_tech,
             d.wikidata_id as dictionary_wikidata_id,
             d.dict_type as dictionary_dict_type,
             d.tier as dictionary_tier,
@@ -239,6 +240,18 @@ def search_terms_mariadb(
         {k: v for k, v in row.items() if k not in excluded_fields and v is not None}
         for row in results
     ]
+
+
+# Each dictionary has a browsable page on the arabterm GitHub Pages site,
+# keyed by its `name_tech` slug (e.g. `ksaa_music`).
+ARABTERM_PAGES_URL = "https://forzagreen.github.io/arabterm/"
+
+
+def arabterm_url(name_tech: str | None) -> str | None:
+    """Public arabterm page for a dictionary, or None when it has no slug."""
+    if not name_tech:
+        return None
+    return f"{ARABTERM_PAGES_URL}{name_tech}/"
 
 
 def normalise_arabic(text: str) -> str:
@@ -475,6 +488,7 @@ class TermResult(BaseModel):
     description: str | None = None
     relevance: float
     dictionary_name_arabic: str
+    dictionary_name_tech: str | None = None
     dictionary_wikidata_id: str | None = None
     dictionary_dict_type: str | None = None
     dictionary_tier: int | None = None
@@ -512,9 +526,11 @@ class Dictionary(BaseModel):
 
     id: int
     name_arabic: str
+    name_tech: str | None = None
     wikidata_id: str | None = None
     dict_type: str | None = None
     tier: int | None = None
+    arabterm_url: str | None = None
 
 
 class DictionariesResponse(BaseModel):
@@ -638,7 +654,10 @@ def list_dicts():
     search endpoints back to a human-readable source name.
     """
     result = execute_with_retry(text("SELECT * FROM dictionary"))
-    dictionaries = [dict(row) for row in result.mappings().all()]
+    dictionaries = [
+        {**row, "arabterm_url": arabterm_url(row.get("name_tech"))}
+        for row in result.mappings().all()
+    ]
     return {"number": len(dictionaries), "dictionaries": dictionaries}
 
 
@@ -688,6 +707,7 @@ def healthz():
 
 @app.get("/", include_in_schema=False)
 @app.get("/dictionaries", include_in_schema=False)
+@app.get("/tools", include_in_schema=False)
 @app.get("/ui/search/raw", include_in_schema=False)
 def index():
     return FileResponse(INDEX_HTML)

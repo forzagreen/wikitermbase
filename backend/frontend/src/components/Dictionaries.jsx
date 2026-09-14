@@ -1,7 +1,7 @@
 // src/components/Dictionaries.jsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
-import { ExternalLink, BookOpen } from 'lucide-react';
+import { ExternalLink, BookOpen, Wrench } from 'lucide-react';
 import Logo from './Logo';
 import ThemeToggle from './ThemeToggle';
 
@@ -70,7 +70,16 @@ const Dictionaries = () => {
               <Logo className="h-10" />
             </Link>
             <h1 className="text-3xl font-bold">قائمة المعاجم</h1>
-            <ThemeToggle />
+            <div className="flex items-center gap-1">
+              <Link
+                to="/tools"
+                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center"
+                title="منظومة الأدوات"
+              >
+                <Wrench size={24} />
+              </Link>
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </header>
@@ -82,6 +91,9 @@ const Dictionaries = () => {
           <div className="mb-6 text-center">
             <p className="text-lg text-gray-600 dark:text-gray-300">
               عدد المعاجم: <span className="font-bold">{formatNumber(dictionaries.length)}</span>
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              اضغط على أي معجم لتصفّح محتواه في موقع arabterm.
             </p>
           </div>
         )}
@@ -106,7 +118,7 @@ const Dictionaries = () => {
             {dictionaries.map((dict) => (
               <div
                 key={dict.id}
-                className={`${cardClasses} rounded-lg p-4 hover:shadow-lg transition-shadow`}
+                className={`${cardClasses} rounded-lg p-4 hover:shadow-lg transition-shadow relative ${dict.arabterm_url ? 'hover:ring-2 hover:ring-blue-400' : ''}`}
               >
                 <div className="flex items-start gap-3">
                   <BookOpen
@@ -121,9 +133,22 @@ const Dictionaries = () => {
                       </div>
                     )}
 
-                    {/* Arabic Name */}
+                    {/* Arabic Name — the whole card links to the arabterm
+                        page via the stretched ::after pseudo-element. */}
                     <h3 className="font-bold text-lg leading-tight mb-2">
-                      {dict.name_arabic}
+                      {dict.arabterm_url ? (
+                        <a
+                          href={dict.arabterm_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="after:absolute after:inset-0 hover:text-blue-600 dark:hover:text-blue-400"
+                          title="تصفّح المعجم في موقع arabterm"
+                        >
+                          {dict.name_arabic}
+                        </a>
+                      ) : (
+                        dict.name_arabic
+                      )}
                     </h3>
 
                     {/* English Name */}
@@ -152,7 +177,7 @@ const Dictionaries = () => {
                           href={`https://www.wikidata.org/wiki/${dict.wikidata_id}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 text-sm"
+                          className="relative z-10 inline-flex items-center gap-1 text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 text-sm"
                           title="عنصر ويكي بيانات"
                         >
                           <ExternalLink size={14} />

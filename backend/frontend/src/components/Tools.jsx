@@ -2,7 +2,7 @@
 //
 // "منظومة حوسبة المعاجم العربية": the ecosystem page. Mirrors the project
 // diagram — three levels (صرفي / دلالي / معجمي), each with a goal, its
-// ready tools, and what is still planned — then the Wikimedia outputs row.
+// ready tools — then the Wikimedia outputs row.
 import { useState, useEffect } from 'react';
 import {
   ExternalLink, BookOpen, Github, Play, Database, Code, FlaskConical,
@@ -43,11 +43,10 @@ const LinkChip = ({ kind, href, label }) => {
 };
 
 // Palette follows the diagram: green = level, yellow = goal, blue = tool,
-// grey = planned, red = outputs.
+// red = outputs.
 const LEVEL_CLASSES = 'bg-green-100 text-green-900 dark:bg-green-900/50 dark:text-green-100';
 const GOAL_CLASSES = 'bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100';
 const TOOL_CLASSES = 'bg-sky-50 border border-sky-200 dark:bg-sky-900/30 dark:border-sky-800';
-const PLANNED_CLASSES = 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300';
 const OUTPUT_CLASSES = 'bg-rose-100 text-rose-900 dark:bg-rose-900/40 dark:text-rose-100';
 
 const ToolCard = ({ tool, stats }) => {
@@ -162,7 +161,6 @@ const LEVELS = [
         ],
       },
     ],
-    planned: [{ name: 'مولّد صرفي', note: 'الأفعال متاحة اليوم عبر المازني' }],
   },
   {
     key: 'semantics',
@@ -179,7 +177,6 @@ const LEVELS = [
         links: [{ kind: 'site', href: 'https://ar-senses.toolforge.org/' }],
       },
     ],
-    planned: [{ name: 'أداة لأتمتة المَعْجَمَة' }],
   },
   {
     key: 'translation',
@@ -214,7 +211,6 @@ const LEVELS = [
         ],
       },
     ],
-    planned: [],
   },
 ];
 
@@ -277,22 +273,10 @@ const Tools = () => {
                 <span className="font-semibold">{level.goal}</span>
               </div>
               <div className="flex flex-col gap-3">
-                <span className="text-xs text-gray-500 dark:text-gray-400 px-1">الأدوات الجاهزة</span>
                 {level.tools.map((tool) => (
                   <ToolCard key={tool.latin} tool={tool} stats={stats} />
                 ))}
               </div>
-              {level.planned.length > 0 && (
-                <div className="flex flex-col gap-2 mt-auto">
-                  <span className="text-xs text-gray-500 dark:text-gray-400 px-1">قيد التطوير</span>
-                  {level.planned.map((p) => (
-                    <div key={p.name} className={`${PLANNED_CLASSES} rounded-lg px-4 py-3 text-center`}>
-                      <span className="font-semibold">{p.name}</span>
-                      {p.note && <span className="block text-xs opacity-80 mt-0.5">{p.note}</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
             </section>
           ))}
         </div>

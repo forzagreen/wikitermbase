@@ -1,16 +1,15 @@
 // src/components/Tools.jsx
 //
 // "منظومة حوسبة المعاجم العربية": the ecosystem page. Mirrors the project
-// diagram — three levels (صرفي / دلالي / ترجماني), each with a goal, its
+// diagram — three levels (صرفي / دلالي / معجمي), each with a goal, its
 // ready tools, and what is still planned — then the Wikimedia outputs row.
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router';
 import {
   ExternalLink, BookOpen, Github, Play, Database, Code, FlaskConical,
   Layers, Languages, Sparkles, Hammer, Search, ArrowLeft,
 } from 'lucide-react';
-import Logo from './Logo';
-import ThemeToggle from './ThemeToggle';
+import SiteHeader from './SiteHeader';
+import SiteFooter from './SiteFooter';
 import MaziniTryIt from './MaziniTryIt';
 
 const formatNumber = (num) =>
@@ -184,7 +183,7 @@ const LEVELS = [
   },
   {
     key: 'translation',
-    title: 'المستوى الترجماني',
+    title: 'المستوى المعجمي',
     goal: 'توحيد المصطلحات المُعرَّبة',
     tools: [
       {
@@ -251,36 +250,17 @@ const Tools = () => {
   const cardClasses = 'bg-white shadow-md dark:bg-gray-800';
 
   return (
-    <div className={`min-h-screen ${themeClasses}`} dir="rtl">
-      <header className={cardClasses}>
-        <div className="max-w-7xl mx-auto py-6 px-4">
-          <div className="flex justify-between items-center">
-            <Link to="/" title="الصفحة الرئيسية">
-              <Logo className="h-10" />
-            </Link>
-            <h1 className="text-2xl sm:text-3xl font-bold text-center">منظومة حوسبة المعاجم العربية</h1>
-            <div className="flex items-center gap-1">
-              <Link
-                to="/dictionaries"
-                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center"
-                title="قائمة المعاجم"
-              >
-                <BookOpen size={24} />
-              </Link>
-              <ThemeToggle />
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className={`min-h-screen flex flex-col ${themeClasses}`} dir="rtl">
+      <SiteHeader title="منظومة حوسبة المعاجم العربية" />
 
-      <div className="max-w-7xl mx-auto mt-8 px-4 pb-16">
+      <div className="max-w-7xl mx-auto mt-8 px-4 pb-16 w-full">
         {/* Intro */}
         <div className={`${cardClasses} rounded-lg p-6 mb-8`}>
           <p className="text-lg leading-relaxed text-gray-700 dark:text-gray-200">
             مسرد الويكي جزء من منظومة مفتوحة المصدر لحوسبة المعاجم العربية، تعمل على ثلاثة مستويات:
             <strong> صرفي</strong> (تحليل الكلمة وتصريفها)،
             <strong> دلالي</strong> (ضبط المعاني وشروحاتها)،
-            <strong> ترجماني</strong> (توحيد المصطلحات المعرَّبة).
+            <strong> معجمي</strong> (توحيد المصطلحات المعرَّبة).
             وكلّها تصبّ في مشاريع ويكيميديا: ويكي بيانات وويكاموس وويكيبيديا.
           </p>
         </div>
@@ -339,6 +319,8 @@ const Tools = () => {
           </div>
         </section>
       </div>
+
+      <SiteFooter />
     </div>
   );
 };

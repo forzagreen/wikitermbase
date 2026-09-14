@@ -1,7 +1,7 @@
 // src/components/DictionaryApp.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
-import { Search, ExternalLink, ChevronDown, ChevronUp, Quote, Copy, Check, HelpCircle, BookOpen } from 'lucide-react';
+import { Search, ExternalLink, ChevronDown, ChevronUp, Quote, Copy, Check, HelpCircle, BookOpen, Wrench } from 'lucide-react';
 import Logo from './Logo';
 import ThemeToggle from './ThemeToggle';
 
@@ -107,8 +107,24 @@ const DictionaryApp = () => {
 
   const formatDictionaryInfo = (occurrence) => {
     const parts = [];
-    parts.push(occurrence.dictionary_name_arabic);
-    
+    // Dictionary name links to its browsable page on arabterm (GitHub Pages),
+    // keyed by the dictionary's `name_tech` slug.
+    parts.push(
+      occurrence.dictionary_name_tech ? (
+        <a
+          href={`https://forzagreen.github.io/arabterm/${occurrence.dictionary_name_tech}/`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-blue-600 hover:underline dark:hover:text-blue-400"
+          title="تصفّح المعجم في موقع arabterm"
+        >
+          {occurrence.dictionary_name_arabic}
+        </a>
+      ) : (
+        occurrence.dictionary_name_arabic
+      )
+    );
+
     if (occurrence.page) {
       parts.push(`ص. ${occurrence.page}`);
     }
@@ -279,6 +295,13 @@ const DictionaryApp = () => {
                 title="قائمة المعاجم"
               >
                 <BookOpen size={24} />
+              </Link>
+              <Link
+                to="/tools"
+                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center"
+                title="منظومة الأدوات"
+              >
+                <Wrench size={24} />
               </Link>
               <a href="https://ar.wikipedia.org/wiki/ويكيبيديا:مسرد_الويكي"
                 target="_blank"

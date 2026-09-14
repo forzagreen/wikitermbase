@@ -1,6 +1,7 @@
 import pytest
 from app import (
     aggregate_terms,
+    arabterm_url,
     normalise_arabic,
     normalise_english,
     normalise_french,
@@ -288,6 +289,15 @@ def test_aggregate_terms_orders_occurences_by_dict_type_then_tier():
 )
 def test_split_translations(input_text, expected_output):
     assert split_translations(input_text) == expected_output
+
+
+def test_arabterm_url():
+    assert (
+        arabterm_url("ksaa_music")
+        == "https://forzagreen.github.io/arabterm/ksaa_music/"
+    )
+    assert arabterm_url(None) is None
+    assert arabterm_url("") is None
 
 
 def test_query_matches_term_exact_arabic_part():

@@ -23,7 +23,7 @@ const LandingCards = ({ stats }) => {
       to: '/tools',
       icon: Wrench,
       title: 'منظومة الأدوات',
-      description: 'أدوات مفتوحة المصدر لحوسبة المعاجم العربية.',
+      description: 'أدوات مفتوحة المصدر لحوسبة اللغة العربية.',
       facts: ['صرفي', 'دلالي', 'معجمي'],
     },
   ];

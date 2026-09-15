@@ -1,6 +1,6 @@
 // src/components/Tools.jsx
 //
-// "منظومة حوسبة المعاجم العربية": the ecosystem page. Mirrors the project
+// "منظومة حوسبة اللغة العربية": the ecosystem page. Mirrors the project
 // diagram — three levels (صرفي / دلالي / معجمي), each with a goal, its
 // ready tools — then the Wikimedia outputs row.
 import { useState, useEffect } from 'react';
@@ -43,11 +43,11 @@ const LinkChip = ({ kind, href, label }) => {
 };
 
 // Palette follows the diagram: green = level, yellow = goal, blue = tool,
-// red = outputs.
+// outputs neutral.
 const LEVEL_CLASSES = 'bg-green-100 text-green-900 dark:bg-green-900/50 dark:text-green-100';
 const GOAL_CLASSES = 'bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100';
 const TOOL_CLASSES = 'bg-sky-50 border border-sky-200 dark:bg-sky-900/30 dark:border-sky-800';
-const OUTPUT_CLASSES = 'bg-rose-100 text-rose-900 dark:bg-rose-900/40 dark:text-rose-100';
+const OUTPUT_CLASSES = 'bg-white border border-gray-200 text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white';
 
 const ToolCard = ({ tool, stats }) => {
   const Icon = tool.icon;
@@ -247,13 +247,13 @@ const Tools = () => {
 
   return (
     <div className={`min-h-screen flex flex-col ${themeClasses}`} dir="rtl">
-      <SiteHeader title="منظومة حوسبة المعاجم العربية" />
+      <SiteHeader title="منظومة حوسبة اللغة العربية" />
 
       <div className="max-w-7xl mx-auto mt-8 px-4 pb-16 w-full">
         {/* Intro */}
         <div className={`${cardClasses} rounded-lg p-6 mb-8`}>
           <p className="text-lg leading-relaxed text-gray-700 dark:text-gray-200">
-            مسرد الويكي جزء من منظومة مفتوحة المصدر لحوسبة المعاجم العربية، تعمل على ثلاثة مستويات:
+            مسرد الويكي جزء من منظومة مفتوحة المصدر لحوسبة اللغة العربية، تعمل على ثلاثة مستويات:
             <strong> صرفي</strong> (تحليل الكلمة وتصريفها)،
             <strong> دلالي</strong> (ضبط المعاني وشروحاتها)،
             <strong> معجمي</strong> (توحيد المصطلحات المعرَّبة).
@@ -284,7 +284,7 @@ const Tools = () => {
         {/* Outputs */}
         <section className="mt-10">
           <h2 className="text-xl font-bold mb-3 flex items-center gap-2">
-            <ArrowLeft size={20} className="text-rose-500" />
+            <ArrowLeft size={20} className="text-gray-500 dark:text-gray-400" />
             المخرجات
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -294,10 +294,10 @@ const Tools = () => {
                 href={o.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`${OUTPUT_CLASSES} rounded-lg px-4 py-4 hover:shadow-md transition-shadow`}
+                className={`${OUTPUT_CLASSES} rounded-lg px-4 py-4 hover:border-blue-400 hover:shadow-md transition-all`}
               >
                 <span className="font-bold text-lg block">{o.name}</span>
-                <span className="text-sm opacity-90">{o.description}</span>
+                <span className="text-sm text-gray-600 dark:text-gray-300">{o.description}</span>
               </a>
             ))}
           </div>

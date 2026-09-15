@@ -8,6 +8,16 @@ const Dictionaries = () => {
   const [dictionaries, setDictionaries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [stats, setStats] = useState(null);
+
+  // Total term count comes from /api/v1/stats (same source as the home
+  // page), so the two numbers always agree; failure just shows '-'.
+  useEffect(() => {
+    fetch('/api/v1/stats')
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setStats)
+      .catch(() => setStats(null));
+  }, []);
 
   // Fetch dictionaries on mount
   useEffect(() => {
@@ -69,10 +79,16 @@ const Dictionaries = () => {
         {!loading && !error && (
           <div className="mb-6 text-center">
             <p className="text-lg text-gray-600 dark:text-gray-300">
-              عدد المعاجم: <span className="font-bold">{formatNumber(dictionaries.length)}</span>
+              <span>
+                عدد المعاجم: <span className="font-bold">{formatNumber(dictionaries.length)}</span>
+              </span>
+              <span className="mx-3 text-gray-400" aria-hidden="true">·</span>
+              <span>
+                عدد المصطلحات: <span className="font-bold">{formatNumber(stats?.number_terms)}</span>
+              </span>
             </p>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              اضغط على أي معجم لتصفّح محتواه في موقع arabterm.
+              اضغط على أي معجم لتصفّح محتواه كاملًا.
             </p>
           </div>
         )}

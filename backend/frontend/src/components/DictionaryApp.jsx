@@ -31,7 +31,7 @@ const LandingCards = ({ stats }) => {
   // Deliberately quiet: no shadow, muted text, well below the search box,
   // so the search bar stays the obvious primary action.
   return (
-    <div className="max-w-3xl mx-auto mt-16 px-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div className="max-w-3xl w-full mx-auto mt-16 px-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
       {cards.map(({ to, icon: Icon, title, description, facts }) => (
         <Link
           key={to}
@@ -343,7 +343,7 @@ const DictionaryApp = () => {
       <SiteHeader title="مسرد الويكي" />
 
       {/* Search Bar */}
-      <div className="max-w-3xl mx-auto mt-8 px-4">
+      <div className="max-w-4xl w-full mx-auto mt-8 px-4">
         <div className="relative">
           <input
             ref={searchInputRef}
@@ -359,7 +359,7 @@ const DictionaryApp = () => {
 
       {/* Error Message */}
       {error && (
-        <div className="max-w-3xl mx-auto mt-4 px-4">
+        <div className="max-w-4xl w-full mx-auto mt-4 px-4">
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
             <span className="block sm:inline">{error}</span>
           </div>
@@ -368,7 +368,7 @@ const DictionaryApp = () => {
 
       {/* Loading State */}
       {loading && (
-        <div className="max-w-3xl mx-auto mt-8 text-center">
+        <div className="max-w-4xl w-full mx-auto mt-8 text-center">
           <p className="text-lg">جارٍ البحث...</p>
         </div>
       )}

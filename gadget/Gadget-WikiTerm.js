@@ -562,15 +562,28 @@ WikiTermDialog.prototype.showCitationPopup = function ($target, term) {
     flags: ['progressive']
   });
 
-  copyBtn.on('click', () => {
-    textarea.select();
-    document.execCommand('copy');
-
+  const onCopied = () => {
     // Show copied message
     copyBtn.setLabel('نُسِخت!');
     setTimeout(() => {
       copyBtn.setLabel('نسخ');
     }, 2000);
+  };
+
+  const copyFallback = () => {
+    textarea.select();
+    document.execCommand('copy');
+    onCopied();
+  };
+
+  copyBtn.on('click', () => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(template)
+        .then(onCopied)
+        .catch(copyFallback);
+    } else {
+      copyFallback();
+    }
   });
 
   // Add elements to the panel

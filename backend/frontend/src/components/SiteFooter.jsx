@@ -25,7 +25,7 @@ const SiteFooter = () => (
       <p className="text-center sm:text-right">
         مسرد الويكي جزء من{' '}
         <Link to="/tools" className="font-semibold hover:text-blue-600 dark:hover:text-blue-400">
-          منظومة حوسبة المعاجم العربية
+          منظومة حوسبة اللغة العربية
         </Link>{' '}
         مفتوحة المصدر، وتصبّ في مشاريع ويكيميديا.
       </p>

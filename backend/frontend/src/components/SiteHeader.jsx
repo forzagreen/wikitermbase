@@ -12,7 +12,7 @@ import { WIKI_GADGET_URL } from '../siteLinks';
 
 const NAV_ITEMS = [
   { to: '/dictionaries', icon: BookOpen, label: 'المعاجم', title: 'قائمة المعاجم' },
-  { to: '/tools', icon: Wrench, label: 'الأدوات', title: 'منظومة حوسبة المعاجم العربية' },
+  { to: '/tools', icon: Wrench, label: 'الأدوات', title: 'منظومة حوسبة اللغة العربية' },
 ];
 
 const navLinkClasses = ({ isActive }) =>

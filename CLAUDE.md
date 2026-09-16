@@ -37,7 +37,7 @@ make fix_dump         # Fix SQL dump compatibility issues
 - Routes defined in [main.jsx](backend/frontend/src/main.jsx): `/`, `/ui/search/raw`, `/dictionaries`, `/tools` (ecosystem hub page; `mazini` npm package is lazy-imported there for the inline conjugation widget)
 - **Important**: When adding new frontend routes, register them in both FastAPI ([app.py](backend/app.py)) and React Router ([main.jsx](backend/frontend/src/main.jsx))
 
-**Wikipedia Gadget** ([gadget/](gadget/)): OOUI-based MediaWiki gadget for in-wiki term lookup. [SearchTerm.js](gadget/SearchTerm.js) is the main file; deployed to Arabic Wikipedia as Gadget-WikiTerm.js
+**Wikipedia Gadget** ([gadget/](gadget/)): MediaWiki gadget for in-wiki term lookup. [Gadget-WikiTerm.js](gadget/Gadget-WikiTerm.js) + [Gadget-WikiTerm.css](gadget/Gadget-WikiTerm.css) are the files deployed to Arabic Wikipedia as `MediaWiki:Gadget-WikiTerm.js/.css`; [SearchTerm.js](gadget/SearchTerm.js) is the user-script variant (same body wrapped in `mw.loader.using`, regenerate it after editing the gadget). The gadget is designed for default enablement: only `mediawiki.util` at page load, OOUI lazy-loaded on first click, ES2015 syntax only (no `requiresES6`, it conflicts with `default`), no `console.*`. Entry point is a header icon on Vector 2022/Minerva and a `p-cactions` ("المزيد") item elsewhere.
 
 **Database**: MariaDB with full-text search. Content managed in separate [arabterm](https://github.com/forzagreen/arabterm) repository. Local dev requires `./var/local.cnf` with database credentials:
 ```ini

@@ -1,0 +1,15 @@
+{
+  "name": "wikitermbase-gadget",
+  "private": true,
+  "description": "Lint and cross-browser checks for the مسرد الويكي (WikiTerm) MediaWiki gadget",
+  "scripts": {
+    "lint": "eslint Gadget-WikiTerm.js SearchTerm.js",
+    "matrix": "node tests/matrix.js",
+    "summary": "node tests/summarize.js tests/out/matrix_results.json"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.1",
+    "eslint-config-wikimedia": "^0.32.6",
+    "playwright": "^1.63.0"
+  }
+}

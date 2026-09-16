@@ -33,6 +33,8 @@ jobs:
           code:
             - '!db/arabterm.sql'
             - '!**/*.md'
+            - '!gadget/**'
+            - '!.github/workflows/gadget.yml'
 
   deploy-code:
     needs: [test, changes]

@@ -71,7 +71,9 @@ npm run summary                           # Markdown table from tests/out/matrix
 BROWSERS=chrome SKINS=vector npm run matrix   # subset
 ```
 
-The matrix opens a real ar.wikipedia article (logged out), injects the working-tree gadget, and drives it end to end: entry point → dialog (lazy OOUI load, bytes and time recorded) → search → expand → citation copy → "show more" → close, failing on any uncaught JavaScript error.
+The matrix opens a real ar.wikipedia article (logged out), injects the working-tree gadget, and drives it end to end: entry point → dialog (lazy OOUI load, bytes and time recorded) → search → expand → citation copy → "show more" → close, failing on any uncaught JavaScript error. `npm run check` is network-free: it verifies `SearchTerm.js` is in sync with the gadget, enforces a gzipped size budget (10 KB JS, 3 KB CSS) and rejects `console.*` calls.
+
+The same three commands run in GitHub Actions ([gadget.yml](.github/workflows/gadget.yml)) on every pull request touching `gadget/`, on pushes to `main`, and weekly. The run's job summary shows the results table and the screenshots + JSON are attached as a downloadable artifact, so the numbers can be checked and re-run by anyone from the [Actions tab](https://github.com/forzagreen/wikitermbase/actions/workflows/gadget.yml).
 
 To try the working-tree version on-wiki without deploying anything, disable the WikiTerm gadget in your preferences, open any page and paste in the browser console (replace `main` with your branch):
 

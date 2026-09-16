@@ -19,8 +19,10 @@ const SHOTS = path.join(OUT, 'shots');
 fs.mkdirSync(SHOTS, { recursive: true });
 const QUERY = 'computer';
 
+// Google Chrome when installed (macOS dev machines, GitHub runners), else Playwright's Chromium.
+const launchChrome = () => pw.chromium.launch({ channel: 'chrome' }).catch(() => pw.chromium.launch());
 const BROWSERS = [
-  ['chrome', () => pw.chromium.launch({ channel: 'chrome' })],
+  ['chrome', launchChrome],
   ['firefox', () => pw.firefox.launch()],
   ['webkit', () => pw.webkit.launch()],
 ];
@@ -143,5 +145,7 @@ async function runCase(browserName, browser, c) {
     await browser.close();
   }
   fs.writeFileSync(path.join(OUT, 'matrix_results.json'), JSON.stringify(results, null, 2));
-  console.log('DONE');
+  const failed = results.filter((r) => !r.version && !r.ok).length;
+  console.log(failed ? `DONE with ${failed} failing case(s)` : 'DONE');
+  process.exitCode = failed ? 1 : 0;
 })().catch((e) => { console.error('FATAL', e); process.exit(1); });

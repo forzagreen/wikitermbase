@@ -32,10 +32,26 @@
   text-decoration: none;
 }
 
-/* Content Translation header: sit inline with the notification icons */
+/* Content Translation header: same box as the Echo badges beside it
+   (20×20 block, 2px side margins, 0.87 opacity) so the row lines up */
 .wikiterm-cx-item {
   display: inline-flex;
   align-items: center;
+}
+
+.wikiterm-cx-item .wikiterm-icon-button {
+  display: block;
+  width: 20px;
+  height: 20px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  margin: 0 2px;
+  opacity: 0.87;
+}
+
+.wikiterm-cx-item .wikiterm-icon-button:hover {
+  opacity: 1;
 }
 
 .wikiterm-minerva {

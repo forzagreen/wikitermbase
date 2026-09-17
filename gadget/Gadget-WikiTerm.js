@@ -549,10 +549,12 @@
 		} );
 	}
 
-	function makeIconButton( extraClasses ) {
+	function makeIconButton( extraClasses, plain ) {
 		return $( '<a>' )
 			.attr( { href: '#', role: 'button', title: TOOLTIP, 'aria-label': LABEL } )
-			.addClass( 'wikiterm-trigger wikiterm-icon-button cdx-button cdx-button--fake-button cdx-button--fake-button--enabled cdx-button--weight-quiet cdx-button--icon-only' )
+			.addClass( 'wikiterm-trigger wikiterm-icon-button' )
+			// Codex quiet icon-only button, unless the host header sizes items itself.
+			.addClass( plain ? '' : 'cdx-button cdx-button--fake-button cdx-button--fake-button--enabled cdx-button--weight-quiet cdx-button--icon-only' )
 			.addClass( extraClasses )
 			.append( $( '<span>' ).addClass( 'wikiterm-icon' ).html( iconSvg() ) )
 			.on( 'click', onTriggerClick );
@@ -590,7 +592,7 @@
 	}
 
 	// Content Translation (Special:ContentTranslation uses its own skin): icon
-	// in the tool's header, next to the notification icons.
+	// in the tool's header, sized like the Echo notification badges next to it.
 	function addToContentTranslation() {
 		const list = document.querySelector(
 			'#user-tools .mw-portlet-body:not( .cx-skin-menu-dropdown ) .cx-skin-menu-content'
@@ -600,7 +602,7 @@
 		}
 		$( list ).append(
 			$( '<li>' ).addClass( 'mw-list-item wikiterm-cx-item' ).append(
-				makeIconButton( 'wikiterm-trigger-cx' )
+				makeIconButton( 'wikiterm-trigger-cx', true )
 			)
 		);
 		return true;

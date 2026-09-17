@@ -34,6 +34,8 @@ const CASES = [
   { skin: 'monobook', viewport: DESKTOP },
   { skin: 'timeless', viewport: DESKTOP },
   { skin: 'minerva', viewport: { width: 390, height: 844 }, mobile: true },
+  // Special:ContentTranslation uses its own skin; logged out it still renders the CX header.
+  { skin: 'contenttranslation', viewport: DESKTOP, url: 'https://ar.wikipedia.org/wiki/Special:ContentTranslation' },
 ];
 
 async function runCase(browserName, browser, c) {
@@ -47,7 +49,7 @@ async function runCase(browserName, browser, c) {
   page.on('console', (m) => { if (m.type() === 'error') r.consoleErrors.push(m.text().split('\n')[0]); });
   const shot = (suffix) => page.screenshot({ path: path.join(SHOTS, `${browserName}-${label}${suffix}.png`) }).catch(() => {});
   try {
-    const url = PAGE + '?useskin=' + c.skin + (c.night ? '&vectornightmode=1' : '');
+    const url = c.url || (PAGE + '?useskin=' + c.skin + (c.night ? '&vectornightmode=1' : ''));
     let t = Date.now();
     await page.goto(url, { waitUntil: 'load', timeout: 90000 });
     await page.waitForFunction(() => window.mw && mw.loader && mw.loader.getState('mediawiki.util') === 'ready', null, { timeout: 60000 });
@@ -62,7 +64,7 @@ async function runCase(browserName, browser, c) {
     await trigger.waitFor({ state: 'attached', timeout: 15000 });
     r.steps.entryPoint = await page.evaluate(() => {
       const el = document.querySelector('.wikiterm-trigger, #ca-wikiterm a');
-      const p = el.closest('#p-cactions, #p-tb, #p-personal, .vector-user-links, .minerva-user-navigation');
+      const p = el.closest('#p-cactions, #p-tb, #p-personal, .vector-user-links, .minerva-user-navigation, #user-tools');
       return p ? (p.id || p.className.split(' ')[0]) : 'unknown';
     });
     r.steps.oouiLoadedAtPageLoad = await page.evaluate(() => mw.loader.getState('oojs-ui-core'));

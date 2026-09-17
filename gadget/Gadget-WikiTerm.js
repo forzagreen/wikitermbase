@@ -3,10 +3,15 @@
  * Gadget-WikiTerm.js — أداة «مسرد الويكي» (WikiTermBase) لويكيبيديا العربية
  *
  * Adds an entry point to the skin chrome — an icon button in the header on
- * Vector 2022 and Minerva, and an item in the page-actions menu ("المزيد")
- * on Vector legacy, MonoBook, Timeless and any other skin — that opens a
- * dialog for looking up a term (Arabic, English or French) across the
- * WikiTermBase dictionaries: https://wikitermbase.toolforge.org
+ * Vector 2022, Minerva and the Content Translation tool, and an item in the
+ * page-actions menu ("المزيد") on Vector legacy, MonoBook, Timeless and any
+ * other skin — that opens a dialog for looking up a term (Arabic, English or
+ * French) across the WikiTermBase dictionaries: https://wikitermbase.toolforge.org
+ *
+ * Optional per-user configuration (in your common.js, before the gadget runs):
+ *   window.wikiTermConfig = { placement: 'personal' };
+ * moves the entry from the page-actions menu to the personal toolbar at the
+ * top of the page on Vector legacy, MonoBook and Timeless.
  *
  * The page-load footprint is deliberately minimal:
  *   - the only hard dependency is mediawiki.util;
@@ -31,6 +36,7 @@
 	// devices and nobody reads past the first few dozen anyway.
 	const PAGE_SIZE = 30;
 	const DESCRIPTION_LIMIT = 200;
+	const USER_CONFIG = window.wikiTermConfig || {};
 
 	// Loaded on demand (first click), never at page load.
 	const DIALOG_MODULES = [
@@ -546,7 +552,7 @@
 	function makeIconButton( extraClasses ) {
 		return $( '<a>' )
 			.attr( { href: '#', role: 'button', title: TOOLTIP, 'aria-label': LABEL } )
-			.addClass( 'wikiterm-trigger cdx-button cdx-button--fake-button cdx-button--fake-button--enabled cdx-button--weight-quiet cdx-button--icon-only' )
+			.addClass( 'wikiterm-trigger wikiterm-icon-button cdx-button cdx-button--fake-button cdx-button--fake-button--enabled cdx-button--weight-quiet cdx-button--icon-only' )
 			.addClass( extraClasses )
 			.append( $( '<span>' ).addClass( 'wikiterm-icon' ).html( iconSvg() ) )
 			.on( 'click', onTriggerClick );
@@ -583,11 +589,31 @@
 		return true;
 	}
 
+	// Content Translation (Special:ContentTranslation uses its own skin): icon
+	// in the tool's header, next to the notification icons.
+	function addToContentTranslation() {
+		const list = document.querySelector(
+			'#user-tools .mw-portlet-body:not( .cx-skin-menu-dropdown ) .cx-skin-menu-content'
+		);
+		if ( !list ) {
+			return false;
+		}
+		$( list ).append(
+			$( '<li>' ).addClass( 'mw-list-item wikiterm-cx-item' ).append(
+				makeIconButton( 'wikiterm-trigger-cx' )
+			)
+		);
+		return true;
+	}
+
 	// Every other skin (Vector legacy, MonoBook, Timeless, …): a plain item in
-	// the page-actions menu ("المزيد" on Vector legacy and Timeless), falling
-	// back to the toolbox.
+	// the page-actions menu ("المزيد" on Vector legacy and Timeless), or in the
+	// personal toolbar at the top when the user asked for it, falling back to
+	// the toolbox.
 	function addToPortlet() {
-		const portlets = [ 'p-cactions', 'p-tb', 'p-personal' ];
+		const portlets = USER_CONFIG.placement === 'personal' ?
+			[ 'p-personal', 'p-cactions', 'p-tb' ] :
+			[ 'p-cactions', 'p-tb', 'p-personal' ];
 		for ( let i = 0; i < portlets.length; i++ ) {
 			const link = mw.util.addPortletLink( portlets[ i ], '#', LABEL, 'ca-wikiterm', TOOLTIP );
 			if ( link ) {
@@ -605,6 +631,8 @@
 			added = addToVector2022();
 		} else if ( skin === 'minerva' ) {
 			added = addToMinerva();
+		} else if ( skin === 'contenttranslation' ) {
+			added = addToContentTranslation();
 		}
 		if ( !added ) {
 			addToPortlet();

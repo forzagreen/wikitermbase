@@ -48,7 +48,7 @@ Files in [gadget/](gadget/):
 
 Design constraints (the gadget is meant to be enabled by default, see the [default-gadget criteria](https://ar.wikipedia.org/wiki/ويكيبيديا:إضافات#معايير)):
 - The only page-load dependency is `mediawiki.util`. OOUI (about 90 KB gzipped) and the dialog are loaded on the first click via `mw.loader.using()`; no request reaches the WikiTermBase API until the user submits a search.
-- Entry points: an icon button in the header on Vector 2022 (and its sticky header) and on Minerva; an item in the page-actions menu ("المزيد") on Vector legacy, MonoBook, Timeless and any other skin, via `mw.util.addPortletLink()`.
+- Entry points: an icon button in the header on Vector 2022 (and its sticky header), on Minerva and in the Content Translation tool (`Special:ContentTranslation` has its own skin); an item in the page-actions menu ("المزيد") on Vector legacy, MonoBook, Timeless and any other skin, via `mw.util.addPortletLink()`. Users of those skins who prefer the top personal toolbar can set `window.wikiTermConfig = { placement: 'personal' };` in their `common.js`.
 - Only ES2015 syntax (MediaWiki's Grade A baseline is ES2019, and `requiresES6` cannot be combined with `default`). No `console.*` calls.
 - Results render in pages of 30 groups with a "show more" button; a new search aborts the previous request.
 
@@ -66,7 +66,7 @@ Tooling lives in [gadget/package.json](gadget/package.json) (ESLint with the Wik
 cd gadget && npm install
 npm run lint                              # eslint-config-wikimedia: client/es6 + mediawiki + jquery
 npx playwright install firefox webkit     # once; Chrome uses the installed Google Chrome
-npm run matrix                            # Chrome/Firefox/WebKit × Vector 2022 (light+night)/Vector 2010/MonoBook/Timeless/Minerva
+npm run matrix                            # Chrome/Firefox/WebKit × Vector 2022 (light+night)/Vector 2010/MonoBook/Timeless/Minerva/Content Translation
 npm run summary                           # Markdown table from tests/out/matrix_results.json (screenshots in tests/out/shots/)
 BROWSERS=chrome SKINS=vector npm run matrix   # subset
 ```

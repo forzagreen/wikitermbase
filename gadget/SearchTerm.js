@@ -23,6 +23,7 @@ mw.loader.using( [ 'mediawiki.util' ] ).then( () => {
 	// devices and nobody reads past the first few dozen anyway.
 	const PAGE_SIZE = 30;
 	const DESCRIPTION_LIMIT = 200;
+	const USER_CONFIG = window.wikiTermConfig || {};
 
 	// Loaded on demand (first click), never at page load.
 	const DIALOG_MODULES = [
@@ -538,7 +539,7 @@ mw.loader.using( [ 'mediawiki.util' ] ).then( () => {
 	function makeIconButton( extraClasses ) {
 		return $( '<a>' )
 			.attr( { href: '#', role: 'button', title: TOOLTIP, 'aria-label': LABEL } )
-			.addClass( 'wikiterm-trigger cdx-button cdx-button--fake-button cdx-button--fake-button--enabled cdx-button--weight-quiet cdx-button--icon-only' )
+			.addClass( 'wikiterm-trigger wikiterm-icon-button cdx-button cdx-button--fake-button cdx-button--fake-button--enabled cdx-button--weight-quiet cdx-button--icon-only' )
 			.addClass( extraClasses )
 			.append( $( '<span>' ).addClass( 'wikiterm-icon' ).html( iconSvg() ) )
 			.on( 'click', onTriggerClick );
@@ -575,11 +576,31 @@ mw.loader.using( [ 'mediawiki.util' ] ).then( () => {
 		return true;
 	}
 
+	// Content Translation (Special:ContentTranslation uses its own skin): icon
+	// in the tool's header, next to the notification icons.
+	function addToContentTranslation() {
+		const list = document.querySelector(
+			'#user-tools .mw-portlet-body:not( .cx-skin-menu-dropdown ) .cx-skin-menu-content'
+		);
+		if ( !list ) {
+			return false;
+		}
+		$( list ).append(
+			$( '<li>' ).addClass( 'mw-list-item wikiterm-cx-item' ).append(
+				makeIconButton( 'wikiterm-trigger-cx' )
+			)
+		);
+		return true;
+	}
+
 	// Every other skin (Vector legacy, MonoBook, Timeless, …): a plain item in
-	// the page-actions menu ("المزيد" on Vector legacy and Timeless), falling
-	// back to the toolbox.
+	// the page-actions menu ("المزيد" on Vector legacy and Timeless), or in the
+	// personal toolbar at the top when the user asked for it, falling back to
+	// the toolbox.
 	function addToPortlet() {
-		const portlets = [ 'p-cactions', 'p-tb', 'p-personal' ];
+		const portlets = USER_CONFIG.placement === 'personal' ?
+			[ 'p-personal', 'p-cactions', 'p-tb' ] :
+			[ 'p-cactions', 'p-tb', 'p-personal' ];
 		for ( let i = 0; i < portlets.length; i++ ) {
 			const link = mw.util.addPortletLink( portlets[ i ], '#', LABEL, 'ca-wikiterm', TOOLTIP );
 			if ( link ) {
@@ -597,6 +618,8 @@ mw.loader.using( [ 'mediawiki.util' ] ).then( () => {
 			added = addToVector2022();
 		} else if ( skin === 'minerva' ) {
 			added = addToMinerva();
+		} else if ( skin === 'contenttranslation' ) {
+			added = addToContentTranslation();
 		}
 		if ( !added ) {
 			addToPortlet();

@@ -21,6 +21,23 @@
   cursor: progress;
 }
 
+/* Sane rendering of the icon button even where Codex button styles are absent */
+.wikiterm-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  color: var(--color-base, #202122);
+  text-decoration: none;
+}
+
+/* Content Translation header: sit inline with the notification icons */
+.wikiterm-cx-item {
+  display: inline-flex;
+  align-items: center;
+}
+
 .wikiterm-minerva {
   display: flex;
   align-items: center;

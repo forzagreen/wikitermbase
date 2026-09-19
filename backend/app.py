@@ -212,6 +212,10 @@ def search_terms_mariadb(
     query_text: str, include_descriptions: bool = True
 ) -> list[dict]:
     """Search for terms in the MariaDB database."""
+    # `t.id` is a deterministic tiebreak: InnoDB relevance is close to a raw
+    # term frequency, so most rows of a broad query tie on it (80% for "نظام").
+    # Without it, two runs could order groups differently and the paginated
+    # windows of /api/v1/search/aggregated would overlap or skip.
     search_query = text("""
         SELECT
             t.*,
@@ -226,7 +230,7 @@ def search_terms_mariadb(
         JOIN dictionary d ON t.dictionary_id = d.id
         WHERE MATCH(t.arabic, t.english, t.french, t.description)
         AGAINST(:query IN NATURAL LANGUAGE MODE)
-        ORDER BY relevance DESC
+        ORDER BY relevance DESC, t.id
     """)
 
     result = execute_with_retry(search_query, {"query": query_text})
@@ -306,9 +310,11 @@ def split_translations(value: str) -> list[str]:
 
 
 def _strip_query_quotes(query: str) -> str:
-    # The frontend and gadget both send q=`"${term}"` (literal quotes) as a
-    # leftover phrase-search hint; MariaDB's NATURAL LANGUAGE MODE ignores
-    # them, but our own exact-match comparison needs the bare term.
+    # The frontend and gadget both send q=`"${term}"` (literal quotes). They
+    # reach MariaDB as-is, where InnoDB treats them as a phrase search even in
+    # NATURAL LANGUAGE MODE (`"data system"` matches 6 rows, unquoted it ORs
+    # the tokens and matches thousands). Our own exact-match comparison needs
+    # the bare term.
     query = query.strip()
     if len(query) >= 2 and query[0] == query[-1] == '"':
         query = query[1:-1].strip()
@@ -370,6 +376,12 @@ def occurrence_sort_key(term: dict):
 
 def aggregate_terms(results: list[dict], query: str = "") -> list[dict]:
     """Aggregate terms by arabic term (after cleaning it)."""
+    # Ignore rows without an English value (NULL, empty or whitespace-only):
+    # every group elects an English headline, and such rows are data errors
+    # tracked upstream (arabterm's validation_baseline.json) until fixed. They
+    # must not break the search in the meantime.
+    results = [term for term in results if (term.get("english") or "").strip()]
+
     # Flag rows that are an exact match for the query (on any one of their
     # possibly multiple translations), so those groups can be bubbled to the
     # top regardless of how many dictionaries carry a merely-related phrase.
@@ -430,8 +442,8 @@ def aggregate_terms(results: list[dict], query: str = "") -> list[dict]:
             list(set(term["dictionary_id"] for term in group["occurences"]))
         )
 
-        # Elect an english term (normalised), the most used one.
-        # Attention: we assume all entries have an english term.
+        # Elect an english term (normalised), the most used one. Every entry
+        # has one: rows without english were dropped above.
         english_terms = [normalise_english(x["english"]) for x in group["occurences"]]
         group["english_normalised"] = Counter(english_terms).most_common(1)[0][0]
 
@@ -469,6 +481,21 @@ def aggregate_terms(results: list[dict], query: str = "") -> list[dict]:
         reverse=True,
     )
     return groups
+
+
+def paginate_groups(
+    groups: list[dict], offset: int = 0, limit: int | None = None
+) -> list[dict]:
+    """Window of `groups` starting at `offset`; everything after it when
+    `limit` is None.
+
+    Applied after aggregation on purpose: relevance ties are too massive for a
+    SQL-side LIMIT, which would cut occurrences out of the top groups and
+    shrink their dictionary count.
+    """
+    if limit is None:
+        return groups[offset:]
+    return groups[offset : offset + limit]
 
 
 class TermResult(BaseModel):
@@ -514,8 +541,13 @@ class TermGroup(BaseModel):
 
 
 class AggregatedSearchResponse(BaseModel):
+    """`number_groups` is the total for the query, not the size of `groups`:
+    more pages remain while `offset + len(groups) < number_groups`."""
+
     q: str
     number_groups: int
+    offset: int = 0
+    limit: int | None = None
     groups: list[TermGroup]
 
 
@@ -583,7 +615,7 @@ def search(
     summary="Search results aggregated by normalised Arabic term",
     response_model=AggregatedSearchResponse,
     response_model_exclude_none=True,
-    response_description="Term groups, exact matches for the query first, then ordered by number of distinct dictionaries (desc), then by total relevance (desc).",
+    response_description="Term groups, exact matches for the query first, then ordered by number of distinct dictionaries (desc), then by total relevance (desc). `number_groups` is the total for the query; `groups` is the requested window of it.",
 )
 def search_aggregated(
     q: str = Query(
@@ -594,6 +626,18 @@ def search_aggregated(
     include_descriptions: bool = Query(
         True,
         description="Include each term's `description` field within every occurrence. Set to `false` to slim the payload.",
+    ),
+    limit: int | None = Query(
+        None,
+        ge=1,
+        le=100,
+        description="Maximum number of groups to return. Omit to get every group (the default, kept for backward compatibility). Broad queries produce thousands of groups and multi-megabyte responses, so interactive clients should pass e.g. `limit=30` and page with `offset`.",
+        examples=[30],
+    ),
+    offset: int = Query(
+        0,
+        ge=0,
+        description="Number of groups to skip, in the order described below. The next page is `offset + len(groups)`; there is one while that is lower than `number_groups`.",
     ),
 ):
     """Search and group results by normalised Arabic term.
@@ -619,6 +663,15 @@ def search_aggregated(
     distinct dictionaries that contain the term (desc), then by the sum of
     relevance scores within the group (desc). This is the endpoint used by
     the on-wiki gadget.
+
+    Rows without an English value are ignored: they are data errors tracked in
+    the arabterm repository. `/api/v1/search` still returns them.
+
+    **Pagination.** `limit` and `offset` select a window of the ordered groups;
+    `number_groups` is always the total. Grouping and ordering are computed
+    over every matching row on each request — the server keeps no state
+    between pages — and the order is deterministic, so consecutive windows
+    neither overlap nor skip a group.
     """
     sentry_sdk.set_tag("search.q", q[:200])  # Sentry caps tag values at 200 chars
 
@@ -635,9 +688,23 @@ def search_aggregated(
 
     sentry_sdk.set_tag("search.number_groups", str(number_groups))
     sentry_sdk.set_measurement("search.number_groups", number_groups)
-    logger.info("search_aggregated q=%r number_groups=%d", q, number_groups)
+    # How often clients go past the first page, and how slow those requests are.
+    sentry_sdk.set_tag("search.offset", str(offset))
+    logger.info(
+        "search_aggregated q=%r number_groups=%d offset=%d limit=%s",
+        q,
+        number_groups,
+        offset,
+        limit,
+    )
 
-    return {"q": q, "number_groups": number_groups, "groups": groups}
+    return {
+        "q": q,
+        "number_groups": number_groups,
+        "offset": offset,
+        "limit": limit,
+        "groups": paginate_groups(groups, offset, limit),
+    }
 
 
 @app.get(

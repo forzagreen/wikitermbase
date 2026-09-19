@@ -5,6 +5,7 @@ from app import (
     normalise_arabic,
     normalise_english,
     normalise_french,
+    paginate_groups,
     query_matches_term,
     split_translations,
 )
@@ -422,3 +423,67 @@ def test_aggregate_terms_bubbles_exact_match_to_top():
 
     assert groups[0]["arabic_normalised"] == "مرقب"
     assert groups[1]["arabic_normalised"] == "مقراب عاكس"
+
+
+# id=575262-like: a valid Arabic/French pair whose English value is missing.
+# Such rows used to raise KeyError and turn the whole search into a 500.
+@pytest.mark.parametrize(
+    "missing_english",
+    [
+        {},  # NULL in the database: the key is dropped from the row
+        {"english": ""},
+        {"english": "   "},
+    ],
+)
+def test_aggregate_terms_ignores_rows_without_english(missing_english):
+    without_english = {
+        "arabic": "أجراس الكاريون",
+        "french": "carillon",
+        "dictionary_id": 822,
+        "relevance": 5.0,
+        **missing_english,
+    }
+    # Same Arabic term, so the bad row would join this group if it were kept.
+    sibling = {
+        "arabic": "أجراس الكاريون",
+        "english": "carillon",
+        "french": "carillon",
+        "dictionary_id": 1,
+        "relevance": 5.0,
+    }
+
+    groups = aggregate_terms([without_english, sibling], "carillon")
+
+    assert len(groups) == 1
+    assert groups[0]["english_normalised"] == "carillon"
+    assert groups[0]["occurences"] == [sibling]
+    assert groups[0]["dictionary_ids"] == [1]
+
+    assert aggregate_terms([without_english], "carillon") == []
+
+
+@pytest.mark.parametrize(
+    "offset, limit, expected",
+    [
+        (0, None, [0, 1, 2, 3, 4]),  # no limit: everything (backward compatible)
+        (2, None, [2, 3, 4]),
+        (0, 2, [0, 1]),
+        (2, 2, [2, 3]),
+        (4, 2, [4]),  # last, partial window
+        (5, 2, []),  # offset == total
+        (9, 2, []),  # offset past the end
+    ],
+)
+def test_paginate_groups(offset, limit, expected):
+    groups = [{"n": n} for n in range(5)]
+    assert paginate_groups(groups, offset, limit) == [{"n": n} for n in expected]
+
+
+def test_paginate_groups_windows_cover_every_group_once():
+    groups = [{"n": n} for n in range(7)]
+    limit = 3
+    pages = [
+        paginate_groups(groups, offset, limit)
+        for offset in range(0, len(groups), limit)
+    ]
+    assert [g for page in pages for g in page] == groups

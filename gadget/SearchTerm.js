@@ -1,996 +1,633 @@
 // <nowiki>
 /**
- * SearchTerm.js - MediaWiki gadget for dictionary term lookup
- * 
- * This gadget provides Arabic-English-French dictionary functionality directly
- * within MediaWiki pages without using an iframe. It uses the Wikitermbase API
- * to fetch dictionary data and presents it using OOJS UI.
+ * SearchTerm.js — user-script variant of Gadget-WikiTerm.js (مسرد الويكي).
+ *
+ * Same code as the gadget, wrapped in mw.loader.using() so it can be loaded
+ * from a user page (e.g. importScript in common.js) without a gadget
+ * definition. Load the CSS separately, e.g. with mw.loader.load( url, "text/css" )
+ * where url is MediaWiki:Gadget-WikiTerm.css with action=raw&ctype=text/css.
+ *
+ * Keep in sync with Gadget-WikiTerm.js: only the first and last lines differ.
  */
-
-// Dependencies and initialization
-mw.loader.using([
-  'mediawiki.util',
-  'jquery',
-  'oojs-ui-core',
-  'oojs-ui-widgets',
-  'oojs-ui-windows',
-  'oojs-ui.styles.icons-content',
-  'oojs-ui.styles.icons-editing-advanced',
-  'oojs-ui.styles.icons-editing-citation',
-  'oojs-ui.styles.icons-interactions',
-], function () {
-  'use strict';
-  console.log('WikiTermGadget: Script loading...');
-
-  // API endpoint configuration
-  const API_ENDPOINT = 'https://wikitermbase.toolforge.org/api/v1/search/aggregated';
-
-  // Arabic count agreement (1 = bare singular, 2 = dual, 3-10 = plural,
-  // 11+ = singular tamyiz) for each dictionary-type bucket.
-  const TERMINOLOGY_COUNT_FORMS = { one: 'معجم مصطلحات واحد', two: 'معجما مصطلحات', few: 'معاجم مصطلحات', many: 'معجم مصطلحات' };
-  const LANGUAGE_COUNT_FORMS = { one: 'معجم لغوي واحد', two: 'معجمان لغويان', few: 'معاجم لغوية', many: 'معجم لغوي' };
-  const THESAURUS_COUNT_FORMS = { one: 'مسرد وب واحد', two: 'مسردا وب', few: 'مسارد وب', many: 'مسرد وب' };
-  // Fallback for dictionaries not yet classified with a dict_type.
-  const GENERIC_COUNT_FORMS = { one: 'معجم واحد', two: 'معجمان', few: 'معاجم', many: 'معجما' };
-
-  function formatCountClause(count, forms) {
-    if (count === 1) return forms.one;
-    if (count === 2) return forms.two;
-    if (count <= 10) return `${count} ${forms.few}`;
-    return `${count} ${forms.many}`;
-  }
-
-  function formatDictionaryCount(occurences) {
-    const countByType = { terminology: 0, language: 0, thesaurus: 0, other: 0 };
-    occurences.forEach((o) => {
-      const type = o.dictionary_dict_type;
-      countByType[type in countByType ? type : 'other'] += 1;
-    });
-
-    const clauses = [];
-    if (countByType.terminology > 0) clauses.push(formatCountClause(countByType.terminology, TERMINOLOGY_COUNT_FORMS));
-    if (countByType.language > 0) clauses.push(formatCountClause(countByType.language, LANGUAGE_COUNT_FORMS));
-    if (countByType.thesaurus > 0) clauses.push(formatCountClause(countByType.thesaurus, THESAURUS_COUNT_FORMS));
-    if (countByType.other > 0) clauses.push(formatCountClause(countByType.other, GENERIC_COUNT_FORMS));
-
-    return clauses.join(' و ');
-  }
-
-  function createCitationTemplate(term) {
-    const wikidataId = term.dictionary_wikidata_id || '';
-
-    if (term.page) {
-      return `{{استشهاد بويكي بيانات|${wikidataId}|ص=${term.page}}}`;
-    } else {
-      return `{{استشهاد بويكي بيانات|${wikidataId}}}`;
-    }
-  }
-
-  // Dictionary Dialog
-  function WikiTermDialog(config) {
-    WikiTermDialog.super.call(this, config);
-  }
-  OO.inheritClass(WikiTermDialog, OO.ui.ProcessDialog);
-
-  // Configure dialog
-  WikiTermDialog.static.name = 'wikiTermDialog';
-  WikiTermDialog.static.title = 'مسرد الويكي';
-  WikiTermDialog.static.size = 'larger';
-  WikiTermDialog.static.position = 'centered';
-  WikiTermDialog.static.actions = [
-    {
-      action: 'close',
-      label: 'إغلاق',
-      flags: ['safe', 'close']
-    }
-  ];
-
-  // Set up the dialog layout
-  WikiTermDialog.prototype.initialize = function () {
-    WikiTermDialog.super.prototype.initialize.call(this);
-
-    // Create UI components
-    this.searchInput = new OO.ui.TextInputWidget({
-      placeholder: 'ابحث عن مصطلح (بالإنجليزية أو الفرنسية أو العربية)...',
-      autocomplete: false,
-      dir: 'auto',
-      classes: ['wikiterm-search-input']
-    });
-
-    this.searchButton = new OO.ui.ButtonWidget({
-      icon: 'search',
-      label: 'بحث'
-    });
-
-    this.contentArea = new OO.ui.PanelLayout({
-      padded: false,
-      expanded: false,
-      classes: ['wikiterm-content-area']
-    });
-
-    this.resultsContainer = new OO.ui.PanelLayout({
-      padded: true,
-      expanded: false,
-      framed: false,
-      classes: ['wikiterm-results-container']
-    });
-
-    this.loadingIndicator = new OO.ui.ProgressBarWidget({
-      progress: false
-    });
-    this.loadingIndicator.$element.hide();
-
-    this.errorMessage = new OO.ui.MessageWidget({
-      type: 'error',
-      inline: true
-    });
-    this.errorMessage.$element.hide();
-
-    this.toolPageLink = new OO.ui.HtmlSnippet(
-      'للمزيد، ندعوك للاطلاع على ' +
-      '<a href="https://ar.wikipedia.org/wiki/ويكيبيديا:مسرد_الويكي" target="_blank">صفحة الأداة</a>'
-    );
-
-    this.toolPageMessage = new OO.ui.MessageWidget({
-      type: 'notice',
-      inline: true,
-      label: this.toolPageLink,
-      classes: ['wikiterm-tool-page-message']
-    });
-
-    // Create search form
-    const searchForm = new OO.ui.ActionFieldLayout(
-      this.searchInput,
-      this.searchButton,
-      {
-        align: 'top',
-        classes: ['wikiterm-search-form']
-      }
-    );
-
-    // Append search form to top section
-    this.$body.append(
-      this.toolPageMessage.$element,
-      searchForm.$element,
-      this.loadingIndicator.$element,
-      this.errorMessage.$element
-    );
-
-    // Add results container to content area
-    this.contentArea.$element.append(
-      this.resultsContainer.$element
-    );
-
-    // Add content area to body
-    this.$body.append(this.contentArea.$element);
-
-    // State variables
-    this.expandedGroups = {};
-    this.currentResults = null;
-    this.activePopup = null;
-
-    // Setup event handlers
-    this.setupEventHandlers();
-
-    // Apply CSS
-    this.applyCustomCSS();
-  };
-
-  WikiTermDialog.prototype.setupEventHandlers = function () {
-    // Search on button click
-    this.searchButton.connect(this, { click: 'performSearch' });
-
-    // Search on enter key
-    this.searchInput.connect(this, { enter: 'performSearch' });
-
-    // Click outside popup closes the popup
-    this.$element.on('click', (e) => {
-      if (this.activePopup && !$(e.target).closest('.wikiterm-citation-popup').length) {
-        this.closeActivePopup();
-      }
-    });
-  };
-
-  WikiTermDialog.prototype.performSearch = function () {
-    const searchTerm = this.searchInput.getValue().trim();
-
-    if (!searchTerm) {
-      this.resultsContainer.$element.empty();
-      return;
-    }
-
-    if (searchTerm.length < 3) {
-      this.loadingIndicator.$element.hide();
-      this.errorMessage.$element.hide();
-      const minLengthMsg = $('<div>')
-        .addClass('wikiterm-no-results')
-        .text('يرجى إدخال 3 أحرف على الأقل للبحث.');
-
-      this.resultsContainer.$element.empty().append(minLengthMsg);
-      return;
-    }
-
-    // Show loading indicator
-    this.loadingIndicator.$element.show();
-    this.errorMessage.$element.hide();
-
-    // Fetch results from API
-    $.ajax({
-      url: API_ENDPOINT,
-      data: { q: `"${searchTerm}"` },
-      method: 'GET',
-      dataType: 'json'
-    })
-      .done((data) => {
-        this.currentResults = data;
-        this.renderResults(data);
-      })
-      .fail((error) => {
-        console.error('WikiTermGadget: Search failed', error);
-        this.errorMessage.setLabel('فشل البحث. الرجاء المحاولة مرة أخرى لاحقًا.');
-        this.errorMessage.$element.show();
-        this.resultsContainer.$element.empty();
-      })
-      .always(() => {
-        this.loadingIndicator.$element.hide();
-      });
-  };
-
-  WikiTermDialog.prototype.renderResults = function (data) {
-    const container = this.resultsContainer.$element;
-    container.empty();
-
-    if (!data.groups || data.groups.length === 0) {
-      const noResults = $('<div>')
-        .addClass('wikiterm-no-results')
-        .text('لا توجد نتائج');
-
-      container.append(noResults);
-      return;
-    }
-
-    // Update dialog size after adding results
-    setTimeout(() => {
-      this.updateSize();
-    }, 100);
-
-    // Create results list
-    const resultsList = $('<div>').addClass('wikiterm-results-list');
-
-    data.groups.forEach((group, groupIndex) => {
-      const isFirstGroup = groupIndex === 0;
-      const resultCard = this.createResultCard(group, groupIndex, isFirstGroup);
-      resultsList.append(resultCard);
-    });
-
-    container.append(resultsList);
-  };
-
-  WikiTermDialog.prototype.createResultCard = function (group, groupIndex, isHighlighted) {
-    const isExpanded = this.expandedGroups[groupIndex] === true;
-    const card = $('<div>')
-      .addClass('wikiterm-result-card')
-      .toggleClass('wikiterm-result-highlighted', isHighlighted);
-
-    // Header with Arabic term
-    const header = $('<div>')
-      .addClass('wikiterm-result-header')
-      .append(
-        $('<span>')
-          .addClass('wikiterm-arabic-term')
-          .text(group.arabic_normalised)
-      );
-
-    // Add English and French translations
-    const translations = $('<div>').addClass('wikiterm-translations');
-
-    // English translation
-    if (group.english_normalised) {
-      translations.append(
-        $('<span>')
-          .addClass('wikiterm-translation wikiterm-en')
-          .append(
-            $('<span>').addClass('wikiterm-lang-tag').text('EN'),
-            ' ',
-            $('<span>').text(group.english_normalised)
-          )
-      );
-    }
-
-    // French translation (if available)
-    if (group.french_normalised) {
-      translations.append(
-        $('<span>')
-          .addClass('wikiterm-translation wikiterm-fr')
-          .append(
-            $('<span>').addClass('wikiterm-lang-tag').text('FR'),
-            ' ',
-            $('<span>').text(group.french_normalised)
-          )
-      );
-    }
-
-    header.append(translations);
-
-    // Dictionary count
-    const dictCountEl = $('<div>')
-      .addClass('wikiterm-dictionary-count')
-      .text(formatDictionaryCount(group.occurences));
-
-    // Toggle button
-    const toggleButton = new OO.ui.ButtonWidget({
-      icon: isExpanded ? 'collapse' : 'expand',
-      framed: false,
-      title: isExpanded ? 'تصغير' : 'توسيع'
-    });
-
-    toggleButton.on('click', () => {
-      this.toggleGroup(groupIndex);
-    });
-
-    // Append header elements
-    header.append(dictCountEl, toggleButton.$element);
-    card.append(header);
-
-    // Details section (hidden by default unless expanded)
-    const details = $('<div>')
-      .addClass('wikiterm-result-details')
-      .toggleClass('wikiterm-hidden', !isExpanded);
-
-    if (isExpanded) {
-      // Variants section
-      const variants = $('<div>').addClass('wikiterm-variants');
-      const variantsList = $('<ul>').addClass('wikiterm-variants-list');
-
-      group.occurences.forEach((term) => {
-        const variant = this.createVariantItem(term);
-        variantsList.append(variant);
-      });
-
-      variants.append(
-        variantsList
-      );
-
-      details.append(variants);
-    }
-
-    card.append(details);
-
-    // Make header clickable to toggle details
-    header.on('click', (e) => {
-      // Prevent toggles when clicking links or buttons
-      if (!$(e.target).closest('a, .oo-ui-buttonElement-button').length) {
-        this.toggleGroup(groupIndex);
-      }
-    });
-
-    return card;
-  };
-
-  WikiTermDialog.prototype.createVariantItem = function (term) {
-    const item = $('<li>').addClass('wikiterm-variant-item');
-
-    // Term information
-    const termInfo = $('<div>').addClass('wikiterm-term-info');
-
-    // Arabic term
-    termInfo.append(
-      $('<span>')
-        .addClass('wikiterm-term-arabic')
-        .text(term.arabic)
-    );
-
-    // English translation
-    if (term.english) {
-      termInfo.append(
-        $('<span>')
-          .addClass('wikiterm-term-translation')
-          .append(
-            $('<span>').addClass('wikiterm-lang-tag').text('EN'),
-            ' ',
-            $('<span>').text(term.english)
-          )
-      );
-    }
-
-    // French translation (if available)
-    if (term.french) {
-      termInfo.append(
-        $('<span>')
-          .addClass('wikiterm-term-translation')
-          .append(
-            $('<span>').addClass('wikiterm-lang-tag').text('FR'),
-            ' ',
-            $('<span>').text(term.french)
-          )
-      );
-    }
-
-    item.append(termInfo);
-
-    // Dictionary information
-    const dictInfo = $('<div>').addClass('wikiterm-dictionary-info');
-
-    // Dictionary name
-    const dictionaryName = $('<span>')
-      .addClass('wikiterm-dictionary-name')
-      .text(term.dictionary_name_arabic || 'قاموس');
-
-    // Add link to Wikidata item if available
-    if (term.dictionary_wikidata_id) {
-      dictionaryName.wrapInner('<a>')
-        .children('a')
-        .attr('href', `https://wikidata.org/wiki/${term.dictionary_wikidata_id}`)
-        .attr('target', '_blank');
-    }
-
-    dictInfo.append(dictionaryName);
-
-    // Page number if available
-    if (term.page) {
-      dictInfo.append(
-        $('<span>')
-          .addClass('wikiterm-dictionary-page')
-          .text(`ص. ${term.page}`)
-      );
-    }
-
-    // Add citation button if Wikidata ID is available
-    if (term.dictionary_wikidata_id) {
-      const citationBtn = new OO.ui.ButtonWidget({
-        icon: 'reference',
-        framed: false,
-        title: 'استشهد بهذا المصطلح',
-        classes: ['wikiterm-citation-button']
-      });
-
-      citationBtn.on('click', () => {
-        this.showCitationPopup(citationBtn.$element, term);
-      });
-
-      dictInfo.append(citationBtn.$element);
-    }
-
-    // External link if available
-    if (term.uri) {
-      const externalLink = new OO.ui.ButtonWidget({
-        icon: 'linkExternal',
-        framed: false,
-        classes: ['wikiterm-external-link']
-      });
-
-      externalLink.on('click', () => {
-        window.open(term.uri, '_blank');
-      });
-
-      dictInfo.append(externalLink.$element);
-    }
-
-    item.append(dictInfo);
-
-    // Description (if available)
-    if (term.description) {
-      const descriptionLimit = 200;
-      const description = term.description;
-      const isLongDescription = description.length > descriptionLimit;
-
-      const descriptionEl = $('<div>').addClass('wikiterm-description');
-      const descriptionText = $('<div>').addClass('wikiterm-description-text');
-
-      if (isLongDescription) {
-        // Create short version
-        const shortText = $('<div>')
-          .addClass('wikiterm-description-short')
-          .text(description.substring(0, descriptionLimit) + '...')
-          .show();
-
-        // Create full version
-        const fullText = $('<div>')
-          .addClass('wikiterm-description-full')
-          .text(description)
-          .hide();
-
-        // Add toggle buttons
-        const showMoreBtn = $('<button>')
-          .addClass('wikiterm-description-toggle')
-          .text('عرض المزيد')
-          .on('click', function () {
-            shortText.hide();
-            fullText.show();
-            $(this).hide();
-            showLessBtn.show();
-          });
-
-        const showLessBtn = $('<button>')
-          .addClass('wikiterm-description-toggle')
-          .text('عرض أقل')
-          .hide()
-          .on('click', function () {
-            fullText.hide();
-            shortText.show();
-            $(this).hide();
-            showMoreBtn.show();
-          });
-
-        descriptionText.append(shortText, fullText);
-        descriptionEl.append(
-          descriptionText,
-          showMoreBtn,
-          showLessBtn
-        );
-      } else {
-        // Short description doesn't need toggle
-        descriptionText.text(description);
-        descriptionEl.append(
-          descriptionText
-        );
-      }
-
-      item.append(descriptionEl);
-    }
-
-    return item;
-  };
-
-  WikiTermDialog.prototype.toggleGroup = function (groupIndex) {
-    // Toggle the expanded state
-    this.expandedGroups[groupIndex] = !this.expandedGroups[groupIndex];
-
-    // Re-render results with the new expanded state
-    if (this.currentResults) {
-      this.renderResults(this.currentResults);
-    }
-  };
-
-  WikiTermDialog.prototype.showCitationPopup = function ($target, term) {
-    // Close any open popup
-    this.closeActivePopup();
-
-    // Generate citation template
-    const template = createCitationTemplate(term);
-
-    // Create content for the popup
-    const content = new OO.ui.PanelLayout({
-      padded: true,
-      expanded: false
-    });
-
-    // Title
-    const title = new OO.ui.LabelWidget({
-      label: 'رمز الاستشهاد',
-      classes: ['wikiterm-citation-title']
-    });
-
-    // Text area with citation
-    const textarea = new OO.ui.MultilineTextInputWidget({
-      value: template,
-      readOnly: true,
-      rows: 3,
-      classes: ['wikiterm-citation-text']
-    });
-
-    // Copy button
-    const copyBtn = new OO.ui.ButtonWidget({
-      label: 'نسخ',
-      icon: 'copy',
-      flags: ['progressive']
-    });
-
-    const onCopied = () => {
-      // Show copied message
-      copyBtn.setLabel('نُسِخت!');
-      setTimeout(() => {
-        copyBtn.setLabel('نسخ');
-      }, 2000);
-    };
-
-    const copyFallback = () => {
-      textarea.select();
-      document.execCommand('copy');
-      onCopied();
-    };
-
-    copyBtn.on('click', () => {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(template)
-          .then(onCopied)
-          .catch(copyFallback);
-      } else {
-        copyFallback();
-      }
-    });
-
-    // Add elements to the panel
-    content.$element.append(
-      title.$element,
-      textarea.$element,
-      $('<div>').css('margin-top', '8px').append(copyBtn.$element)
-    );
-
-    // Create the popup
-    const popup = new OO.ui.PopupWidget({
-      $content: content.$element,
-      $floatableContainer: $target,
-      padded: true,
-      width: 300,
-      align: 'forwards',
-      position: 'below',
-      autoClose: true,
-      head: false
-    });
-
-    // Add popup to the DOM and show it
-    this.$element.append(popup.$element);
-    popup.toggle(true);
-
-    this.activePopup = popup;
-
-    // Focus and select text
-    setTimeout(() => {
-      textarea.focus().select();
-    }, 100);
-  };
-
-  WikiTermDialog.prototype.closeActivePopup = function () {
-    if (this.activePopup) {
-      this.activePopup.toggle(false);
-      this.activePopup.$element.remove();
-      this.activePopup = null;
-    }
-  };
-
-  // When the dialog is ready, focus on the search input
-  WikiTermDialog.prototype.getReadyProcess = function (data) {
-    return WikiTermDialog.super.prototype.getReadyProcess.call(this, data)
-      .next(() => {
-        // Focus on the search input - using a more reliable method
-        if (this.searchInput) {
-          this.searchInput.focus();
-        }
-      });
-  };
-
-  WikiTermDialog.prototype.applyCustomCSS = function () {
-    mw.util.addCSS(`
-      /* Make sure top controls stay in place */
-      .wikiterm-search-form {
-        margin: 12px 12px 12px 12px;
-        /* top right bottom left */
-        background-color: var(--background-color-base, #fff);
-        z-index: 2;
-      }
-
-      .wikiterm-search-input {
-        width: 100%;
-      }
-
-      .wikiterm-tool-page-message {
-        margin: 12px 12px 0 12px;
-      }
-
-      .wikiterm-tool-page-message .oo-ui-inline-notice {
-        justify-content: center;
-      }
-
-      .wikiterm-tool-page-message a {
-        color: var(--color-progressive--focus, #36c);
-        text-decoration: none;
-      }
-
-      .wikiterm-tool-page-message a:hover {
-        text-decoration: underline;
-      }
-
-      /* Content area styling */
-      .wikiterm-content-area {
-        width: 100%;
-        border-top: 1px solid var(--border-color-muted, #dadde3);
-        padding-top: 10px;
-      }
-
-      /* Results scrollable container */
-      .wikiterm-results-container {
-        max-height: 60vh;
-        overflow-y: auto;
-        padding-right: 10px;
-        margin-bottom: 20px;
-      }
-
-      .wikiterm-no-results {
-        padding: 16px;
-        text-align: center;
-        color: var(--color-placeholder, #72777d);
-      }
-
-      .wikiterm-results-list {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-
-      .wikiterm-result-card {
-        border: 1px solid var(--border-color-muted, #dadde3);
-        border-radius: 4px;
-        overflow: hidden;
-      }
-
-      .wikiterm-result-highlighted {
-        border-color: var(--border-color-progressive--focus, #36c);
-        box-shadow: 0 0 0 1px var(--border-color-progressive--focus, #36c);
-      }
-
-      .wikiterm-result-header {
-        padding: 12px;
-        background-color: var(--background-color-neutral-subtle, #f8f9fa);
-        cursor: pointer;
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .wikiterm-result-highlighted .wikiterm-result-header {
-        background-color: var(--background-color-progressive-subtle, #f1f4fd);
-      }
-
-      .wikiterm-arabic-term {
-        font-size: 16px;
-        font-weight: bold;
-        margin-right: 12px;
-      }
-
-      .wikiterm-translations {
-        flex-grow: 1;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-      }
-
-      .wikiterm-translation {
-        font-size: 14px;
-      }
-
-      .wikiterm-lang-tag {
-        color: var(--color-placeholder, #72777d);
-        font-size: 12px;
-        font-weight: bold;
-      }
-
-      .wikiterm-dictionary-count {
-        color: var(--color-placeholder, #72777d);
-        font-size: 12px;
-        margin-left: auto;
-      }
-
-      .wikiterm-result-details {
-        padding: 16px;
-        border-top: 1px solid var(--border-color-muted, #dadde3);
-        background-color: var(--background-color-base, #fff);
-      }
-
-      .wikiterm-hidden {
-        display: none;
-      }
-
-      .wikiterm-variants-list {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-      }
-
-      .wikiterm-variant-item {
-        padding: 8px;
-        border-bottom: 1px solid var(--border-color-muted, #dadde3);
-      }
-
-      .wikiterm-variant-item:last-child {
-        border-bottom: none;
-      }
-
-      .wikiterm-term-info {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 8px;
-      }
-
-      .wikiterm-term-arabic {
-        font-weight: bold;
-        margin-right: 8px;
-      }
-
-      .wikiterm-term-translation {
-        color: var(--color-base, #202122);
-      }
-
-      .wikiterm-dictionary-info {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 8px;
-      }
-
-      .wikiterm-dictionary-name {
-        color: var(--color-progressive--focus, #36c);
-        font-size: 13px;
-      }
-
-      .wikiterm-description {
-        margin-top: 8px;
-        font-size: 13px;
-        color: var(--color-subtle, #54595d);
-      }
-
-      .wikiterm-description h5 {
-        margin: 0 0 4px 0;
-        font-size: 13px;
-        color: var(--color-base, #202122);
-      }
-
-      .wikiterm-description-toggle {
-        color: var(--color-progressive--focus, #36c);
-        background: none;
-        border: none;
-        padding: 0;
-        font-size: 13px;
-        cursor: pointer;
-        margin-top: 4px;
-      }
-
-      .wikiterm-description-toggle:hover {
-        text-decoration: underline;
-      }
-
-      /* Citation Popup Styles */
-      .wikiterm-citation-title {
-        font-weight: bold;
-        margin-bottom: 8px;
-      }
-
-      .wikiterm-citation-text {
-        width: 100%;
-        margin: 8px 0;
-      }
-
-      .wikiterm-citation-text textarea,
-      .oo-ui-textInputWidget.wikiterm-citation-text textarea.oo-ui-inputWidget-input {
-        font-family: 'Courier New', Courier, monospace !important;
-        /* Using !important to override OOUI styles */
-        direction: rtl;
-        background-color: var(--background-color-neutral-subtle, #f8f9fa);
-        color: var(--color-base, #202122);
-        padding: 8px;
-        border: 1px solid var(--border-color-base, #a2a9b1);
-        border-radius: 2px;
-        font-size: 13px;
-        line-height: 1.4;
-      }
-
-      .mobile-wiki-dictionary-button {
-        margin: 0.5em auto;
-        padding: 8px;
-        display: block;
-        text-align: center;
-        background-color: var(--background-color-base, #fff);
-        border-bottom: 1px solid var(--border-color-muted, #dadde3);
-      }
-
-      .mobile-wiki-dictionary-button .oo-ui-buttonElement-button {
-        width: 90%;
-        max-width: 300px;
-      }
-    `);
-  };
-
-  WikiTermDialog.prototype.getActionProcess = function (action) {
-    if (action === 'close') {
-      return new OO.ui.Process(() => {
-        this.close();
-      });
-    }
-    return WikiTermDialog.super.prototype.getActionProcess.call(this, action);
-  };
-
-  // Initialize main functionality
-  function initialize() {
-    const windowManager = new OO.ui.WindowManager();
-    $('body').append(windowManager.$element);
-    const dialog = new WikiTermDialog();
-    windowManager.addWindows([dialog]);
-
-    const button = new OO.ui.ButtonWidget({
-      label: 'مسرد الويكي',
-      invisibleLabel: true,
-      icon: 'articlesSearch',
-      framed: false
-    });
-
-    // Different integration points based on skin
-    const skinName = mw.config.get('skin');
-    if (skinName === 'minerva') {
-      console.log('WikiTermGadget: Mobile skin detected');
-
-      button.$element.addClass(
-        'cdx-button cdx-button--size-large cdx-button--fake-button--enabled ' + 
-        'cdx-button--icon-only cdx-button--weight-quiet'
-      );
-
-      // Create a wrapper similar to the notifications element
-      const $navButtonWrapper = $('<div class="minerva-dictionary">').append(
-        $('<ul>').append($('<li>').append(button.$element))
-      );
-
-      // Add to navigation next to notifications
-      $('.minerva-user-navigation .minerva-notifications').before($navButtonWrapper);
-
-      // Add custom styles
-      mw.util.addCSS(`
-        .minerva-dictionary {
-          display: inline-block;
-        }
-        .minerva-dictionary ul {
-          list-style: none;
-          margin: 0;
-          padding: 0;
-        }
-        .minerva-dictionary li {
-          display: inline-block;
-        }
-        .minerva-dictionary .oo-ui-buttonElement-button {
-          min-height: 44px;
-          min-width: 44px;
-        }
-      `);
-    } else if (skinName === 'vector-2022') {
-      // Vector 2
-      $('#p-vector-user-menu-userpage').after(button.$element);
-
-      // Create a second identical button for the sticky header
-      const stickyButton = new OO.ui.ButtonWidget({
-        label: 'مسرد الويكي',
-        invisibleLabel: true,
-        icon: 'articlesSearch',
-        framed: false
-      });
-
-      // Add the same click handler
-      stickyButton.on('click', function () {
-        windowManager.openWindow(dialog);
-      });
-
-      // Add button to sticky header when page is scrolled
-      $(window).on('scroll', function () {
-        if ($('.vector-sticky-header-icons').length &&
-          !$('.vector-sticky-header-icons .wiki-term-sticky-button').length) {
-          stickyButton.$element.addClass('wiki-term-sticky-button');
-          $('.vector-sticky-header-icons').prepend(stickyButton.$element);
-          console.log('WikiTermGadget: Button added to sticky header');
-
-          // Remove this scroll handler once we've added the button
-          $(window).off('scroll');
-        }
-      });
-
-      console.log('WikiTermGadget: Button added to Vector 2');
-    } else if (skinName === 'vector') {
-      // Vector legacy
-      $('#p-personal').after(button.$element);
-      console.log('WikiTermGadget: Button added to Vector legacy');
-    } else {
-      console.warn('WikiTermGadget: unsupported skin: ' + skinName);
-    }
-
-    button.on('click', function () {
-      windowManager.openWindow(dialog);
-    });
-  }
-
-  $(document).ready(function () {
-    initialize();
-    console.log('WikiTermGadget: Initialization complete');
-  });
-});
+mw.loader.using( [ 'mediawiki.util' ] ).then( () => {
+	'use strict';
+
+	const API_ENDPOINT = 'https://wikitermbase.toolforge.org/api/v1/search/aggregated';
+	const TOOL_PAGE_URL = 'https://ar.wikipedia.org/wiki/ويكيبيديا:مسرد_الويكي';
+	const LABEL = 'مسرد الويكي';
+	const TOOLTIP = 'ابحث عن مصطلح في مسرد الويكي';
+	const MIN_QUERY_LENGTH = 3;
+	const REQUEST_TIMEOUT_MS = 20000;
+	// Result groups rendered per "show more" step. Broad queries can return
+	// several hundred groups; rendering them all at once is slow on low-end
+	// devices and nobody reads past the first few dozen anyway.
+	const PAGE_SIZE = 30;
+	const DESCRIPTION_LIMIT = 200;
+	const USER_CONFIG = window.wikiTermConfig || {};
+
+	// Loaded on demand (first click), never at page load.
+	const DIALOG_MODULES = [
+		'oojs-ui-core',
+		'oojs-ui-widgets',
+		'oojs-ui-windows',
+		'oojs-ui.styles.icons-content',
+		'oojs-ui.styles.icons-editing-advanced',
+		'oojs-ui.styles.icons-editing-citation',
+		'oojs-ui.styles.icons-interactions'
+	];
+
+	// Codex "articlesSearch" icon, inlined so the entry point needs no icon
+	// module. fill="currentColor" makes it follow the skin's colour scheme,
+	// including night mode.
+	const ICON_PATHS = {
+		ltr: '<path d="M16 19H0V5h16zM2 17h9.586L9.29 14.704A3 3 0 018 15a3 3 0 113-3c0 .463-.109.899-.296 1.29L14 16.586V7H2zm6-6a1 1 0 100 2 1 1 0 000-2"/><path d="M20 17h-2V3H6V1h14z"/>',
+		rtl: '<path d="M20 19H4V5h16zM6 17h9.586l-2.296-2.296A3 3 0 0112 15a3 3 0 113-3c0 .463-.109.899-.296 1.29L18 16.586V7H6zm6-6a1 1 0 100 2 1 1 0 000-2"/><path d="M14 1v2H2v14H0V1z"/>'
+	};
+
+	function iconSvg() {
+		const dir = document.documentElement.dir === 'rtl' ? 'rtl' : 'ltr';
+		return '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">' +
+			ICON_PATHS[ dir ] + '</svg>';
+	}
+
+	// Arabic count agreement: 1 = bare singular, 2 = dual, 3–10 = plural,
+	// 11+ = singular tamyiz.
+	function formatDictionaryCount( count ) {
+		if ( count === 1 ) {
+			return 'معجم واحد';
+		}
+		if ( count === 2 ) {
+			return 'معجمان';
+		}
+		if ( count <= 10 ) {
+			return count + ' معاجم';
+		}
+		return count + ' معجما';
+	}
+
+	function createCitationTemplate( term ) {
+		const wikidataId = term.dictionary_wikidata_id || '';
+		if ( term.page ) {
+			return '{{استشهاد بويكي بيانات|' + wikidataId + '|ص=' + term.page + '}}';
+		}
+		return '{{استشهاد بويكي بيانات|' + wikidataId + '}}';
+	}
+
+	function translationSpan( langTag, text, cls ) {
+		return $( '<span>' ).addClass( cls ).append(
+			$( '<span>' ).addClass( 'wikiterm-lang-tag' ).text( langTag ),
+			' ',
+			$( '<span>' ).text( text )
+		);
+	}
+
+	/**
+	 * Builds the dialog class. Called once, after OOUI has been loaded.
+	 *
+	 * @return {Function} WikiTermDialog constructor
+	 */
+	function defineDialogClass() {
+		function WikiTermDialog( config ) {
+			WikiTermDialog.super.call( this, config );
+		}
+		OO.inheritClass( WikiTermDialog, OO.ui.ProcessDialog );
+
+		WikiTermDialog.static.name = 'wikiTermDialog';
+		WikiTermDialog.static.title = LABEL;
+		WikiTermDialog.static.size = 'larger';
+		WikiTermDialog.static.actions = [
+			{ action: 'close', label: 'إغلاق', flags: [ 'safe', 'close' ] }
+		];
+
+		WikiTermDialog.prototype.initialize = function () {
+			WikiTermDialog.super.prototype.initialize.call( this );
+
+			this.searchInput = new OO.ui.TextInputWidget( {
+				placeholder: 'ابحث عن مصطلح (بالإنجليزية أو الفرنسية أو العربية)...',
+				autocomplete: false,
+				dir: 'auto',
+				classes: [ 'wikiterm-search-input' ]
+			} );
+			this.searchButton = new OO.ui.ButtonWidget( {
+				icon: 'search',
+				label: 'بحث'
+			} );
+			this.loadingIndicator = new OO.ui.ProgressBarWidget( { progress: false } );
+			this.loadingIndicator.toggle( false );
+			this.errorMessage = new OO.ui.MessageWidget( { type: 'error', inline: true } );
+			this.errorMessage.toggle( false );
+			this.toolPageMessage = new OO.ui.MessageWidget( {
+				type: 'notice',
+				inline: true,
+				label: new OO.ui.HtmlSnippet(
+					'للمزيد، ندعوك للاطلاع على <a href="' + TOOL_PAGE_URL + '" target="_blank">صفحة الأداة</a>'
+				),
+				classes: [ 'wikiterm-tool-page-message' ]
+			} );
+
+			const searchForm = new OO.ui.ActionFieldLayout( this.searchInput, this.searchButton, {
+				align: 'top',
+				label: 'ابحث عن مصطلح عربي أو إنكليزي أو فرنسي',
+				classes: [ 'wikiterm-search-form' ]
+			} );
+
+			this.$results = $( '<div>' ).addClass( 'wikiterm-results-container' );
+			this.$body.append(
+				this.toolPageMessage.$element,
+				searchForm.$element,
+				this.loadingIndicator.$element,
+				this.errorMessage.$element,
+				$( '<div>' ).addClass( 'wikiterm-content-area' ).append( this.$results )
+			);
+
+			this.activePopup = null;
+			this.abortController = null;
+
+			this.searchButton.connect( this, { click: 'performSearch' } );
+			this.searchInput.connect( this, { enter: 'performSearch' } );
+			// A click anywhere outside the citation popup closes it.
+			this.$element.on( 'click', ( e ) => {
+				if ( this.activePopup && !$( e.target ).closest( '.wikiterm-citation-popup' ).length ) {
+					this.closeActivePopup();
+				}
+			} );
+		};
+
+		WikiTermDialog.prototype.showNotice = function ( text ) {
+			this.$results.empty().append(
+				$( '<div>' ).addClass( 'wikiterm-no-results' ).text( text )
+			);
+		};
+
+		WikiTermDialog.prototype.performSearch = function () {
+			const query = this.searchInput.getValue().trim();
+			this.closeActivePopup();
+			this.errorMessage.toggle( false );
+
+			if ( !query ) {
+				this.$results.empty();
+				return;
+			}
+			if ( query.length < MIN_QUERY_LENGTH ) {
+				this.showNotice( 'يرجى إدخال ' + MIN_QUERY_LENGTH + ' أحرف على الأقل للبحث.' );
+				return;
+			}
+
+			// Only one request in flight: a new search cancels the previous one,
+			// so results never arrive out of order on slow connections.
+			if ( this.abortController ) {
+				this.abortController.abort();
+			}
+			const controller = new AbortController();
+			this.abortController = controller;
+			const timer = setTimeout( () => controller.abort(), REQUEST_TIMEOUT_MS );
+			this.loadingIndicator.toggle( true );
+
+			const url = API_ENDPOINT + '?q=' + encodeURIComponent( '"' + query + '"' );
+			fetch( url, { signal: controller.signal, headers: { Accept: 'application/json' } } )
+				.then( ( response ) => {
+					if ( !response.ok ) {
+						throw new Error( 'HTTP ' + response.status );
+					}
+					return response.json();
+				} )
+				.then( ( data ) => {
+					this.renderResults( data );
+				} )
+				.catch( ( err ) => {
+					if ( this.abortController !== controller ) {
+						// Superseded by a newer search; nothing to report.
+						return;
+					}
+					mw.log.warn( 'WikiTerm: search failed', err );
+					this.$results.empty();
+					this.errorMessage.setLabel( controller.signal.aborted ?
+						'انتهت مهلة البحث. يرجى المحاولة مرة أخرى.' :
+						'فشل البحث. الرجاء المحاولة مرة أخرى لاحقًا.'
+					);
+					this.errorMessage.toggle( true );
+				} )
+				.then( () => {
+					clearTimeout( timer );
+					if ( this.abortController === controller ) {
+						this.abortController = null;
+						this.loadingIndicator.toggle( false );
+					}
+				} );
+		};
+
+		WikiTermDialog.prototype.renderResults = function ( data ) {
+			const groups = data.groups || [];
+			this.$results.empty().scrollTop( 0 );
+
+			if ( !groups.length ) {
+				this.showNotice( 'لا توجد نتائج' );
+				this.updateSize();
+				return;
+			}
+
+			const $list = $( '<div>' ).addClass( 'wikiterm-results-list' );
+			const moreButton = new OO.ui.ButtonWidget( {
+				label: 'عرض المزيد من النتائج',
+				framed: false,
+				flags: [ 'progressive' ],
+				icon: 'expand'
+			} );
+			const $more = $( '<div>' ).addClass( 'wikiterm-show-more' ).append( moreButton.$element );
+			this.$results.append( $list, $more );
+
+			let rendered = 0;
+			const renderMore = () => {
+				const end = Math.min( rendered + PAGE_SIZE, groups.length );
+				for ( let i = rendered; i < end; i++ ) {
+					$list.append( this.createResultCard( groups[ i ], i === 0 ) );
+				}
+				rendered = end;
+				const remaining = groups.length - rendered;
+				$more.toggle( remaining > 0 );
+				moreButton.setLabel( 'عرض المزيد من النتائج (' + remaining + ')' );
+				this.updateSize();
+			};
+			moreButton.on( 'click', renderMore );
+			renderMore();
+		};
+
+		WikiTermDialog.prototype.createResultCard = function ( group, isHighlighted ) {
+			const $card = $( '<div>' )
+				.addClass( 'wikiterm-result-card' )
+				.toggleClass( 'wikiterm-result-highlighted', isHighlighted );
+
+			const $translations = $( '<div>' ).addClass( 'wikiterm-translations' );
+			if ( group.english_normalised ) {
+				$translations.append( translationSpan( 'EN', group.english_normalised, 'wikiterm-translation wikiterm-en' ) );
+			}
+			if ( group.french_normalised ) {
+				$translations.append( translationSpan( 'FR', group.french_normalised, 'wikiterm-translation wikiterm-fr' ) );
+			}
+
+			const chevron = new OO.ui.IconWidget( { icon: 'expand', title: 'توسيع' } );
+
+			// The whole header is one keyboard-operable disclosure button.
+			const $header = $( '<div>' )
+				.addClass( 'wikiterm-result-header' )
+				.attr( { role: 'button', tabindex: 0, 'aria-expanded': 'false' } )
+				.append(
+					$( '<span>' ).addClass( 'wikiterm-arabic-term' ).text( group.arabic_normalised ),
+					$translations,
+					$( '<div>' ).addClass( 'wikiterm-dictionary-count' )
+						.text( formatDictionaryCount( group.dictionary_ids.length ) ),
+					chevron.$element
+				);
+			const $details = $( '<div>' ).addClass( 'wikiterm-result-details wikiterm-hidden' );
+			$card.append( $header, $details );
+
+			let expanded = false;
+			let built = false;
+			const toggle = () => {
+				expanded = !expanded;
+				if ( expanded && !built ) {
+					// Variants are built lazily, the first time a group is opened.
+					const $variants = $( '<ul>' ).addClass( 'wikiterm-variants-list' );
+					group.occurences.forEach( ( term ) => {
+						$variants.append( this.createVariantItem( term ) );
+					} );
+					$details.append( $( '<div>' ).addClass( 'wikiterm-variants' ).append( $variants ) );
+					built = true;
+				}
+				$details.toggleClass( 'wikiterm-hidden', !expanded );
+				$header.attr( 'aria-expanded', String( expanded ) );
+				chevron.setIcon( expanded ? 'collapse' : 'expand' ).setTitle( expanded ? 'تصغير' : 'توسيع' );
+				this.updateSize();
+			};
+			$header.on( 'click', ( e ) => {
+				if ( !$( e.target ).closest( 'a' ).length ) {
+					toggle();
+				}
+			} );
+			$header.on( 'keydown', ( e ) => {
+				if ( e.key === 'Enter' || e.key === ' ' ) {
+					e.preventDefault();
+					toggle();
+				}
+			} );
+
+			return $card;
+		};
+
+		WikiTermDialog.prototype.createVariantItem = function ( term ) {
+			const $item = $( '<li>' ).addClass( 'wikiterm-variant-item' );
+
+			const $termInfo = $( '<div>' ).addClass( 'wikiterm-term-info' ).append(
+				$( '<span>' ).addClass( 'wikiterm-term-arabic' ).text( term.arabic )
+			);
+			if ( term.english ) {
+				$termInfo.append( translationSpan( 'EN', term.english, 'wikiterm-term-translation' ) );
+			}
+			if ( term.french ) {
+				$termInfo.append( translationSpan( 'FR', term.french, 'wikiterm-term-translation' ) );
+			}
+			$item.append( $termInfo );
+
+			const $dictInfo = $( '<div>' ).addClass( 'wikiterm-dictionary-info' );
+			const $dictName = $( '<span>' ).addClass( 'wikiterm-dictionary-name' );
+			if ( term.dictionary_wikidata_id ) {
+				$dictName.append(
+					$( '<a>' )
+						.attr( {
+							href: 'https://www.wikidata.org/wiki/' + term.dictionary_wikidata_id,
+							target: '_blank',
+							rel: 'noopener'
+						} )
+						.text( term.dictionary_name_arabic || 'قاموس' )
+				);
+			} else {
+				$dictName.text( term.dictionary_name_arabic || 'قاموس' );
+			}
+			$dictInfo.append( $dictName );
+
+			if ( term.page ) {
+				$dictInfo.append(
+					$( '<span>' ).addClass( 'wikiterm-dictionary-page' ).text( 'ص. ' + term.page )
+				);
+			}
+
+			if ( term.dictionary_wikidata_id ) {
+				const citationBtn = new OO.ui.ButtonWidget( {
+					icon: 'reference',
+					label: 'استشهد بهذا المصطلح',
+					invisibleLabel: true,
+					framed: false,
+					title: 'استشهد بهذا المصطلح',
+					classes: [ 'wikiterm-citation-button' ]
+				} );
+				citationBtn.on( 'click', () => {
+					this.showCitationPopup( citationBtn.$element, term );
+				} );
+				$dictInfo.append( citationBtn.$element );
+			}
+
+			if ( term.uri ) {
+				const externalLink = new OO.ui.ButtonWidget( {
+					icon: 'linkExternal',
+					label: 'فتح المصدر',
+					invisibleLabel: true,
+					framed: false,
+					href: term.uri,
+					target: '_blank',
+					rel: [ 'noopener' ],
+					title: 'فتح المصدر',
+					classes: [ 'wikiterm-external-link' ]
+				} );
+				$dictInfo.append( externalLink.$element );
+			}
+			$item.append( $dictInfo );
+
+			if ( term.description ) {
+				$item.append( this.createDescription( term.description ) );
+			}
+
+			return $item;
+		};
+
+		WikiTermDialog.prototype.createDescription = function ( description ) {
+			const $description = $( '<div>' ).addClass( 'wikiterm-description' );
+			const $text = $( '<div>' ).addClass( 'wikiterm-description-text' );
+			$description.append( $text );
+
+			if ( description.length <= DESCRIPTION_LIMIT ) {
+				$text.text( description );
+				return $description;
+			}
+
+			let showingAll = false;
+			const $toggle = $( '<button>' )
+				.attr( 'type', 'button' )
+				.addClass( 'wikiterm-description-toggle' );
+			const render = () => {
+				$text.text( showingAll ? description : description.slice( 0, DESCRIPTION_LIMIT ) + '...' );
+				$toggle.text( showingAll ? 'عرض أقل' : 'عرض المزيد' );
+			};
+			$toggle.on( 'click', () => {
+				showingAll = !showingAll;
+				render();
+				this.updateSize();
+			} );
+			render();
+			return $description.append( $toggle );
+		};
+
+		WikiTermDialog.prototype.showCitationPopup = function ( $target, term ) {
+			this.closeActivePopup();
+			const template = createCitationTemplate( term );
+
+			const textarea = new OO.ui.MultilineTextInputWidget( {
+				value: template,
+				readOnly: true,
+				rows: 3,
+				classes: [ 'wikiterm-citation-text' ]
+			} );
+			const copyBtn = new OO.ui.ButtonWidget( {
+				label: 'نسخ',
+				icon: 'copy',
+				flags: [ 'progressive' ]
+			} );
+			const onCopied = () => {
+				copyBtn.setLabel( 'نُسِخت!' );
+				setTimeout( () => {
+					copyBtn.setLabel( 'نسخ' );
+				}, 2000 );
+			};
+			const copyFallback = () => {
+				textarea.select();
+				// Deprecated, but still the only option in a few environments.
+				document.execCommand( 'copy' );
+				onCopied();
+			};
+			copyBtn.on( 'click', () => {
+				if ( navigator.clipboard && navigator.clipboard.writeText ) {
+					navigator.clipboard.writeText( template ).then( onCopied, copyFallback );
+				} else {
+					copyFallback();
+				}
+			} );
+
+			const $content = $( '<div>' ).append(
+				new OO.ui.LabelWidget( { label: 'رمز الاستشهاد', classes: [ 'wikiterm-citation-title' ] } ).$element,
+				textarea.$element,
+				$( '<div>' ).addClass( 'wikiterm-citation-actions' ).append( copyBtn.$element )
+			);
+			const popup = new OO.ui.PopupWidget( {
+				$content: $content,
+				$floatableContainer: $target,
+				padded: true,
+				width: 300,
+				align: 'forwards',
+				position: 'below',
+				autoClose: true,
+				head: false,
+				classes: [ 'wikiterm-citation-popup' ]
+			} );
+			this.$element.append( popup.$element );
+			popup.toggle( true );
+			this.activePopup = popup;
+
+			setTimeout( () => {
+				textarea.focus().select();
+			}, 100 );
+		};
+
+		WikiTermDialog.prototype.closeActivePopup = function () {
+			if ( this.activePopup ) {
+				this.activePopup.toggle( false );
+				this.activePopup.$element.remove();
+				this.activePopup = null;
+			}
+		};
+
+		WikiTermDialog.prototype.getReadyProcess = function ( data ) {
+			return WikiTermDialog.super.prototype.getReadyProcess.call( this, data )
+				.next( () => {
+					this.searchInput.focus();
+				} );
+		};
+
+		WikiTermDialog.prototype.getActionProcess = function ( action ) {
+			if ( action === 'close' ) {
+				return new OO.ui.Process( () => {
+					this.close();
+				} );
+			}
+			return WikiTermDialog.super.prototype.getActionProcess.call( this, action );
+		};
+
+		return WikiTermDialog;
+	}
+
+	/* ---------- Entry point (what actually runs at page load) ---------- */
+
+	let dialogPromise = null;
+
+	function openDialog() {
+		if ( !dialogPromise ) {
+			dialogPromise = mw.loader.using( DIALOG_MODULES ).then( () => {
+				const WikiTermDialog = defineDialogClass();
+				const windowManager = new OO.ui.WindowManager();
+				$( document.body ).append( windowManager.$element );
+				const dialog = new WikiTermDialog();
+				windowManager.addWindows( [ dialog ] );
+				return { windowManager: windowManager, dialog: dialog };
+			} );
+		}
+		return dialogPromise.then( ( ui ) => {
+			ui.windowManager.openWindow( ui.dialog );
+		}, ( err ) => {
+			// Let the next click retry the download.
+			dialogPromise = null;
+			mw.log.warn( 'WikiTerm: failed to load the dialog', err );
+			mw.notify( 'تعذّر تحميل مسرد الويكي. يرجى المحاولة مرة أخرى.', { type: 'error' } );
+		} );
+	}
+
+	function onTriggerClick( e ) {
+		e.preventDefault();
+		const $trigger = $( e.currentTarget ).addClass( 'wikiterm-busy' );
+		openDialog().then( () => {
+			$trigger.removeClass( 'wikiterm-busy' );
+		} );
+	}
+
+	function makeIconButton( extraClasses, plain ) {
+		return $( '<a>' )
+			.attr( { href: '#', role: 'button', title: TOOLTIP, 'aria-label': LABEL } )
+			.addClass( 'wikiterm-trigger wikiterm-icon-button' )
+			// Codex quiet icon-only button, unless the host header sizes items itself.
+			.addClass( plain ? '' : 'cdx-button cdx-button--fake-button cdx-button--fake-button--enabled cdx-button--weight-quiet cdx-button--icon-only' )
+			.addClass( extraClasses )
+			.append( $( '<span>' ).addClass( 'wikiterm-icon' ).html( iconSvg() ) )
+			.on( 'click', onTriggerClick );
+	}
+
+	// Vector 2022: icon next to the user links in the header (and in the
+	// sticky header, when the skin renders one).
+	function addToVector2022() {
+		const anchor = document.getElementById( 'p-vector-user-menu-userpage' );
+		if ( !anchor ) {
+			return false;
+		}
+		$( anchor ).after( makeIconButton( 'wikiterm-trigger-header' ) );
+		const stickyIcons = document.querySelector( '.vector-sticky-header-icons' );
+		if ( stickyIcons ) {
+			$( stickyIcons ).prepend(
+				makeIconButton( 'wikiterm-trigger-sticky' ).attr( 'tabindex', -1 )
+			);
+		}
+		return true;
+	}
+
+	// Minerva (mobile): icon in the header's user navigation.
+	function addToMinerva() {
+		const nav = document.querySelector( '.minerva-user-navigation' );
+		if ( !nav ) {
+			return false;
+		}
+		$( nav ).prepend(
+			$( '<div>' ).addClass( 'wikiterm-minerva' ).append(
+				makeIconButton( 'cdx-button--size-large' )
+			)
+		);
+		return true;
+	}
+
+	// Content Translation (Special:ContentTranslation uses its own skin): icon
+	// in the tool's header, sized like the Echo notification badges next to it.
+	function addToContentTranslation() {
+		const list = document.querySelector(
+			'#user-tools .mw-portlet-body:not( .cx-skin-menu-dropdown ) .cx-skin-menu-content'
+		);
+		if ( !list ) {
+			return false;
+		}
+		$( list ).append(
+			$( '<li>' ).addClass( 'mw-list-item wikiterm-cx-item' ).append(
+				makeIconButton( 'wikiterm-trigger-cx', true )
+			)
+		);
+		return true;
+	}
+
+	// Every other skin (Vector legacy, MonoBook, Timeless, …): a plain item in
+	// the page-actions menu ("المزيد" on Vector legacy and Timeless), or in the
+	// personal toolbar at the top when the user asked for it, falling back to
+	// the toolbox.
+	function addToPortlet() {
+		const portlets = USER_CONFIG.placement === 'personal' ?
+			[ 'p-personal', 'p-cactions', 'p-tb' ] :
+			[ 'p-cactions', 'p-tb', 'p-personal' ];
+		for ( let i = 0; i < portlets.length; i++ ) {
+			const link = mw.util.addPortletLink( portlets[ i ], '#', LABEL, 'ca-wikiterm', TOOLTIP );
+			if ( link ) {
+				$( link ).find( 'a' ).addClass( 'wikiterm-trigger' ).on( 'click', onTriggerClick );
+				return true;
+			}
+		}
+		return false;
+	}
+
+	function init() {
+		const skin = mw.config.get( 'skin' );
+		let added = false;
+		if ( skin === 'vector-2022' ) {
+			added = addToVector2022();
+		} else if ( skin === 'minerva' ) {
+			added = addToMinerva();
+		} else if ( skin === 'contenttranslation' ) {
+			added = addToContentTranslation();
+		}
+		if ( !added ) {
+			addToPortlet();
+		}
+	}
+
+	$( init );
+} );
 // </nowiki>

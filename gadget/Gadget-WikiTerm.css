@@ -1,3 +1,73 @@
+/* Gadget-WikiTerm.css — styles for the «مسرد الويكي» (WikiTermBase) gadget.
+ * Colours use Codex design tokens with fallbacks, so the dialog follows the
+ * skin's colour scheme (including night mode). */
+
+/* ---------- Entry point (header icon / menu item) ---------- */
+
+.wikiterm-icon {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  vertical-align: text-bottom;
+}
+
+.wikiterm-icon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.wikiterm-trigger.wikiterm-busy {
+  cursor: progress;
+}
+
+/* Sane rendering of the icon button even where Codex button styles are absent */
+.wikiterm-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  color: var(--color-base, #202122);
+  text-decoration: none;
+}
+
+/* Content Translation header: same box as the Echo badges beside it
+   (20×20 block, 2px side margins, 0.87 opacity) so the row lines up */
+.wikiterm-cx-item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.wikiterm-cx-item .wikiterm-icon-button {
+  display: block;
+  width: 20px;
+  height: 20px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  margin: 0 2px;
+  opacity: 0.87;
+}
+
+.wikiterm-cx-item .wikiterm-icon-button:hover {
+  opacity: 1;
+}
+
+.wikiterm-minerva {
+  display: flex;
+  align-items: center;
+}
+
+@media print {
+  .wikiterm-trigger,
+  #ca-wikiterm {
+    display: none;
+  }
+}
+
+/* ---------- Dialog ---------- */
+
 /* Make sure top controls stay in place */
 .wikiterm-search-form {
   margin: 12px 12px 12px 12px;
@@ -38,7 +108,7 @@
 .wikiterm-results-container {
   max-height: 60vh;
   overflow-y: auto;
-  padding-right: 10px;
+  padding: 0 12px 12px;
   margin-bottom: 20px;
 }
 
@@ -52,6 +122,11 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.wikiterm-show-more {
+  text-align: center;
+  padding-top: 12px;
 }
 
 .wikiterm-result-card {
@@ -73,6 +148,11 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+.wikiterm-result-header:focus-visible {
+  outline: 2px solid var(--border-color-progressive--focus, #36c);
+  outline-offset: -2px;
 }
 
 .wikiterm-result-highlighted .wikiterm-result-header {
@@ -170,12 +250,6 @@
   color: var(--color-subtle, #54595d);
 }
 
-.wikiterm-description h5 {
-  margin: 0 0 4px 0;
-  font-size: 13px;
-  color: var(--color-base, #202122);
-}
-
 .wikiterm-description-toggle {
   color: var(--color-progressive--focus, #36c);
   background: none;
@@ -201,6 +275,10 @@
   margin: 8px 0;
 }
 
+.wikiterm-citation-actions {
+  margin-top: 8px;
+}
+
 .wikiterm-citation-text textarea,
 .oo-ui-textInputWidget.wikiterm-citation-text textarea.oo-ui-inputWidget-input {
   font-family: 'Courier New', Courier, monospace !important;
@@ -213,23 +291,4 @@
   border-radius: 2px;
   font-size: 13px;
   line-height: 1.4;
-}
-
-.minerva-dictionary {
-  display: inline-block;
-}
-
-.minerva-dictionary ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.minerva-dictionary li {
-  display: inline-block;
-}
-
-.minerva-dictionary .oo-ui-buttonElement-button {
-  min-height: 44px;
-  min-width: 44px;
 }

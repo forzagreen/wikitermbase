@@ -1,0 +1,6 @@
+{
+  "root": true,
+  "extends": [ "wikimedia/client/es6", "wikimedia/mediawiki", "wikimedia/jquery" ],
+  "globals": { "OO": "readonly" },
+  "ignorePatterns": [ "node_modules/", "tests/", "SearchTerm-iframe.js", "common.js" ]
+}

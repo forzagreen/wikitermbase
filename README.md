@@ -30,7 +30,7 @@ It is hosted on [Toolforge](https://wikitech.wikimedia.org/wiki/Help:Toolforge),
 
 The website's frontend is built with [React](https://react.dev/) framework.
 
-The Wikipedia gadget frontend is built with [OOUI](https://www.mediawiki.org/wiki/OOUI) and can be enabled in Arabic Wikipedia's user preferences.
+The Wikipedia gadget is built with [OOUI](https://www.mediawiki.org/wiki/OOUI) (loaded on demand) and can be enabled in Arabic Wikipedia's user preferences.
 
 
 ## Wiki Gadget
@@ -42,9 +42,55 @@ The deployed version in Arabic Wikipedia:
 - Gadget Javascript code: [Gadget-WikiTerm.js](https://ar.wikipedia.org/wiki/ميدياويكي:Gadget-WikiTerm.js)
 - Gadget CSS code: [Gadget-WikiTerm.css](https://ar.wikipedia.org/wiki/ميدياويكي:Gadget-WikiTerm.css)
 
-On Wikipedia, gadgets are production-ready features, while user scripts serve as a flexible environment for development and experimentation.
+Files in [gadget/](gadget/):
+- [Gadget-WikiTerm.js](gadget/Gadget-WikiTerm.js) and [Gadget-WikiTerm.css](gadget/Gadget-WikiTerm.css) are the gadget, copied verbatim to the `MediaWiki:` pages above.
+- [SearchTerm.js](gadget/SearchTerm.js) is the [user script](https://en.wikipedia.org/wiki/Wikipedia:User_scripts) variant used for development: the same body as the gadget wrapped in `mw.loader.using( [ 'mediawiki.util' ] )` (only the first and last lines differ). Regenerate it after editing the gadget so both stay in sync.
 
-The [user script](https://en.wikipedia.org/wiki/Wikipedia:User_scripts), available at [gadget/SearchTerm.js](gadget/SearchTerm.js), differs from gadget code in that it consolidates all imports, JavaScript code, and CSS styles into a single file.
+Design constraints (the gadget is meant to be enabled by default, see the [default-gadget criteria](https://ar.wikipedia.org/wiki/ويكيبيديا:إضافات#معايير)):
+- The only page-load dependency is `mediawiki.util`. OOUI (about 90 KB gzipped) and the dialog are loaded on the first click via `mw.loader.using()`; no request reaches the WikiTermBase API until the user submits a search.
+- Entry points: an icon button in the header on Vector 2022 (and its sticky header), on Minerva and in the Content Translation tool (`Special:ContentTranslation` has its own skin); an item in the page-actions menu ("المزيد") on Vector legacy, MonoBook, Timeless and any other skin, via `mw.util.addPortletLink()`. Users of those skins who prefer the top personal toolbar can set `window.wikiTermConfig = { placement: 'personal' };` in their `common.js`.
+- Only ES2015 syntax (MediaWiki's Grade A baseline is ES2019, and `requiresES6` cannot be combined with `default`). No `console.*` calls.
+- Results render in pages of 30 groups with a "show more" button; a new search aborts the previous request.
+
+Recommended gadget definition (registered users only, testable with `?withgadget=WikiTerm` before enabling it by default):
+
+```
+* WikiTerm [default |rights=minoredit |supportsUrlLoad |dependencies=mediawiki.util] |WikiTerm.js |WikiTerm.css
+```
+
+### Testing the gadget
+
+Tooling lives in [gadget/package.json](gadget/package.json) (ESLint with the Wikimedia config, Playwright for a browser matrix):
+
+```sh
+cd gadget && npm install
+npm run lint                              # eslint-config-wikimedia: client/es6 + mediawiki + jquery
+npx playwright install firefox webkit     # once; Chrome uses the installed Google Chrome
+npm run matrix                            # Chrome/Firefox/WebKit × Vector 2022 (light+night)/Vector 2010/MonoBook/Timeless/Minerva/Content Translation
+npm run summary                           # Markdown table from tests/out/matrix_results.json (screenshots in tests/out/shots/)
+BROWSERS=chrome SKINS=vector npm run matrix   # subset
+```
+
+The matrix opens a real ar.wikipedia article (logged out), injects the working-tree gadget, and drives it end to end: entry point → dialog (lazy OOUI load, bytes and time recorded) → search → expand → citation copy → "show more" → close, failing on any uncaught JavaScript error. `npm run check` is network-free: it verifies `SearchTerm.js` is in sync with the gadget, enforces a gzipped size budget (10 KB JS, 3 KB CSS) and rejects `console.*` calls.
+
+The same three commands run in GitHub Actions ([gadget.yml](.github/workflows/gadget.yml)) on every pull request touching `gadget/`, on pushes to `main`, and weekly. The run's job summary shows the results table and the screenshots + JSON are attached as a downloadable artifact, so the numbers can be checked and re-run by anyone from the [Actions tab](https://github.com/forzagreen/wikitermbase/actions/workflows/gadget.yml).
+
+To try the working-tree version on-wiki without deploying anything, disable the WikiTerm gadget in your preferences, open any page and paste in the browser console (replace `main` with your branch):
+
+```js
+const base = 'https://raw.githubusercontent.com/forzagreen/wikitermbase/main/gadget/';
+fetch(base + 'Gadget-WikiTerm.css').then(r => r.text()).then(css => mw.util.addCSS(css));
+fetch(base + 'Gadget-WikiTerm.js').then(r => r.text()).then(js => $.globalEval(js));
+```
+
+Or install it as a user script: copy [gadget/SearchTerm.js](gadget/SearchTerm.js) to `User:You/SearchTerm.js`, the CSS to `User:You/SearchTerm.css`, and load both from your `common.js`.
+
+Reproducible footprint checks anyone can run in the browser console on ar.wikipedia:
+- `mw.loader.getState('oojs-ui-core')` — `registered` means OOUI is not loaded; the old definition makes it `ready` on every page, the new one only after the first click.
+- `mw.loader.inspect()` — MediaWiki's own per-module size report; look for `ext.gadget.WikiTerm` and the `oojs-ui-*` rows.
+- DevTools → Network, filter `load.php`: with the new gadget nothing is fetched from `wikitermbase.toolforge.org` until a search is submitted.
+
+Once the gadget definition carries `supportsUrlLoad`, external tools can A/B the page-load impact on the same URL with and without `?withgadget=WikiTerm` (e.g. Lighthouse in Chrome DevTools, [PageSpeed Insights](https://pagespeed.web.dev/), [WebPageTest](https://www.webpagetest.org/)). Note `?withgadget=` only works for users the gadget is registered for, so a `rights=` restriction hides it from logged-out tools.
 
 
 ## Local Setup

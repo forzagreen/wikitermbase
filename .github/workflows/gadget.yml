@@ -1,0 +1,66 @@
+name: Gadget
+
+# Checks for the on-wiki gadget (gadget/). Lint + deterministic checks run on
+# every change; the browser matrix drives the gadget on a live ar.wikipedia
+# page in Chrome, Firefox and WebKit across five skins, and also runs weekly so
+# skin/MediaWiki changes that break the gadget are noticed. Results: the run's
+# job summary shows the table, and the screenshots/JSON are kept as an artifact.
+
+on:
+  pull_request:
+    paths: ['gadget/**', '.github/workflows/gadget.yml']
+  push:
+    branches: [main]
+    paths: ['gadget/**', '.github/workflows/gadget.yml']
+  schedule:
+    - cron: '17 6 * * 1'   # Mondays 06:17 UTC
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: gadget
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gadget/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run check
+
+  browser-matrix:
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gadget/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run matrix
+      - name: Results table
+        if: always()
+        run: |
+          {
+            echo "## Gadget browser matrix"
+            echo
+            echo "Live ar.wikipedia article, gadget injected from this commit. Screenshots are in the run artifact."
+            echo
+            npm run --silent summary
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: gadget-matrix-${{ github.run_number }}
+          path: gadget/tests/out
+          retention-days: 30

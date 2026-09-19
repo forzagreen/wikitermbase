@@ -115,7 +115,10 @@ async function runCase(browserName, browser, c) {
 
     if (r.steps.showMoreVisible) {
       await page.locator('.wikiterm-show-more a').first().click();
-      await page.waitForTimeout(500);
+      // The next page comes from the API, so wait for the cards, not for a delay.
+      await page.waitForFunction(
+        (before) => document.querySelectorAll('.wikiterm-result-card').length > before,
+        r.steps.cardsRendered, { timeout: 30000 });
       r.steps.cardsAfterShowMore = await page.locator('.wikiterm-result-card').count();
     }
     // Close via the dialog's safe action; the dialog must disappear.

@@ -173,18 +173,61 @@ mw.loader.using( [ 'mediawiki.util' ] ).then( () => {
 				return;
 			}
 
-			// Only one request in flight: a new search cancels the previous one,
-			// so results never arrive out of order on slow connections.
+			// The results on screen stay until the new ones arrive, but their
+			// "show more" must not fire meanwhile: it would cancel this search.
+			this.$results.find( '.wikiterm-show-more' ).hide();
+			this.loadingIndicator.toggle( true );
+
+			this.fetchGroups( query, 0 )
+				.then( ( data ) => {
+					this.loadingIndicator.toggle( false );
+					this.renderResults( query, data );
+				} )
+				.catch( ( err ) => {
+					if ( err.superseded ) {
+						// A newer search owns the dialog now; nothing to report.
+						return;
+					}
+					this.loadingIndicator.toggle( false );
+					mw.log.warn( 'WikiTerm: search failed', err );
+					this.$results.empty();
+					this.errorMessage.setLabel( err.timedOut ?
+						'انتهت مهلة البحث. يرجى المحاولة مرة أخرى.' :
+						'فشل البحث. الرجاء المحاولة مرة أخرى لاحقًا.'
+					);
+					this.errorMessage.toggle( true );
+				} );
+		};
+
+		// Fetches one window of result groups (PAGE_SIZE of them, from `offset`).
+		// Only one request is in flight: a new one cancels the previous, so
+		// results never arrive out of order on slow connections. The promise
+		// rejects with `superseded` set when that happened, `timedOut` when the
+		// request ran out of time.
+		WikiTermDialog.prototype.fetchGroups = function ( query, offset ) {
 			if ( this.abortController ) {
 				this.abortController.abort();
 			}
 			const controller = new AbortController();
 			this.abortController = controller;
-			const timer = setTimeout( () => controller.abort(), REQUEST_TIMEOUT_MS );
-			this.loadingIndicator.toggle( true );
+			let timedOut = false;
+			const timer = setTimeout( () => {
+				timedOut = true;
+				controller.abort();
+			}, REQUEST_TIMEOUT_MS );
+			// True when a newer request has taken over in the meantime.
+			const settle = () => {
+				clearTimeout( timer );
+				if ( this.abortController !== controller ) {
+					return true;
+				}
+				this.abortController = null;
+				return false;
+			};
 
-			const url = API_ENDPOINT + '?q=' + encodeURIComponent( '"' + query + '"' );
-			fetch( url, { signal: controller.signal, headers: { Accept: 'application/json' } } )
+			const url = API_ENDPOINT + '?q=' + encodeURIComponent( '"' + query + '"' ) +
+				'&limit=' + PAGE_SIZE + '&offset=' + offset;
+			return fetch( url, { signal: controller.signal, headers: { Accept: 'application/json' } } )
 				.then( ( response ) => {
 					if ( !response.ok ) {
 						throw new Error( 'HTTP ' + response.status );
@@ -192,35 +235,28 @@ mw.loader.using( [ 'mediawiki.util' ] ).then( () => {
 					return response.json();
 				} )
 				.then( ( data ) => {
-					this.renderResults( data );
-				} )
-				.catch( ( err ) => {
-					if ( this.abortController !== controller ) {
-						// Superseded by a newer search; nothing to report.
-						return;
+					if ( settle() ) {
+						const err = new Error( 'superseded' );
+						err.superseded = true;
+						throw err;
 					}
-					mw.log.warn( 'WikiTerm: search failed', err );
-					this.$results.empty();
-					this.errorMessage.setLabel( controller.signal.aborted ?
-						'انتهت مهلة البحث. يرجى المحاولة مرة أخرى.' :
-						'فشل البحث. الرجاء المحاولة مرة أخرى لاحقًا.'
-					);
-					this.errorMessage.toggle( true );
-				} )
-				.then( () => {
-					clearTimeout( timer );
-					if ( this.abortController === controller ) {
-						this.abortController = null;
-						this.loadingIndicator.toggle( false );
-					}
+					return data;
+				}, ( err ) => {
+					err.superseded = settle();
+					err.timedOut = timedOut;
+					throw err;
 				} );
 		};
 
-		WikiTermDialog.prototype.renderResults = function ( data ) {
-			const groups = data.groups || [];
+		WikiTermDialog.prototype.renderResults = function ( query, data ) {
+			// Groups received but not shown yet. The API sends one page at a
+			// time, so this is normally exactly one page; a response that
+			// ignored `limit` carries everything and is paged from memory.
+			let pending = data.groups || [];
+			let total = Math.max( data.number_groups || 0, pending.length );
 			this.$results.empty().scrollTop( 0 );
 
-			if ( !groups.length ) {
+			if ( !pending.length ) {
 				this.showNotice( 'لا توجد نتائج' );
 				this.updateSize();
 				return;
@@ -237,19 +273,43 @@ mw.loader.using( [ 'mediawiki.util' ] ).then( () => {
 			this.$results.append( $list, $more );
 
 			let rendered = 0;
-			const renderMore = () => {
-				const end = Math.min( rendered + PAGE_SIZE, groups.length );
-				for ( let i = rendered; i < end; i++ ) {
-					$list.append( this.createResultCard( groups[ i ], i === 0 ) );
-				}
-				rendered = end;
-				const remaining = groups.length - rendered;
+			const showPage = () => {
+				pending.splice( 0, PAGE_SIZE ).forEach( ( group ) => {
+					$list.append( this.createResultCard( group, rendered === 0 ) );
+					rendered++;
+				} );
+				const remaining = total - rendered;
 				$more.toggle( remaining > 0 );
-				moreButton.setLabel( 'عرض المزيد من النتائج (' + remaining + ')' );
+				moreButton.setDisabled( false )
+					.setLabel( 'عرض المزيد من النتائج (' + remaining + ')' );
 				this.updateSize();
 			};
-			moreButton.on( 'click', renderMore );
-			renderMore();
+			moreButton.on( 'click', () => {
+				if ( pending.length ) {
+					showPage();
+					return;
+				}
+				moreButton.setDisabled( true ).setLabel( 'جارٍ التحميل…' );
+				this.fetchGroups( query, rendered )
+					.then( ( next ) => {
+						pending = next.groups || [];
+						if ( !pending.length ) {
+							// Fewer groups than announced (the data changed
+							// between two pages): stop offering more.
+							total = rendered;
+						}
+						showPage();
+					} )
+					.catch( ( err ) => {
+						if ( err.superseded ) {
+							return;
+						}
+						mw.log.warn( 'WikiTerm: loading more results failed', err );
+						moreButton.setDisabled( false )
+							.setLabel( 'تعذّر تحميل المزيد. أعد المحاولة' );
+					} );
+			} );
+			showPage();
 		};
 
 		WikiTermDialog.prototype.createResultCard = function ( group, isHighlighted ) {

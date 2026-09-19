@@ -1,5 +1,5 @@
 // src/components/DictionaryApp.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router';
 import { Search, ExternalLink, ChevronDown, ChevronUp, Quote, Copy, Check, BookOpen, Wrench, ArrowLeft } from 'lucide-react';
 import SiteHeader from './SiteHeader';
@@ -7,6 +7,10 @@ import SiteFooter from './SiteFooter';
 
 const formatNumber = (num) =>
   num === null || num === undefined ? '…' : num.toLocaleString('en-US');
+
+// Result groups fetched per request (same step as the on-wiki gadget). Broad
+// queries have thousands of groups; downloading them all took several seconds.
+const PAGE_SIZE = 30;
 
 // Shown under the search box while it is empty: points first-time visitors
 // to the two other pages and fills what would otherwise be a blank screen.
@@ -83,13 +87,23 @@ const DictionaryApp = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedGroups, setExpandedGroups] = useState({});
   const [results, setResults] = useState([]);
+  // Total groups for the current query; `results` holds the pages loaded so far.
+  const [totalGroups, setTotalGroups] = useState(0);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreFailed, setLoadMoreFailed] = useState(false);
   const [openPopupId, setOpenPopupId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [stats, setStats] = useState(null);
   const searchInputRef = useRef(null);
   const searchTimeoutRef = useRef(null);
+  // Only one request in flight: a new search cancels the previous one, so a
+  // slow response for a broad term can't overwrite the results of a newer one.
+  const abortRef = useRef(null);
+  // Term the displayed results belong to. "Show more" must page that one, not
+  // whatever is in the input while the debounce is still pending.
+  const resultsTermRef = useRef('');
 
   // Focus search input on mount
   useEffect(() => {
@@ -116,14 +130,25 @@ const DictionaryApp = () => {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [openPopupId]);
 
-  // Cleanup timeout on unmount
+  // Cleanup timeout and in-flight request on unmount
   useEffect(() => {
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
+      abortRef.current?.abort();
     };
   }, []);
+
+  // Badge for the single group found in the most dictionary entries. Computed
+  // over the first page only: that is where such a group sorts, and the badge
+  // must not move to another card when more pages are appended.
+  const topResultIndex = useMemo(() => {
+    const counts = results.slice(0, PAGE_SIZE).map((g) => g.occurences.length);
+    if (counts.length === 0) return -1;
+    const max = Math.max(...counts);
+    return counts.filter((count) => count === max).length === 1 ? counts.indexOf(max) : -1;
+  }, [results]);
 
   const toggleGroup = (index) => {
     setExpandedGroups(prev => ({
@@ -272,25 +297,51 @@ const DictionaryApp = () => {
     ));
   };
 
+  // One page of grouped results. `number_groups` is the total for the query.
+  const fetchPage = async (term, offset, signal) => {
+    const response = await fetch(
+      `/api/v1/search/aggregated?q="${encodeURIComponent(term)}"&limit=${PAGE_SIZE}&offset=${offset}`,
+      { signal }
+    );
+    if (!response.ok) {
+      throw new Error('حدث خطأ في البحث. الرجاء المحاولة مرة أخرى.');
+    }
+    return response.json();
+  };
+
+  // Cancels whatever is in flight and returns the controller for a new request.
+  const startRequest = () => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    return controller;
+  };
+
   // Search function with debouncing
   const handleSearch = async (term) => {
     if (term.trim().length < 3) {
+      abortRef.current?.abort();
+      abortRef.current = null;
+      setLoading(false);
+      setLoadingMore(false);
       setResults([]);
+      setTotalGroups(0);
       return;
     }
 
+    const controller = startRequest();
     setLoading(true);
+    setLoadingMore(false);
+    setLoadMoreFailed(false);
     setError(null);
 
     try {
-      const response = await fetch(`/api/v1/search/aggregated?q="${encodeURIComponent(term)}"`);
-      if (!response.ok) {
-        throw new Error('حدث خطأ في البحث. الرجاء المحاولة مرة أخرى.');
-      }
-      const data = await response.json();
-      
+      const data = await fetchPage(term, 0, controller.signal);
+
       if (data && Array.isArray(data.groups)) {
+        resultsTermRef.current = term;
         setResults(data.groups);
+        setTotalGroups(data.number_groups ?? data.groups.length);
         const initialExpanded = data.groups.reduce((acc, _, index) => {
           acc[index] = true;
           return acc;
@@ -298,13 +349,49 @@ const DictionaryApp = () => {
         setExpandedGroups(initialExpanded);
       } else {
         setResults([]);
+        setTotalGroups(0);
         setError('لم يتم العثور على نتائج');
       }
     } catch (err) {
+      if (err.name === 'AbortError') return; // superseded by a newer search
       setError(err.message);
       setResults([]);
+      setTotalGroups(0);
     } finally {
-      setLoading(false);
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        setLoading(false);
+      }
+    }
+  };
+
+  // Appends the next page of the displayed query.
+  const loadMore = async () => {
+    const offset = results.length;
+    const controller = startRequest();
+    setLoadingMore(true);
+    setLoadMoreFailed(false);
+
+    try {
+      const data = await fetchPage(resultsTermRef.current, offset, controller.signal);
+      const groups = Array.isArray(data?.groups) ? data.groups : [];
+      setResults((prev) => [...prev, ...groups]);
+      setTotalGroups(data?.number_groups ?? offset + groups.length);
+      setExpandedGroups((prev) => {
+        const next = { ...prev };
+        groups.forEach((_, index) => {
+          next[offset + index] = true;
+        });
+        return next;
+      });
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+      setLoadMoreFailed(true);
+    } finally {
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        setLoadingMore(false);
+      }
     }
   };
 
@@ -389,10 +476,7 @@ const DictionaryApp = () => {
           </div>
         )}
         {results.map((group, index) => {
-          const occurrencesCounts = results.map(g => g.occurences.length);
-          const maxOccurrences = Math.max(...occurrencesCounts);
-          const topResultsCount = occurrencesCounts.filter(count => count === maxOccurrences).length;
-          const isTopResult = group.occurences.length === maxOccurrences && topResultsCount === 1; // Check if only one top result
+          const isTopResult = index === topResultIndex;
 
           return (
           <div key={index} className={`${cardClasses} rounded-lg mb-6 p-6 ${isTopResult ? 'border-2 border-blue-500' : ''}`}>
@@ -493,6 +577,26 @@ const DictionaryApp = () => {
 
           </div>
         )})}
+
+        {/* Next page */}
+        {!loading && results.length > 0 && results.length < totalGroups && (
+          <div className="text-center">
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="px-5 py-2.5 rounded-lg border border-blue-500 text-blue-600 hover:bg-blue-50 disabled:opacity-60 disabled:cursor-wait dark:text-blue-400 dark:border-blue-400 dark:hover:bg-gray-800"
+            >
+              {loadingMore
+                ? 'جارٍ التحميل...'
+                : `عرض المزيد من النتائج (${formatNumber(totalGroups - results.length)})`}
+            </button>
+            {loadMoreFailed && (
+              <p className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">
+                تعذّر تحميل المزيد من النتائج. الرجاء المحاولة مرة أخرى.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <SiteFooter />

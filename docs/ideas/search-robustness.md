@@ -6,6 +6,39 @@ Context: ~90% of queries are English terms looking for an Arabic translation.
 So the priority is English-side robustness; French comes almost for free;
 Arabic is a separate, smaller branch.
 
+## Findings 2026-09-19 (from the pagination work) — read before starting
+
+Measured on production and on `db/arabterm.sql` while adding `limit`/`offset` to
+`/api/v1/search/aggregated`. Two of them change assumptions made further down.
+
+- **Quotes are a phrase search, not ignored.** The web UI and both gadgets send
+  `q="term"` with literal quotes, and InnoDB honours them even in natural-language
+  mode: `"data system"` → 6 rows; unquoted it ORs the tokens → thousands. So the
+  Architecture below ("natural-language mode OR's the tokens, appending variants is
+  safe") only holds if `expand_query` strips the quotes before the DB call — and
+  doing that turns every multi-word query from a phrase search into an OR, which is
+  a relevance change of its own. Decide that deliberately.
+- **Relevance is close to a raw term frequency.** For `نظام`, 6,347 rows share 13
+  distinct scores and 80% tie on one; the 112 rows where `نظام` *is* the term sit
+  anywhere from rank 28 to 6,298. Consequences: never `LIMIT` in SQL before grouping
+  (it cuts occurrences out of the top groups), which is why pagination is applied
+  after aggregation; and appended variants won't be ranked below the original token
+  by the DB — any "original first" ordering has to come from `query_matches_term`.
+- **Expansion widens result sets**, and response size is what users wait for
+  (server work ≈ 0.1–0.25 s up to 3k rows; a 7 s `system` search was ~all transfer).
+  Pagination makes that affordable for clients that pass `limit`; the on-wiki gadget
+  only will after its follow-up to PR #89.
+- **Arabic function words are not stopwords.** InnoDB's default list is English-only:
+  `على` matches 35,233 rows, `إلى` 21,932, `التي` 14,589, `des` 8,521. Quoted
+  (phrase) queries are unaffected, but any unquoted multi-word Arabic query — which
+  is what `expand_query` would produce — drags them in (~4–5 s server time per page,
+  ~20 s before pagination). Idea to verify: build the fulltext index with an Arabic
+  (+ French) stopword table via the session-scoped `innodb_ft_user_stopword_table`,
+  set before the index is created in `deploy-db`. Unverified on ToolsDB. Cheaper
+  fallback: drop those tokens in `expand_query`.
+- Rows without an English value (83, tracked in arabterm's
+  `validation_baseline.json`) are ignored by `aggregate_terms`.
+
 ## What the DB already gives us
 
 - Fulltext index: InnoDB, `(arabic, english, french, description)`,

@@ -463,6 +463,122 @@ def test_aggregate_terms_ignores_rows_without_english(missing_english):
     assert aggregate_terms([without_english], "carillon") == []
 
 
+def _row(arabic, english, dictionary_id, tier=None, **extra):
+    row = {
+        "arabic": arabic,
+        "english": english,
+        "dictionary_id": dictionary_id,
+        "relevance": 10.0,
+        **extra,
+    }
+    if tier is not None:
+        row["dictionary_tier"] = tier
+    return row
+
+
+def _suggested(groups):
+    return [g["arabic_normalised"] for g in groups if g.get("suggested")]
+
+
+def test_suggested_ignores_groups_that_do_not_translate_the_query():
+    # The "Netscape" search: the only entry translating the query comes from a
+    # lone tier-5 web glossary, while a tier-1 dictionary lists a related
+    # phrase twice. The old rule (most occurrences) badged the latter.
+    rows = [
+        _row("نيتسكيب", "Netscape", 798, tier=5),
+        _row("واجهة برمجة تطبيقات مخدم Netscape", "NSAPI", 786, tier=1),
+        _row(
+            "واجهة برمجة تطبيقات مخدِّم Netscape",
+            "Netscape Server Application Programming Interface",
+            786,
+            tier=1,
+        ),
+    ]
+
+    groups = aggregate_terms(rows, '"Netscape"')
+
+    assert _suggested(groups) == []
+    assert groups[0]["arabic_normalised"] == "نيتسكيب"
+
+
+def test_suggested_counts_each_dictionary_once_and_weighs_by_tier():
+    rows = [
+        # Two tier-3 dictionaries agree: 3 + 3 votes.
+        _row("مقراب", "telescope", 1, tier=3),
+        _row("مِقراب", "Telescope", 2, tier=3),
+        # One tier-5 dictionary repeating itself still votes once: 1 vote.
+        _row("تلسكوب", "telescope", 3, tier=5),
+        _row("تلسكوب", "telescope", 3, tier=5),
+        _row("تلسكوب", "telescope", 3, tier=5),
+    ]
+
+    groups = aggregate_terms(rows, "telescope")
+
+    assert _suggested(groups) == ["مقراب"]
+    assert groups[0]["arabic_normalised"] == "مقراب"
+
+
+def test_suggested_accepts_a_single_tier_1_dictionary():
+    rows = [
+        _row("بُرَيْمِج Java", "Java applet", 786, tier=1),
+        _row("تطبيق جافا", "java applet", 798, tier=5),
+    ]
+
+    assert _suggested(aggregate_terms(rows, "Java applet")) == ["بُرَيْمِج Java"]
+
+
+def test_suggested_is_withheld_when_contested():
+    # "bank": two senses, equally well attested.
+    rows = [
+        _row("مصرف", "bank", 1, tier=1),
+        _row("مصرف", "bank", 2, tier=3),
+        _row("ضفة", "bank", 3, tier=1),
+        _row("ضفة", "bank", 4, tier=3),
+    ]
+
+    assert _suggested(aggregate_terms(rows, "bank")) == []
+
+
+def test_suggested_ranks_first_even_with_fewer_dictionaries():
+    rows = [
+        # Three dictionaries, but only one gives "software" itself.
+        _row("برمجيات", "software", 1, tier=5),
+        _row("برمجيات", "computer software", 2, tier=5),
+        _row("برمجيات", "software package", 3, tier=5),
+        # Two dictionaries, both translating the query.
+        _row("برمجية", "software", 4, tier=1),
+        _row("برمجية", "software", 5, tier=3),
+    ]
+
+    groups = aggregate_terms(rows, "software")
+
+    assert _suggested(groups) == ["برمجية"]
+    assert groups[0]["arabic_normalised"] == "برمجية"
+
+
+def test_suggested_for_arabic_query_is_the_group_of_that_term():
+    # The packed row matches "مقراب" exactly, but must not turn its other
+    # part (تلسكوب) into the suggested translation of "مقراب".
+    rows = [
+        _row("تلسكوب، مقراب", "telescope", 1, tier=1),
+        _row("تلسكوب", "telescope", 2, tier=1),
+        _row("مقراب", "telescope", 3, tier=3),
+    ]
+
+    assert _suggested(aggregate_terms(rows, "مقراب")) == ["مقراب"]
+
+
+def test_suggested_needs_an_arabic_term():
+    rows = [
+        {"english": "atom", "dictionary_id": 1, "dictionary_tier": 1, "relevance": 1.0}
+    ]
+
+    groups = aggregate_terms(rows, "atom")
+
+    assert len(groups) == 1
+    assert _suggested(groups) == []
+
+
 @pytest.mark.parametrize(
     "offset, limit, expected",
     [

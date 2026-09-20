@@ -10,7 +10,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -341,6 +341,11 @@ def query_matches_term(term: dict, query: str) -> bool:
         ):
             return True
 
+    return _query_matches_translation(term, query)
+
+
+def _query_matches_translation(term: dict, query: str) -> bool:
+    """English/French half of query_matches_term; `query` is already bare."""
     for field, normaliser in (
         ("english", normalise_english),
         ("french", normalise_french),
@@ -372,6 +377,59 @@ def occurrence_sort_key(term: dict):
     tier = term.get("dictionary_tier")
     tier_priority = tier if tier is not None else UNRANKED_TIER
     return (type_priority, tier_priority, term.get("dictionary_wikidata_id") is None)
+
+
+# Election of the "suggested translation" (the UI's «الترجمة المقترحة» badge).
+# Every dictionary that gives the query itself as a translation of a group's
+# Arabic term votes for that group, with a weight of 6 - tier (tier 1 = 5 votes,
+# tier 5 or unranked = 1). The leading group is suggested only when its score
+# reaches SUGGESTION_MIN_SCORE (one tier-1 dictionary, or several lesser ones
+# agreeing; a lone web glossary is not enough) and is at least
+# SUGGESTION_MARGIN times the runner-up's. A contested query -- two senses
+# ("bank": مصرف / ضفة) or two rival terms ("gene": مورثة / جين) -- gets no
+# suggestion rather than an arbitrary one.
+SUGGESTION_MIN_SCORE = 5
+SUGGESTION_MARGIN = 1.5
+
+
+def dictionary_vote(term: dict) -> int:
+    tier = term.get("dictionary_tier")
+    if tier is None:
+        return 1
+    return max(6 - tier, 1)
+
+
+def suggestion_score(variant: str, occurences: list[dict], query: str) -> int:
+    """Votes for the group of normalised Arabic `variant` as the translation
+    of `query`.
+
+    Only occurrences translating the query itself count, so neither a related
+    phrase ("Netscape Navigator" for "Netscape") nor another sense filed under
+    the same Arabic term adds weight. For an Arabic query that means the group
+    of that very term: a packed row like "تلسكوب، مقراب" matches "مقراب", but
+    must not make تلسكوب its suggested translation. Each dictionary votes
+    once, however many entries it has.
+    """
+    query = _strip_query_quotes(query)
+    if not query:
+        return 0
+    is_query_variant = normalise_arabic(query) == variant
+    votes = {}
+    for term in occurences:
+        if is_query_variant or _query_matches_translation(term, query):
+            votes[term["dictionary_id"]] = dictionary_vote(term)
+    return sum(votes.values())
+
+
+def elect_suggested_group(scores: list[int]) -> int | None:
+    """Index of the winning score, or None when no group qualifies."""
+    ranked = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
+    if not ranked or scores[ranked[0]] < SUGGESTION_MIN_SCORE:
+        return None
+    runner_up = scores[ranked[1]] if len(ranked) > 1 else 0
+    if scores[ranked[0]] < SUGGESTION_MARGIN * runner_up:
+        return None
+    return ranked[0]
 
 
 def aggregate_terms(results: list[dict], query: str = "") -> list[dict]:
@@ -420,7 +478,8 @@ def aggregate_terms(results: list[dict], query: str = "") -> list[dict]:
             groups_dict.setdefault(variant, []).append((term, raw_part))
 
     groups = []
-    for entries in groups_dict.values():
+    suggestion_scores = []
+    for variant, entries in groups_dict.items():
         raw_parts = [raw_part for _term, raw_part in entries]
         groups.append(
             {
@@ -431,6 +490,16 @@ def aggregate_terms(results: list[dict], query: str = "") -> list[dict]:
                 "occurences": [term for term, _raw_part in entries],
             }
         )
+        suggestion_scores.append(
+            suggestion_score(variant, groups[-1]["occurences"], query)
+        )
+
+    # Flag the suggested translation, if any (see SUGGESTION_MIN_SCORE). Only
+    # groups with an Arabic term are candidates: the ones added below have
+    # nothing to suggest.
+    suggested_index = elect_suggested_group(suggestion_scores)
+    if suggested_index is not None:
+        groups[suggested_index]["suggested"] = True
 
     # Add terms without arabic as separate groups with one occurence
     results_without_arabic = [term for term in results if "arabic" not in term]
@@ -469,11 +538,12 @@ def aggregate_terms(results: list[dict], query: str = "") -> list[dict]:
             variant["relevance"] for variant in group["occurences"]
         )
 
-    # Sort by: exact match first (a group where some occurrence's translation
-    # exactly equals the query), then number of unique dictionaries, then
-    # total relevance.
+    # Sort by: the suggested translation, then exact match (a group where some
+    # occurrence's translation exactly equals the query), then number of
+    # unique dictionaries, then total relevance.
     groups.sort(
         key=lambda x: (
+            x.get("suggested", False),
             any(exact_match_by_id[id(term)] for term in x["occurences"]),
             len(x["dictionary_ids"]),
             x["total_relevance"],
@@ -537,6 +607,10 @@ class TermGroup(BaseModel):
     french_normalised: str | None = None
     dictionary_ids: list[int]
     total_relevance: float
+    suggested: bool = Field(
+        False,
+        description="True for at most one group per query: the Arabic term that the dictionaries agree on as the translation of `q`. Computed over all groups, so it does not depend on `limit`/`offset`.",
+    )
     occurences: list[TermResult]
 
 
@@ -657,12 +731,19 @@ def search_aggregated(
     unclassified last), then by `tier` ascending (1 = most reliable), then
     bubbling entries without a Wikidata ID to the end.
 
-    Groups are sorted with exact matches first — a group where some
-    occurrence's Arabic/English/French translation (or one part of a
-    multi-translation field) equals the query exactly — then by the number of
-    distinct dictionaries that contain the term (desc), then by the sum of
-    relevance scores within the group (desc). This is the endpoint used by
-    the on-wiki gadget.
+    Groups are sorted with the suggested translation first (see below), then
+    exact matches — a group where some occurrence's Arabic/English/French
+    translation (or one part of a multi-translation field) equals the query
+    exactly — then by the number of distinct dictionaries that contain the
+    term (desc), then by the sum of relevance scores within the group (desc).
+    This is the endpoint used by the on-wiki gadget.
+
+    **Suggested translation.** At most one group has `suggested: true`. Each
+    dictionary giving the query itself as a translation of the group's Arabic
+    term votes for it once, weighted by reliability (`6 - tier`: 5 votes for
+    tier 1, 1 for tier 5 or unranked). The leading group is suggested when it
+    gathers at least 5 votes and at least 1.5 times the runner-up's; a query
+    with thin or contested evidence has no suggestion.
 
     Rows without an English value are ignored: they are data errors tracked in
     the arabterm repository. `/api/v1/search` still returns them.

@@ -2,7 +2,8 @@ import configparser
 import logging
 import os
 import re
-from collections import Counter
+import time
+from collections import Counter, defaultdict, deque
 from typing import Literal
 
 import sentry_sdk
@@ -127,6 +128,29 @@ async def tag_referer(request: Request, call_next):
             referer_source = "none"
         sentry_sdk.set_tag("referer.source", referer_source)
         sentry_sdk.set_tag("referer", referer[:200])
+    return await call_next(request)
+
+
+# Basic per-client request throttling to protect the small MariaDB pool
+# (POOL_SIZE + MAX_OVERFLOW connections) from exhaustion under sustained
+# high-volume traffic (CWE-770: uncontrolled resource consumption).
+RATE_LIMIT_MAX_REQUESTS = 60
+RATE_LIMIT_WINDOW_SECONDS = 60
+_request_hits: dict[str, deque] = defaultdict(deque)
+
+
+@app.middleware("http")
+async def rate_limit(request: Request, call_next):
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.monotonic()
+    hits = _request_hits[client_ip]
+    while hits and now - hits[0] > RATE_LIMIT_WINDOW_SECONDS:
+        hits.popleft()
+    if len(hits) >= RATE_LIMIT_MAX_REQUESTS:
+        return JSONResponse(
+            status_code=429, content={"detail": "Too many requests, slow down."}
+        )
+    hits.append(now)
     return await call_next(request)
 
 

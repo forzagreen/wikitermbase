@@ -272,8 +272,8 @@ def normalise_arabic(text: str) -> str:
 
     # Remove anything inside parentheses
     text = re.sub(r"\(.*?\)", "", text)
-    # Replace non-Arabic characters with space
-    text = re.sub(r"[^\u0600-\u06FF\s]", " ", text)
+    # Replace non-Arabic and non-Latin characters with space
+    text = re.sub(r"[^\u0600-\u06FFA-Za-z\s]", " ", text)
     # Strip and remove extra spaces
     text = re.sub(r"\s+", " ", text.strip())
     return text

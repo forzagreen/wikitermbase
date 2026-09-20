@@ -4,6 +4,7 @@
   "description": "Lint and cross-browser checks for the مسرد الويكي (WikiTerm) MediaWiki gadget",
   "scripts": {
     "lint": "eslint Gadget-WikiTerm.js SearchTerm.js",
+    "lint:fix": "eslint Gadget-WikiTerm.js SearchTerm.js --fix",
     "check": "node tests/check.js",
     "matrix": "node tests/matrix.js",
     "summary": "node tests/summarize.js tests/out/matrix_results.json"

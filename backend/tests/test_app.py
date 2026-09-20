@@ -1,12 +1,21 @@
 import pytest
 from app import (
+    MATCH_AS_TYPED,
+    MATCH_VARIANT,
+    MAX_QUERY_VARIANTS,
+    NO_MATCH,
     aggregate_terms,
     arabterm_url,
+    expand_query,
+    fulltext_query,
     normalise_arabic,
     normalise_english,
     normalise_french,
     paginate_groups,
+    query_match_rank,
     query_matches_term,
+    singular_candidates,
+    spelling_candidates,
     split_translations,
 )
 
@@ -317,7 +326,9 @@ def test_query_matches_term_exact_translation_part_case_insensitive():
     }
     assert query_matches_term(term, "Landslide") is True
     assert query_matches_term(term, "landslip") is True
-    assert query_matches_term(term, "landslides") is False
+    assert query_matches_term(term, "landing") is False
+    # A plural query matches through its singular variant (see expand_query).
+    assert query_matches_term(term, "landslides") is True
 
 
 def test_query_matches_term_strips_quoted_query():
@@ -333,6 +344,223 @@ def test_query_matches_term_not_fooled_by_compound_phrase():
 
 def test_query_matches_term_empty_query():
     assert query_matches_term({"english": "telescope"}, "") is False
+
+
+# --- Query expansion ---------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "token, expected",
+    [
+        # Regular -s, and -es only after a sibilant or -o (never "telescop").
+        ("telescopes", ["telescope"]),
+        ("boxes", ["boxe", "box", "boxis"]),
+        ("volcanoes", ["volcanoe", "volcano"]),
+        ("phases", ["phase", "phas", "phasis"]),
+        ("lenses", ["lense", "lens"]),
+        # Both readings of an ambiguous suffix; the database picks.
+        ("axes", ["axe", "ax", "axis"]),
+        ("analyses", ["analyse", "analys", "analysis"]),
+        ("categories", ["category"]),
+        ("formulae", ["formula"]),
+        ("radii", ["radius"]),
+        # Table entries: no "devix", no "valf".
+        ("matrices", ["matrix"]),
+        ("indices", ["index"]),
+        ("devices", ["device"]),
+        ("valves", ["valve"]),
+        ("leaves", ["leaf"]),
+        ("criteria", ["criterion"]),
+        ("data", ["datum"]),
+        # French: -s and -x plurals, -aux -> -au / -al.
+        ("données", ["donnée"]),
+        ("réseaux", ["réseau", "réseal"]),
+        ("chevaux", ["chevau", "cheval"]),
+        ("jeux", ["jeu"]),
+        # Not plurals.
+        ("boundary", []),
+        ("physics", []),
+        ("analysis", []),
+        ("virus", []),
+        ("glass", []),
+        ("bus", []),
+        ("gas", []),
+    ],
+)
+def test_singular_candidates(token, expected):
+    assert singular_candidates(token) == expected
+
+
+@pytest.mark.parametrize(
+    "token, expected",
+    [
+        ("colour", ["color"]),
+        ("color", ["colour"]),
+        # One candidate per applicable rule (-our and -meter here).
+        ("colourimeter", ["colorimeter", "colourimetre"]),
+        ("centre", ["center"]),
+        ("center", ["centre"]),
+        ("kilometres", ["kilometers"]),
+        ("fibre", ["fiber"]),
+        ("oxidised", ["oxidized"]),
+        ("oxidized", ["oxidised"]),
+        ("organisation", ["organization"]),
+        ("analyse", ["analyze"]),
+        ("analyze", ["analyse"]),
+        ("haemoglobin", ["hemoglobin"]),
+        ("hemoglobin", ["haemoglobin"]),
+        ("anaemia", ["anemia"]),
+        ("oesophagus", ["esophagus"]),
+        ("esophagus", ["oesophagus"]),
+        ("oestrogen", ["estrogen"]),  # not "ooestrogen"
+        ("estrogen", ["oestrogen"]),
+        ("paediatric", ["pediatric"]),
+        ("modelling", ["modeling"]),
+        ("modeling", ["modelling"]),
+        ("labelled", ["labeled"]),
+        ("catalogue", ["catalog"]),
+        ("catalog", ["catalogue"]),
+        ("programme", ["program"]),
+        ("program", ["programme"]),
+        ("defence", ["defense"]),
+        ("license", ["licence"]),
+        ("aluminium", ["aluminum"]),
+        ("sulphur", ["sulfur"]),
+        ("sulfate", ["sulphate"]),
+        ("grey", ["gray"]),
+        ("tyre", ["tire"]),
+        ("disc", ["disk"]),
+        # Suffixes that look British/American but are not.
+        ("vector", []),
+        ("science", []),
+        ("analogy", []),
+        ("entire", []),
+        ("discount", []),
+        ("sampling", []),
+        ("boundary", []),
+    ],
+)
+def test_spelling_candidates(token, expected):
+    assert spelling_candidates(token) == expected
+
+
+@pytest.mark.parametrize(
+    "query, expected",
+    [
+        # The query as typed comes first, bare of its quotes.
+        ('"telescopes"', ("telescopes", "telescope")),
+        ("Telescopes", ("Telescopes", "telescope")),
+        ("telescope", ("telescope",)),
+        ('"boundary conditions"', ("boundary conditions", "boundary condition")),
+        # Every combination, fewest changed tokens first.
+        (
+            "colour centre",
+            ("colour centre", "colour center", "color centre", "color center"),
+        ),
+        ("e-mails", ("e-mails", "emails", "e-mail", "email")),
+        ("3D printers", ("3D printers", "3d printer")),
+        # Untouched: Arabic, a query with its own phrase operators, empty.
+        ("مكتبات", ("مكتبات",)),
+        ('"مكتبات"', ("مكتبات",)),
+        ('"foo" "bar"', ('foo" "bar',)),
+        ("", ("",)),
+        ('""', ("",)),
+    ],
+)
+def test_expand_query(query, expected):
+    assert expand_query(query) == expected
+
+
+def test_expand_query_is_capped_and_keeps_single_changes_first():
+    variants = expand_query("the boundary conditions of the colour centres")
+    assert len(variants) == MAX_QUERY_VARIANTS
+    assert variants[0] == "the boundary conditions of the colour centres"
+    # Every one-token change makes the cut before any two-token change.
+    assert "the boundary condition of the colour centres" in variants
+    assert "the boundary conditions of the color centres" in variants
+    assert "the boundary conditions of the colour centre" in variants
+
+
+@pytest.mark.parametrize(
+    "query, expected",
+    [
+        # A quoted query stays a phrase search: every variant is a phrase.
+        ('"telescopes"', '"telescopes" "telescope"'),
+        (
+            '"colour centre"',
+            '"colour centre" "colour center" "color centre" "color center"',
+        ),
+        # An unquoted query is already an OR of tokens; the variants' tokens
+        # join the bag, without duplicates.
+        ("telescopes", "telescopes telescope"),
+        ("data systems", "data systems system datum"),
+        # Nothing to add: sent exactly as received, quoting included.
+        ('"telescope"', '"telescope"'),
+        ("telescope", "telescope"),
+        ('"مكتبات"', '"مكتبات"'),
+        ('"foo" "bar"', '"foo" "bar"'),
+        ("", ""),
+    ],
+)
+def test_fulltext_query(query, expected):
+    assert fulltext_query(query) == expected
+
+
+def test_query_match_rank_as_typed_above_variant():
+    assert (
+        query_match_rank({"english": "boundary conditions"}, '"boundary conditions"')
+        == MATCH_AS_TYPED
+    )
+    assert (
+        query_match_rank({"english": "boundary condition"}, '"boundary conditions"')
+        == MATCH_VARIANT
+    )
+    assert (
+        query_match_rank(
+            {"english": "Neumann boundary condition"}, '"boundary conditions"'
+        )
+        == NO_MATCH
+    )
+    # Both directions of a spelling pair, on any part of a packed field.
+    assert query_match_rank({"english": "color; hue"}, "colour") == MATCH_VARIANT
+    assert query_match_rank({"english": "colour"}, "color") == MATCH_VARIANT
+    # French goes through the same variants.
+    assert query_match_rank({"french": "réseau (m.)"}, "réseaux") == MATCH_VARIANT
+    # Arabic is matched as typed only.
+    assert query_match_rank({"arabic": "مكتبة"}, "مكتبة") == MATCH_AS_TYPED
+    assert query_match_rank({"arabic": "مكتبة"}, "مكتبات") == NO_MATCH
+
+
+def test_aggregate_terms_ranks_query_as_typed_above_its_variant():
+    plural_entry = _row("شروط حدية", "boundary conditions", 1, tier=5)
+    singular_a = _row("شرط حدي", "boundary condition", 2, tier=5)
+    singular_b = _row("شرط حدي", "boundary condition", 3, tier=5)
+    related = _row("شرط نويمان الحدي", "Neumann boundary condition", 4, tier=5)
+
+    groups = aggregate_terms(
+        [related, singular_a, singular_b, plural_entry], '"boundary conditions"'
+    )
+
+    # The as-typed match outranks the variant match despite fewer dictionaries,
+    # and the variant match outranks the merely related phrase.
+    assert [g["arabic_normalised"] for g in groups] == [
+        "شروط حدية",
+        "شرط حدي",
+        "شرط نويمان الحدي",
+    ]
+
+
+def test_suggested_counts_dictionaries_translating_a_variant():
+    # "telescopes": nobody lists the plural, but a tier-1 dictionary gives
+    # "telescope", which is what the user is after.
+    rows = [
+        _row("مقراب", "telescope", 1, tier=1),
+        _row("مرصد", "observatory", 2, tier=1),
+    ]
+
+    groups = aggregate_terms(rows, '"telescopes"')
+
+    assert _suggested(groups) == ["مقراب"]
 
 
 def test_aggregate_terms_packed_row_joins_each_variants_group_separately():

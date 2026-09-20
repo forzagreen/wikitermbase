@@ -3,7 +3,7 @@
   "private": true,
   "description": "Lint and cross-browser checks for the مسرد الويكي (WikiTerm) MediaWiki gadget",
   "scripts": {
-    "lint": "eslint Gadget-WikiTerm.js SearchTerm.js",
+    "lint": "eslint Gadget-WikiTerm.js SearchTerm.js Gadget-WikiTermSelection.js",
     "check": "node tests/check.js",
     "matrix": "node tests/matrix.js",
     "summary": "node tests/summarize.js tests/out/matrix_results.json"

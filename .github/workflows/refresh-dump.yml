@@ -23,7 +23,7 @@ jobs:
           make fix_dump
 
       - name: Open PR
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.WIKITERMBASE_REFRESH_PAT }}
           branch: auto/update-dump-${{ github.event.client_payload.arabterm_sha || github.event.inputs.arabterm_sha || github.run_id }}

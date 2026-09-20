@@ -560,7 +560,16 @@
 		WikiTermDialog.prototype.getReadyProcess = function ( data ) {
 			return WikiTermDialog.super.prototype.getReadyProcess.call( this, data )
 				.next( () => {
-					this.searchInput.focus();
+					const prefill = data && data.prefill;
+					if ( prefill ) {
+						this.searchInput.setValue( prefill );
+						this.performSearch();
+						// Cursor at the end, whole term selected, so the user
+						// can immediately retype if the wrong text was picked up.
+						this.searchInput.$input.trigger( 'focus' ).trigger( 'select' );
+					} else {
+						this.searchInput.focus();
+					}
 				} );
 		};
 
@@ -580,7 +589,7 @@
 
 	let dialogPromise = null;
 
-	function openDialog() {
+	function openDialog( prefillText ) {
 		if ( !dialogPromise ) {
 			dialogPromise = mw.loader.using( DIALOG_MODULES ).then( () => {
 				const WikiTermDialog = defineDialogClass();
@@ -592,7 +601,7 @@
 			} );
 		}
 		return dialogPromise.then( ( ui ) => {
-			ui.windowManager.openWindow( ui.dialog );
+			ui.windowManager.openWindow( ui.dialog, { prefill: prefillText } );
 		}, ( err ) => {
 			// Let the next click retry the download.
 			dialogPromise = null;
@@ -685,6 +694,16 @@
 		}
 		return false;
 	}
+
+	// Exposed so companion gadgets — such as a selection-based keyboard-
+	// shortcut trigger loaded as a separate script — can open the dialog
+	// pre-filled with a term, without duplicating the OOUI-loading/dialog
+	// construction logic above. This follows the common mw.libs.* convention
+	// used for cross-gadget public interfaces on Wikimedia wikis.
+	mw.libs = mw.libs || {};
+	mw.libs.wikiTerm = {
+		openDialog: openDialog
+	};
 
 	function init() {
 		const skin = mw.config.get( 'skin' );

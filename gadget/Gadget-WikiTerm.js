@@ -30,6 +30,8 @@
 	const LABEL = 'مسرد الويكي';
 	const TOOLTIP = 'ابحث عن مصطلح في مسرد الويكي';
 	const MIN_QUERY_LENGTH = 3;
+	// The API rejects longer queries (a pasted paragraph is not a term).
+	const MAX_QUERY_LENGTH = 200;
 	const REQUEST_TIMEOUT_MS = 20000;
 	// Result groups rendered per "show more" step. Broad queries can return
 	// several hundred groups; rendering them all at once is slow on low-end
@@ -183,6 +185,10 @@
 			}
 			if ( query.length < MIN_QUERY_LENGTH ) {
 				this.showNotice( 'يرجى إدخال ' + MIN_QUERY_LENGTH + ' أحرف على الأقل للبحث.' );
+				return;
+			}
+			if ( query.length > MAX_QUERY_LENGTH ) {
+				this.showNotice( 'يرجى إدخال ' + MAX_QUERY_LENGTH + ' حرفًا على الأكثر للبحث.' );
 				return;
 			}
 

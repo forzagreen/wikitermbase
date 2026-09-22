@@ -11,6 +11,8 @@ const formatNumber = (num) =>
 // Result groups fetched per request (same step as the on-wiki gadget). Broad
 // queries have thousands of groups; downloading them all took several seconds.
 const PAGE_SIZE = 30;
+// The API rejects longer queries (a pasted paragraph is not a term).
+const MAX_QUERY_LENGTH = 200;
 
 // Shown under the search box while it is empty: points first-time visitors
 // to the two other pages and fills what would otherwise be a blank screen.
@@ -427,6 +429,7 @@ const DictionaryApp = () => {
             type="text"
             className={`w-full px-5 py-4 text-lg rounded-xl border shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${inputClasses}`}
             placeholder="ابحث عن مصطلح (بالإنجليزية أو الفرنسية أو العربية)..."
+            maxLength={MAX_QUERY_LENGTH}
             value={searchTerm}
             onChange={handleSearchInputChange}
           />

@@ -2,9 +2,11 @@ import pytest
 from app import (
     MATCH_AS_TYPED,
     MATCH_VARIANT,
+    MAX_QUERY_LENGTH,
     MAX_QUERY_VARIANTS,
     NO_MATCH,
     aggregate_terms,
+    app,
     arabterm_url,
     expand_query,
     fulltext_query,
@@ -18,6 +20,9 @@ from app import (
     spelling_candidates,
     split_translations,
 )
+from fastapi.testclient import TestClient
+
+SEARCH_PATHS = ["/api/v1/search", "/api/v1/search/aggregated"]
 
 
 @pytest.mark.parametrize(
@@ -832,3 +837,27 @@ def test_paginate_groups_windows_cover_every_group_once():
         for offset in range(0, len(groups), limit)
     ]
     assert [g for page in pages for g in page] == groups
+
+
+@pytest.fixture(scope="module")
+def client():
+    # Validation runs before the endpoint, so these tests never touch the DB.
+    return TestClient(app)
+
+
+@pytest.mark.parametrize("path", SEARCH_PATHS)
+def test_search_rejects_over_long_query(client, path):
+    # An article pasted into the search box used to reach InnoDB, which
+    # rejects phrases over 128 words with a 500.
+    response = client.get(path, params={"q": '"' + "a" * MAX_QUERY_LENGTH + '"'})
+    assert response.status_code == 422
+    (error,) = response.json()["detail"]
+    assert error["loc"] == ["query", "q"]
+    assert "at most" in error["msg"]
+
+
+@pytest.mark.parametrize("path", SEARCH_PATHS)
+def test_search_documents_query_length_limit(client, path):
+    parameters = client.get("/openapi.json").json()["paths"][path]["get"]["parameters"]
+    (q,) = [p for p in parameters if p["name"] == "q"]
+    assert q["schema"]["maxLength"] == MAX_QUERY_LENGTH

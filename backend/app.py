@@ -345,6 +345,12 @@ MAX_QUERY_VARIANTS = 8
 # work on long queries.
 MAX_VARIANT_COMBINATIONS = 64
 
+# Longest `q` the search endpoints accept. A term is a few words; a pasted
+# article is not a query, and InnoDB rejects phrases over 128 words with a
+# 500 ("Too many words in a FTS phrase or proximity search"). The gadget and
+# the UI cap the typed text at 200 so the quotes they add around it still fit.
+MAX_QUERY_LENGTH = 256
+
 # Plurals no suffix rule gets right: Greek and Latin neuters, -ix/-ex words
 # (a rule would turn "devices" into "devix") and -f/-fe words (likewise
 # "valves"). The rules in singular_candidates cover -s/-es/-ies, -ae, -i,
@@ -974,7 +980,8 @@ class HealthResponse(BaseModel):
 def search(
     q: str = Query(
         ...,
-        description="Free-text query. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode. Wrap it in double quotes for a phrase search. Latin-script queries are also searched as their singular (`telescopes` → `telescope`), hyphen-free (`e-mail` → `email`) and British/American (`colour centre` → `color center`) variants; a quoted query stays a phrase search, its variants are searched as phrases too.",
+        max_length=MAX_QUERY_LENGTH,
+        description="Free-text query, at most 256 characters. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode. Wrap it in double quotes for a phrase search. Latin-script queries are also searched as their singular (`telescopes` → `telescope`), hyphen-free (`e-mail` → `email`) and British/American (`colour centre` → `color center`) variants; a quoted query stays a phrase search, its variants are searched as phrases too.",
         examples=["telescope", "اشتقاق"],
     ),
     include_descriptions: bool = Query(
@@ -1003,7 +1010,8 @@ def search(
 def search_aggregated(
     q: str = Query(
         ...,
-        description="Free-text query. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode. Wrap it in double quotes for a phrase search. Latin-script queries are also searched as their singular (`telescopes` → `telescope`), hyphen-free (`e-mail` → `email`) and British/American (`colour centre` → `color center`) variants; a quoted query stays a phrase search, its variants are searched as phrases too.",
+        max_length=MAX_QUERY_LENGTH,
+        description="Free-text query, at most 256 characters. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode. Wrap it in double quotes for a phrase search. Latin-script queries are also searched as their singular (`telescopes` → `telescope`), hyphen-free (`e-mail` → `email`) and British/American (`colour centre` → `color center`) variants; a quoted query stays a phrase search, its variants are searched as phrases too.",
         examples=["telescope", "اشتقاق"],
     ),
     include_descriptions: bool = Query(

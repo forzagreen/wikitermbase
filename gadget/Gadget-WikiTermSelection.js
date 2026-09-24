@@ -1,47 +1,18 @@
 // <nowiki>
 /**
- * Gadget-WikiTermSelection.js — مُشغِّل «مسرد الويكي» بالتحديد + الاختصار
+ * Gadget-WikiTermSelection.js — Opens WikiTerm for a mouse-selected term.
  *
- * Companion to Gadget-WikiTerm.js. Lets an editor highlight a word with the
- * mouse inside an editing surface, then press a keyboard shortcut to open
- * the WikiTerm lookup dialog pre-filled with that selection — without
- * leaving the editor or re-typing the term.
+ * Requires Gadget-WikiTerm.js and mw.libs.wikiTerm.
  *
- * Requires Gadget-WikiTerm.js (declare it as a dependency in the gadget's
- * definition on [[MediaWiki:Gadgets-definition]]) for mw.libs.wikiTerm.
+ * Trigger sequence:
+ *   1. mouseup arms the shortcut after a non-collapsed mouse selection.
+ *   2. keydown (Ctrl+Shift+K) opens the WikiTerm dialog with the selection.
+ * Both steps are required and must occur in an allowed editing surface.
+ * A new mousedown disarms any previous selection.
  *
- * Trigger sequence (both steps are required, in order):
- *   1. mouseup — the user finishes a mouse-based text selection inside one
- *      of the allowed editing surfaces. This only *arms* the shortcut; it
- *      does not read the selected text yet.
- *   2. keydown — Ctrl+Shift+K (see SHORTCUT below), fired while still
- *      focused in the same kind of surface and while a selection made this
- *      way is still active. Only now is the selection's text read, and the
- *      dialog opened with it.
- * Either step alone does nothing: pressing the shortcut with no prior mouse
- * selection is a no-op, and selecting text with no shortcut afterwards does
- * nothing either. Starting a new mouse selection (mousedown) disarms the
- * shortcut until a fresh mouseup re-arms it, so a stale, previously-read
- * selection can never be reused.
- *
- * Scope / privacy
- * ----------------
- * Both listeners bail out immediately, before touching the selection at
- * all, unless `document.activeElement` is inside one of ALLOWED_SELECTORS
- * (the wikitext editor, WikiEditor/CodeMirror, the Visual Editor surface, or
- * a Content Translation segment). Outside of these, the gadget never reads
- * `window.getSelection()` — passively or otherwise.
- *
- * Even inside those surfaces, the only thing read on mouseup is whether the
- * selection is collapsed (a boolean, not its contents) so the shortcut can
- * be armed. The selected text itself is only read once, at the moment the
- * shortcut fires, and is used solely to pre-fill the WikiTerm search field;
- * nothing is transmitted anywhere beyond the existing WikiTermBase query
- * that Gadget-WikiTerm.js already sends once a search is performed. See
- * [[ويكيبيديا:مسرد الويكي]] for details.
- *
- * The shortcut below (Ctrl+Shift+K) is a starting suggestion, not final —
- * change SHORTCUT if it conflicts with a browser or MediaWiki shortcut.
+ * The gadget only checks the selection inside ALLOWED_SELECTORS and never
+ * reads its contents until the shortcut is pressed. The selected text is
+ * used only to pre-fill the WikiTerm search field.
  */
 ( function () {
 	'use strict';

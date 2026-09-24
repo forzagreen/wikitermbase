@@ -76,7 +76,7 @@ The primary gadget is meant to be enabled by default (see the [default-gadget cr
   - Content Translation segments (`.cx-segment`)
 - **Two-phase trigger sequence**:
   1. `mouseup`: The user completes a mouse selection inside an allowed editing surface. This only *arms* the shortcut and checks `!selection.isCollapsed` — it does not read the selected text.
-  2. `keydown` (`Ctrl+Shift+K`): Fired while still focused in the surface. Only then is the selection text read and passed to `mw.libs.wikiTerm.openDialog(text)`.
+  2. `keydown` (`Ctrl + Alt + W`): Fired while still focused in the surface. Only then is the selection text read and passed to `mw.libs.wikiTerm.openDialog(text)`.
 - **Scope & privacy**: Outside allowed editing surfaces, listeners bail out immediately without touching `window.getSelection()`. Starting a new mouse gesture (`mousedown`) disarms the shortcut until a fresh `mouseup` re-arms it, ensuring stale selections are never reused.
 
 ### Recommended Gadget Definitions

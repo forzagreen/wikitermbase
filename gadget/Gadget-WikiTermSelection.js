@@ -6,7 +6,7 @@
  *
  * Trigger sequence:
  *   1. mouseup arms the shortcut after a non-collapsed mouse selection.
- *   2. keydown (Ctrl+Shift+K) opens the WikiTerm dialog with the selection.
+ *   2. keydown (Ctrl + Alt + W) opens the WikiTerm dialog with the selection.
  * Both steps are required and must occur in an allowed editing surface.
  * A new mousedown disarms any previous selection.
  *
@@ -27,7 +27,7 @@
 	];
 	const ALLOWED_SELECTOR = ALLOWED_SELECTORS.join( ',' );
 
-	const SHORTCUT = { ctrlKey: true, shiftKey: true, altKey: false, metaKey: false, key: 'k' };
+	const SHORTCUT = { ctrlKey: true, shiftKey: false, altKey: true, metaKey: false, key: 'KeyW' };
 	// The dependency name Gadget-WikiTerm.js is registered under; adjust to
 	// match the actual gadget/module name if it differs on this wiki.
 	const WIKITERM_MODULE = 'ext.gadget.WikiTerm';
@@ -61,7 +61,7 @@
             e.shiftKey === SHORTCUT.shiftKey &&
             e.altKey === SHORTCUT.altKey &&
             e.metaKey === SHORTCUT.metaKey &&
-            e.key.toLowerCase() === SHORTCUT.key;
+            e.code === SHORTCUT.key;
 	}
 
 	function onKeyDown( e ) {

@@ -92,9 +92,10 @@ def test_build_statements_creates_missing_ones():
 class FakeWikis:
     """Serves the stats endpoint and just enough of the Wikidata API."""
 
-    def __init__(self, item_claims, stats=LIVE):
+    def __init__(self, item_claims, stats=LIVE, edit_error=None):
         self.item_claims = item_claims
         self.stats = stats
+        self.edit_error = edit_error
         self.actions = []
         self.edit = None
 
@@ -116,6 +117,8 @@ class FakeWikis:
             return httpx.Response(200, json={"login": {"result": "Success"}})
         if action == "wbeditentity":
             self.edit = params
+            if self.edit_error:
+                return httpx.Response(200, json={"error": self.edit_error})
             return httpx.Response(200, json={"success": 1, "entity": {"lastrevid": 43}})
         raise AssertionError(f"unexpected request {request.url}")
 
@@ -158,3 +161,13 @@ def test_sync_dry_run_does_not_log_in():
 def test_sync_refuses_empty_stats(stats):
     with pytest.raises(ValueError, match="Refusing to publish"):
         run(FakeWikis(claims(), stats=stats))
+
+
+def test_sync_reports_why_an_edit_was_refused():
+    error = {
+        "code": "permissiondenied",
+        "info": "You do not have the permissions needed to carry out this action.",
+        "messages": [{"name": "session-page-restricted", "parameters": []}],
+    }
+    with pytest.raises(RuntimeError, match="Reasons: session-page-restricted"):
+        run(FakeWikis(claims(), edit_error=error))

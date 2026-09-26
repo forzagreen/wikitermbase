@@ -121,3 +121,27 @@ jobs:
 
           echo "[DB] Import complete"
           EOF
+
+  wikidata-stats:
+    # Copy /api/v1/stats to Wikidata (Q133800945), where ويكيبيديا:مسرد_الويكي
+    # reads its figures. Runs after each DB import, and on "Run workflow" to
+    # re-sync by hand; waits for deploy-code so it doesn't hit the restart.
+    needs: [deploy-code, deploy-db]
+    if: |
+      !cancelled() && !contains(needs.*.result, 'failure') &&
+      github.ref == 'refs/heads/main' &&
+      (needs.deploy-db.result == 'success' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: wikidata-stats
+      cancel-in-progress: false
+    steps:
+    - uses: actions/checkout@v7
+    - uses: astral-sh/setup-uv@v10.1.0
+      with:
+        python-version: '3.13'
+    - run: make init
+    - run: make wikidata_stats
+      env:
+        WIKIDATA_USERNAME: ${{ secrets.WIKIDATA_USERNAME }}
+        WIKIDATA_PASSWORD: ${{ secrets.WIKIDATA_PASSWORD }}

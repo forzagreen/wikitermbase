@@ -186,8 +186,12 @@ def wikidata(client, method, **params):
             time.sleep(int(response.headers.get("Retry-After", MAXLAG)))
             continue
         if error:
+            # "info" is a generic sentence; Wikibase lists the actual reasons
+            # (a missing grant, a bot password's page restriction...) here.
+            reasons = [m.get("name") for m in error.get("messages", [])]
             raise RuntimeError(
                 f"Wikidata API error: {error.get('code')}: {error.get('info')}"
+                + (f" Reasons: {', '.join(reasons)}" if reasons else "")
             )
         return body
     raise RuntimeError("Wikidata is lagging, giving up")

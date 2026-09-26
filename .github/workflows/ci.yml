@@ -132,6 +132,9 @@ jobs:
       github.ref == 'refs/heads/main' &&
       (needs.deploy-db.result == 'success' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
+    # The Wikidata secrets live in this environment, which only main may use,
+    # so a workflow pushed on another branch can't read them.
+    environment: wikidata
     concurrency:
       group: wikidata-stats
       cancel-in-progress: false

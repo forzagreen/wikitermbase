@@ -88,6 +88,14 @@
 		return '{{استشهاد بويكي بيانات|' + wikidataId + '}}';
 	}
 
+	function createGroupedCitationTemplate( terms ) {
+		const citations = terms.map( ( term, index ) => {
+			return '|م' + ( index + 1 ) + '=' + createCitationTemplate( term );
+		} );
+
+		return '{{ترقيم استشهادات\n' + citations.join( '\n' ) + '\n}}';
+	}
+
 	function translationSpan( langTag, text, cls ) {
 		return $( '<span>' ).addClass( cls ).append(
 			$( '<span>' ).addClass( 'wikiterm-lang-tag' ).text( langTag ),
@@ -357,7 +365,22 @@
 						.text( formatDictionaryCount( group.dictionary_ids.length ) ),
 					chevron.$element
 				);
+
 			const $details = $( '<div>' ).addClass( 'wikiterm-result-details wikiterm-hidden' );
+
+			const $groupCitationBtn = new OO.ui.ButtonWidget( {
+				label: 'تجميع الاستشهادات',
+				icon: 'reference',
+				framed: false,
+				classes: [ 'wikiterm-group-citation-button' ]
+			} );
+
+			$groupCitationBtn.on( 'click', ( e ) => {
+				e.stopPropagation();
+				this.showGroupedCitationPopup( $groupCitationBtn.$element, group.occurences );
+			} );
+
+			$details.append( $groupCitationBtn.$element );
 			$card.append( $header, $details );
 
 			let expanded = false;
@@ -546,6 +569,74 @@
 				head: false,
 				classes: [ 'wikiterm-citation-popup' ]
 			} );
+			this.$element.append( popup.$element );
+			popup.toggle( true );
+			this.activePopup = popup;
+
+			setTimeout( () => {
+				textarea.focus().select();
+			}, 100 );
+		};
+
+		WikiTermDialog.prototype.showGroupedCitationPopup = function ( $target, terms ) {
+			this.closeActivePopup();
+			const template = createGroupedCitationTemplate( terms );
+
+			const textarea = new OO.ui.MultilineTextInputWidget( {
+				value: template,
+				readOnly: true,
+				rows: 6,
+				classes: [ 'wikiterm-citation-text' ]
+			} );
+
+			const copyBtn = new OO.ui.ButtonWidget( {
+				label: 'نسخ',
+				icon: 'copy',
+				flags: [ 'progressive' ]
+			} );
+
+			const onCopied = () => {
+				copyBtn.setLabel( 'نُسِخت!' );
+				setTimeout( () => {
+					copyBtn.setLabel( 'نسخ' );
+				}, 2000 );
+			};
+
+			const copyFallback = () => {
+				textarea.select();
+				document.execCommand( 'copy' );
+				onCopied();
+			};
+
+			copyBtn.on( 'click', () => {
+				if ( navigator.clipboard && navigator.clipboard.writeText ) {
+					navigator.clipboard.writeText( template ).then( onCopied, copyFallback );
+				} else {
+					copyFallback();
+				}
+			} );
+
+			const $content = $( '<div>' ).append(
+				new OO.ui.LabelWidget( {
+					label: 'رمز الاستشهادات المجمعة',
+					classes: [ 'wikiterm-citation-title' ]
+				} ).$element,
+				textarea.$element,
+				$( '<div>' ).addClass( 'wikiterm-citation-actions' ).append( copyBtn.$element )
+			);
+
+			const popup = new OO.ui.PopupWidget( {
+				$content: $content,
+				$floatableContainer: $target,
+				padded: true,
+				width: 400,
+				align: 'forwards',
+				position: 'below',
+				autoClose: true,
+				head: false,
+				classes: [ 'wikiterm-citation-popup' ]
+			} );
+
 			this.$element.append( popup.$element );
 			popup.toggle( true );
 			this.activePopup = popup;

@@ -1,5 +1,5 @@
 // src/components/DictionaryApp.jsx
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
 import { Search, ExternalLink, ChevronDown, ChevronUp, Quote, Copy, Check, BookOpen, Wrench, ArrowLeft } from 'lucide-react';
 import SiteHeader from './SiteHeader';
@@ -11,6 +11,8 @@ const formatNumber = (num) =>
 // Result groups fetched per request (same step as the on-wiki gadget). Broad
 // queries have thousands of groups; downloading them all took several seconds.
 const PAGE_SIZE = 30;
+// The API rejects longer queries (a pasted paragraph is not a term).
+const MAX_QUERY_LENGTH = 200;
 
 // Shown under the search box while it is empty: points first-time visitors
 // to the two other pages and fills what would otherwise be a blank screen.
@@ -139,16 +141,6 @@ const DictionaryApp = () => {
       abortRef.current?.abort();
     };
   }, []);
-
-  // Badge for the single group found in the most dictionary entries. Computed
-  // over the first page only: that is where such a group sorts, and the badge
-  // must not move to another card when more pages are appended.
-  const topResultIndex = useMemo(() => {
-    const counts = results.slice(0, PAGE_SIZE).map((g) => g.occurences.length);
-    if (counts.length === 0) return -1;
-    const max = Math.max(...counts);
-    return counts.filter((count) => count === max).length === 1 ? counts.indexOf(max) : -1;
-  }, [results]);
 
   const toggleGroup = (index) => {
     setExpandedGroups(prev => ({
@@ -437,6 +429,7 @@ const DictionaryApp = () => {
             type="text"
             className={`w-full px-5 py-4 text-lg rounded-xl border shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${inputClasses}`}
             placeholder="ابحث عن مصطلح (بالإنجليزية أو الفرنسية أو العربية)..."
+            maxLength={MAX_QUERY_LENGTH}
             value={searchTerm}
             onChange={handleSearchInputChange}
           />
@@ -476,7 +469,8 @@ const DictionaryApp = () => {
           </div>
         )}
         {results.map((group, index) => {
-          const isTopResult = index === topResultIndex;
+          // Elected by the API over all the groups of the query (at most one).
+          const isTopResult = group.suggested === true;
 
           return (
           <div key={index} className={`${cardClasses} rounded-lg mb-6 p-6 ${isTopResult ? 'border-2 border-blue-500' : ''}`}>

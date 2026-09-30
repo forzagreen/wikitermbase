@@ -1,8 +1,10 @@
 import configparser
+import itertools
 import logging
 import os
 import re
 from collections import Counter
+from functools import lru_cache
 from typing import Literal
 
 import sentry_sdk
@@ -10,7 +12,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -233,7 +235,7 @@ def search_terms_mariadb(
         ORDER BY relevance DESC, t.id
     """)
 
-    result = execute_with_retry(search_query, {"query": query_text})
+    result = execute_with_retry(search_query, {"query": fulltext_query(query_text)})
     results = result.mappings().all()
 
     # Remove excluded fields
@@ -272,8 +274,8 @@ def normalise_arabic(text: str) -> str:
 
     # Remove anything inside parentheses
     text = re.sub(r"\(.*?\)", "", text)
-    # Replace non-Arabic characters with space
-    text = re.sub(r"[^\u0600-\u06FF\s]", " ", text)
+    # Replace non-Arabic and non-Latin characters with space
+    text = re.sub(r"[^\u0600-\u06FFA-Za-z\s]", " ", text)
     # Strip and remove extra spaces
     text = re.sub(r"\s+", " ", text.strip())
     return text
@@ -321,26 +323,344 @@ def _strip_query_quotes(query: str) -> str:
     return query
 
 
-def query_matches_term(term: dict, query: str) -> bool:
-    """True when `query` exactly matches one of the term's translations.
+def _is_quoted(query: str) -> bool:
+    query = query.strip()
+    return len(query) >= 2 and query[0] == query[-1] == '"'
+
+
+# --- Query expansion ---------------------------------------------------------
+#
+# The fulltext index has no stemming and knows nothing about British/American
+# spelling, so "telescopes", "colour centre" or "e-mails" return nothing while
+# "telescope", "color center" and "e-mail" are in the database. expand_query()
+# derives a few spelling variants of the query and the database is asked for
+# all of them at once. Variants are added, never substituted: a wrong guess
+# ("axes" -> "axe", "ax" and "axis") costs one lookup of a phrase that matches
+# nothing, and the query as typed still ranks first (see query_match_rank).
+# Only Latin-script tokens are touched; Arabic passes through unchanged (that
+# branch is planned in docs/ideas/search-robustness.md).
+
+MAX_QUERY_VARIANTS = 8
+# Product of the per-token candidates that is sorted and capped; bounds the
+# work on long queries.
+MAX_VARIANT_COMBINATIONS = 64
+
+# Longest `q` the search endpoints accept. A term is a few words; a pasted
+# article is not a query, and InnoDB rejects phrases over 128 words with a
+# 500 ("Too many words in a FTS phrase or proximity search"). The gadget and
+# the UI cap the typed text at 200 so the quotes they add around it still fit.
+MAX_QUERY_LENGTH = 256
+
+# Plurals no suffix rule gets right: Greek and Latin neuters, -ix/-ex words
+# (a rule would turn "devices" into "devix") and -f/-fe words (likewise
+# "valves"). The rules in singular_candidates cover -s/-es/-ies, -ae, -i,
+# -ses/-sis and -aux.
+IRREGULAR_PLURALS = {
+    "apices": "apex",
+    "appendices": "appendix",
+    "automata": "automaton",
+    "bacteria": "bacterium",
+    "calves": "calf",
+    "children": "child",
+    "codices": "codex",
+    "corpora": "corpus",
+    "cortices": "cortex",
+    "criteria": "criterion",
+    "curricula": "curriculum",
+    "data": "datum",
+    "feet": "foot",
+    "genera": "genus",
+    "halves": "half",
+    "helices": "helix",
+    "hooves": "hoof",
+    "indices": "index",
+    "knives": "knife",
+    "leaves": "leaf",
+    "lemmata": "lemma",
+    "loaves": "loaf",
+    "matrices": "matrix",
+    "maxima": "maximum",
+    "media": "medium",
+    "men": "man",
+    "mice": "mouse",
+    "minima": "minimum",
+    "momenta": "momentum",
+    "optima": "optimum",
+    "ova": "ovum",
+    "phenomena": "phenomenon",
+    "quanta": "quantum",
+    "radices": "radix",
+    "schemata": "schema",
+    "sheaves": "sheaf",
+    "shelves": "shelf",
+    "spectra": "spectrum",
+    "stomata": "stoma",
+    "strata": "stratum",
+    "taxa": "taxon",
+    "teeth": "tooth",
+    "vertices": "vertex",
+    "vortices": "vortex",
+    "women": "woman",
+}
+
+# Plain (British, American) substrings that differ; applied in both
+# directions anywhere in the token, so "haematology" and "sulphates" work too.
+SPELLING_PAIRS = [
+    ("aluminium", "aluminum"),
+    ("aeroplane", "airplane"),
+    ("aesth", "esth"),
+    ("aetiolog", "etiolog"),
+    ("amoeb", "ameb"),
+    ("anaem", "anem"),
+    ("archaeo", "archeo"),
+    ("artefact", "artifact"),
+    ("caesium", "cesium"),
+    ("coeliac", "celiac"),
+    ("diarrhoe", "diarrhe"),
+    ("draught", "draft"),
+    ("faecal", "fecal"),
+    ("faeces", "feces"),
+    ("foetal", "fetal"),
+    ("foetus", "fetus"),
+    ("grey", "gray"),
+    ("gynaec", "gynec"),
+    ("haem", "hem"),
+    ("homoeo", "homeo"),
+    ("judgement", "judgment"),
+    ("kerb", "curb"),
+    ("leukaem", "leukem"),
+    ("manoeuv", "maneuv"),
+    ("mollusc", "mollusk"),
+    ("mould", "mold"),
+    ("oedem", "edem"),
+    ("oesoph", "esoph"),
+    ("oestr", "estr"),
+    ("orthopaed", "orthoped"),
+    ("paediatr", "pediatr"),
+    ("plough", "plow"),
+    ("sceptic", "skeptic"),
+    ("speciality", "specialty"),
+    ("sulph", "sulf"),
+]
+
+# Regex rules for the productive British/American families, each written in
+# both directions. Stems are listed where a suffix alone would be ambiguous
+# ("motor" must not become "motour", "science" must not become "sciense").
+_OUR_STEMS = r"(arm|behavi|col|endeav|fav|flav|harb|hon|hum|lab|neighb|od|rig|rum|sav|tum|vap|vig)"
+_RE_STEMS = r"(calib|cent|fib|goit|lit|lust|met|mit|nit|och|somb|spect|theat|tit)"
+_OGUE_STEMS = r"(anal|catal|dial|epil|homol|monol|prol)"
+_ENCE_STEMS = r"(def|lic|off|pret)"
+SPELLING_RULES = [
+    # oxidise, organisation, analyser; analyse, catalyse
+    (r"is(e|ed|es|ing|er|ers|ation|ations|able)$", r"iz\1"),
+    (r"iz(e|ed|es|ing|er|ers|ation|ations|able)$", r"is\1"),
+    (r"ys(e|ed|es|ing|er|ers)$", r"yz\1"),
+    (r"yz(e|ed|es|ing|er|ers)$", r"ys\1"),
+    # colour, vapour, behaviour (and colourimeter, vaporisation)
+    (rf"^{_OUR_STEMS}our", r"\1or"),
+    (rf"^{_OUR_STEMS}or", r"\1our"),
+    # centre, fibre, kilometre, litre, calibre, titre
+    (rf"{_RE_STEMS}re(s|d)?$", r"\1er\2"),
+    (rf"{_RE_STEMS}er(s|d)?$", r"\1re\2"),
+    # modelling, labelled, signalling, traveller
+    (r"([aeiou])ll(ed|ing|er|ers|ation)$", r"\1l\2"),
+    (r"([aeiou])l(ed|ing|er|ers|ation)$", r"\1ll\2"),
+    # catalogue, analogue, dialogue (not analogy, analogous)
+    (rf"^{_OGUE_STEMS}ogue", r"\1og"),
+    (rf"^{_OGUE_STEMS}og(?=s?$|ed$)", r"\1ogue"),
+    # programme, kilogramme
+    (r"gramme(s)?$", r"gram\1"),
+    (r"gram(s)?$", r"gramme\1"),
+    # defence, licence, offence, pretence
+    (rf"^{_ENCE_STEMS}ence", r"\1ense"),
+    (rf"^{_ENCE_STEMS}ense", r"\1ence"),
+    # tyre, disc (anchored: "entire", "discount")
+    (r"^tyre(s)?$", r"tire\1"),
+    (r"^tire(s)?$", r"tyre\1"),
+    (r"^disc(s)?$", r"disk\1"),
+    (r"^disk(s)?$", r"disc\1"),
+    # British ae/oe digraphs, for words missing from SPELLING_PAIRS. The
+    # reverse direction is not generalisable ("e" -> "ae" anywhere).
+    (r"ae", "e"),
+    (r"oe", "e"),
+]
+
+
+def _pair_rules(uk: str, us: str) -> list[tuple[re.Pattern, str]]:
+    # When the American form is a suffix of the British one ("estr" in
+    # "oestr"), the US -> UK rule must not fire on a token that is already
+    # British, or "oestrogen" would yield "ooestrogen".
+    us_pattern = re.escape(us)
+    if uk.endswith(us):
+        us_pattern = rf"(?<!{re.escape(uk[: -len(us)])}){us_pattern}"
+    return [(re.compile(re.escape(uk)), us), (re.compile(us_pattern), uk)]
+
+
+SPELLING_RULES = [(re.compile(p), r) for p, r in SPELLING_RULES] + [
+    rule for uk, us in SPELLING_PAIRS for rule in _pair_rules(uk, us)
+]
+
+# A word of Latin letters (accents included), optionally hyphenated or
+# apostrophised; never digits ("3d", "h2o") or Arabic script.
+LATIN_WORD_RE = re.compile(r"[^\W\d_]+(?:['\-][^\W\d_]+)*")
+ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
+
+
+def singular_candidates(token: str) -> list[str]:
+    """Possible singulars of a lowercase English/French token, best guess
+    first; empty when it does not look like a plural.
+
+    Where the suffix is ambiguous every reading is returned ("axes" -> "axe",
+    "ax", "axis"; "lenses" -> "lense", "lens") and the database decides which
+    exists.
+    """
+    if token in IRREGULAR_PLURALS:
+        return [IRREGULAR_PLURALS[token]]
+    if len(token) < 4 or token.endswith(("ss", "us", "is", "ics")):
+        return []
+    if token.endswith("ies"):  # categories -> category
+        return [token[:-3] + "y"]
+    if token.endswith("ae"):  # formulae -> formula
+        return [token[:-1]]
+    if token.endswith("i"):  # radii -> radius
+        return [token[:-1] + "us"]
+    if token.endswith("aux"):  # réseaux -> réseau, chevaux -> cheval
+        return [token[:-1], token[:-3] + "al"]
+    if token.endswith("x"):  # jeux -> jeu
+        return [token[:-1]]
+    if token.endswith("s"):  # telescopes -> telescope
+        candidates = [token[:-1]]
+        # -es is a suffix of its own only after a sibilant or -o: boxes,
+        # gases, lenses, matches, volcanoes (but phases -> phase only).
+        if token.endswith(("ses", "xes", "zes", "ches", "shes", "oes")):
+            candidates.append(token[:-2])
+        # Greek -sis plurals: analyses, hypotheses, diagnoses, axes.
+        if token.endswith(("ses", "xes")) and token[-4] in "aeiouy":
+            candidates.append(token[:-2] + "is")
+        return candidates
+    return []
+
+
+def spelling_candidates(token: str) -> list[str]:
+    """The other-side-of-the-Atlantic spellings of a lowercase token, if
+    any rule in SPELLING_RULES applies to it."""
+    candidates = []
+    for pattern, replacement in SPELLING_RULES:
+        if pattern.search(token):
+            candidate = pattern.sub(replacement, token)
+            if candidate != token and candidate not in candidates:
+                candidates.append(candidate)
+    return candidates
+
+
+def token_candidates(token: str) -> list[str]:
+    """`token` (lowercased) first, then its hyphen-free, singular and
+    alternative-spelling forms, deduplicated."""
+    token = token.casefold()
+    if not LATIN_WORD_RE.fullmatch(token) or ARABIC_RE.search(token):
+        return [token]
+    bases = [token]
+    if "-" in token:
+        bases.append(token.replace("-", ""))  # e-mail -> email
+    singulars = [s for base in bases for s in singular_candidates(base)]
+    candidates = bases + singulars
+    candidates += [s for form in bases + singulars for s in spelling_candidates(form)]
+    return list(dict.fromkeys(candidates))
+
+
+@lru_cache(maxsize=1024)
+def expand_query(query: str) -> tuple[str, ...]:
+    """The bare query as typed, followed by up to MAX_QUERY_VARIANTS - 1
+    variants of it (singulars, British/American spellings, hyphens removed),
+    fewest changed tokens first.
+
+    Cached: the aggregation compares every result row against these.
+    """
+    bare = _strip_query_quotes(query)
+    tokens = bare.split()
+    if not tokens or '"' in bare:
+        # Empty, or a query with its own phrase operators: leave it alone.
+        return (bare,)
+
+    per_token = [token_candidates(token) for token in tokens]
+    combinations = itertools.islice(
+        itertools.product(*per_token), MAX_VARIANT_COMBINATIONS
+    )
+    ranked = sorted(
+        combinations,
+        key=lambda combo: sum(
+            word != candidates[0] for word, candidates in zip(combo, per_token)
+        ),
+    )
+    variants = [bare]
+    for combo in ranked:
+        variant = " ".join(combo)
+        if variant != bare.casefold() and variant not in variants:
+            variants.append(variant)
+    return tuple(variants[:MAX_QUERY_VARIANTS])
+
+
+def fulltext_query(query: str) -> str:
+    """What is sent to MATCH ... AGAINST for `query`: the query itself when it
+    has no variants, otherwise the query and its variants.
+
+    A quoted query is a phrase search (see _strip_query_quotes), and several
+    quoted phrases in natural-language mode match the union of the phrases, so
+    each variant is quoted too and the phrase semantics survive. An unquoted
+    query already ORs its tokens; the variants' tokens just join the bag.
+    """
+    variants = expand_query(query)
+    if len(variants) == 1:
+        return query
+    if _is_quoted(query):
+        return " ".join(f'"{variant}"' for variant in variants)
+    return " ".join(
+        dict.fromkeys(word for variant in variants for word in variant.split())
+    )
+
+
+# How closely a term's translation matches the query (see query_match_rank).
+MATCH_AS_TYPED = 2
+MATCH_VARIANT = 1
+NO_MATCH = 0
+
+
+def query_match_rank(term: dict, query: str) -> int:
+    """MATCH_AS_TYPED when one of the term's translations is exactly the
+    query, MATCH_VARIANT when it is exactly one of the query's variants (see
+    expand_query: "boundary conditions" -> "boundary condition"), else
+    NO_MATCH.
 
     Compares against every part of a multi-translation field (see
     split_translations), not just the field as a whole, so a query like
     "telescope" matches a term whose english is "reflecting telescope"
     only if "telescope" is itself one of the listed synonyms.
     """
-    query = _strip_query_quotes(query)
-    if not query:
-        return False
+    variants = expand_query(query)
+    query_typed = variants[0]
+    if not query_typed:
+        return NO_MATCH
 
     arabic = term.get("arabic")
     if arabic:
-        query_ar = normalise_arabic(query)
+        query_ar = normalise_arabic(query_typed)
         if query_ar and any(
             normalise_arabic(part) == query_ar for part in split_translations(arabic)
         ):
-            return True
+            return MATCH_AS_TYPED
 
+    return _translation_match_rank(term, variants)
+
+
+def query_matches_term(term: dict, query: str) -> bool:
+    """True when the term translates the query or one of its variants."""
+    return query_match_rank(term, query) > NO_MATCH
+
+
+def _translation_match_rank(term: dict, variants: tuple[str, ...]) -> int:
+    """English/French half of query_match_rank; `variants` come from
+    expand_query, the query as typed first."""
+    rank = NO_MATCH
     for field, normaliser in (
         ("english", normalise_english),
         ("french", normalise_french),
@@ -348,14 +668,13 @@ def query_matches_term(term: dict, query: str) -> bool:
         value = term.get(field)
         if not value:
             continue
-        query_norm = normaliser(query).casefold()
-        if query_norm and any(
-            normaliser(part).casefold() == query_norm
-            for part in split_translations(value)
-        ):
-            return True
-
-    return False
+        parts = {normaliser(part).casefold() for part in split_translations(value)}
+        for i, variant in enumerate(variants):
+            variant_norm = normaliser(variant).casefold()
+            if variant_norm and variant_norm in parts:
+                rank = max(rank, MATCH_AS_TYPED if i == 0 else MATCH_VARIANT)
+                break
+    return rank
 
 
 # Display/ranking order for dictionary types within a result group.
@@ -374,6 +693,59 @@ def occurrence_sort_key(term: dict):
     return (type_priority, tier_priority, term.get("dictionary_wikidata_id") is None)
 
 
+# Election of the "suggested translation" (the UI's «الترجمة المقترحة» badge).
+# Every dictionary that gives the query itself as a translation of a group's
+# Arabic term votes for that group, with a weight of 6 - tier (tier 1 = 5 votes,
+# tier 5 or unranked = 1). The leading group is suggested only when its score
+# reaches SUGGESTION_MIN_SCORE (one tier-1 dictionary, or several lesser ones
+# agreeing; a lone web glossary is not enough) and is at least
+# SUGGESTION_MARGIN times the runner-up's. A contested query -- two senses
+# ("bank": مصرف / ضفة) or two rival terms ("gene": مورثة / جين) -- gets no
+# suggestion rather than an arbitrary one.
+SUGGESTION_MIN_SCORE = 5
+SUGGESTION_MARGIN = 1.5
+
+
+def dictionary_vote(term: dict) -> int:
+    tier = term.get("dictionary_tier")
+    if tier is None:
+        return 1
+    return max(6 - tier, 1)
+
+
+def suggestion_score(variant: str, occurences: list[dict], query: str) -> int:
+    """Votes for the group of normalised Arabic `variant` as the translation
+    of `query`.
+
+    Only occurrences translating the query itself count, so neither a related
+    phrase ("Netscape Navigator" for "Netscape") nor another sense filed under
+    the same Arabic term adds weight. For an Arabic query that means the group
+    of that very term: a packed row like "تلسكوب، مقراب" matches "مقراب", but
+    must not make تلسكوب its suggested translation. Each dictionary votes
+    once, however many entries it has.
+    """
+    variants = expand_query(query)
+    if not variants[0]:
+        return 0
+    is_query_variant = normalise_arabic(variants[0]) == variant
+    votes = {}
+    for term in occurences:
+        if is_query_variant or _translation_match_rank(term, variants) > NO_MATCH:
+            votes[term["dictionary_id"]] = dictionary_vote(term)
+    return sum(votes.values())
+
+
+def elect_suggested_group(scores: list[int]) -> int | None:
+    """Index of the winning score, or None when no group qualifies."""
+    ranked = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
+    if not ranked or scores[ranked[0]] < SUGGESTION_MIN_SCORE:
+        return None
+    runner_up = scores[ranked[1]] if len(ranked) > 1 else 0
+    if scores[ranked[0]] < SUGGESTION_MARGIN * runner_up:
+        return None
+    return ranked[0]
+
+
 def aggregate_terms(results: list[dict], query: str = "") -> list[dict]:
     """Aggregate terms by arabic term (after cleaning it)."""
     # Ignore rows without an English value (NULL, empty or whitespace-only):
@@ -382,12 +754,13 @@ def aggregate_terms(results: list[dict], query: str = "") -> list[dict]:
     # must not break the search in the meantime.
     results = [term for term in results if (term.get("english") or "").strip()]
 
-    # Flag rows that are an exact match for the query (on any one of their
-    # possibly multiple translations), so those groups can be bubbled to the
-    # top regardless of how many dictionaries carry a merely-related phrase.
+    # Rank rows that are an exact match for the query (on any one of their
+    # possibly multiple translations) -- as typed above one of its variants
+    # (see query_match_rank) -- so those groups can be bubbled to the top
+    # regardless of how many dictionaries carry a merely-related phrase.
     # Keyed by object identity rather than mutating `term`, so this internal
-    # flag never leaks into the API response.
-    exact_match_by_id = {id(term): query_matches_term(term, query) for term in results}
+    # rank never leaks into the API response.
+    match_rank_by_id = {id(term): query_match_rank(term, query) for term in results}
 
     # Normalise arabic terms. A single field may pack several synonymous
     # spellings/terms (see split_translations); each part independently
@@ -420,7 +793,8 @@ def aggregate_terms(results: list[dict], query: str = "") -> list[dict]:
             groups_dict.setdefault(variant, []).append((term, raw_part))
 
     groups = []
-    for entries in groups_dict.values():
+    suggestion_scores = []
+    for variant, entries in groups_dict.items():
         raw_parts = [raw_part for _term, raw_part in entries]
         groups.append(
             {
@@ -431,6 +805,16 @@ def aggregate_terms(results: list[dict], query: str = "") -> list[dict]:
                 "occurences": [term for term, _raw_part in entries],
             }
         )
+        suggestion_scores.append(
+            suggestion_score(variant, groups[-1]["occurences"], query)
+        )
+
+    # Flag the suggested translation, if any (see SUGGESTION_MIN_SCORE). Only
+    # groups with an Arabic term are candidates: the ones added below have
+    # nothing to suggest.
+    suggested_index = elect_suggested_group(suggestion_scores)
+    if suggested_index is not None:
+        groups[suggested_index]["suggested"] = True
 
     # Add terms without arabic as separate groups with one occurence
     results_without_arabic = [term for term in results if "arabic" not in term]
@@ -469,12 +853,13 @@ def aggregate_terms(results: list[dict], query: str = "") -> list[dict]:
             variant["relevance"] for variant in group["occurences"]
         )
 
-    # Sort by: exact match first (a group where some occurrence's translation
-    # exactly equals the query), then number of unique dictionaries, then
-    # total relevance.
+    # Sort by: the suggested translation, then exact match (a group where some
+    # occurrence's translation exactly equals the query as typed, then one of
+    # its variants), then number of unique dictionaries, then total relevance.
     groups.sort(
         key=lambda x: (
-            any(exact_match_by_id[id(term)] for term in x["occurences"]),
+            x.get("suggested", False),
+            max(match_rank_by_id[id(term)] for term in x["occurences"]),
             len(x["dictionary_ids"]),
             x["total_relevance"],
         ),
@@ -537,6 +922,10 @@ class TermGroup(BaseModel):
     french_normalised: str | None = None
     dictionary_ids: list[int]
     total_relevance: float
+    suggested: bool = Field(
+        False,
+        description="True for at most one group per query: the Arabic term that the dictionaries agree on as the translation of `q`. Computed over all groups, so it does not depend on `limit`/`offset`.",
+    )
     occurences: list[TermResult]
 
 
@@ -591,7 +980,8 @@ class HealthResponse(BaseModel):
 def search(
     q: str = Query(
         ...,
-        description="Free-text query. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode.",
+        max_length=MAX_QUERY_LENGTH,
+        description="Free-text query, at most 256 characters. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode. Wrap it in double quotes for a phrase search. Latin-script queries are also searched as their singular (`telescopes` → `telescope`), hyphen-free (`e-mail` → `email`) and British/American (`colour centre` → `color center`) variants; a quoted query stays a phrase search, its variants are searched as phrases too.",
         examples=["telescope", "اشتقاق"],
     ),
     include_descriptions: bool = Query(
@@ -620,7 +1010,8 @@ def search(
 def search_aggregated(
     q: str = Query(
         ...,
-        description="Free-text query. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode.",
+        max_length=MAX_QUERY_LENGTH,
+        description="Free-text query, at most 256 characters. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode. Wrap it in double quotes for a phrase search. Latin-script queries are also searched as their singular (`telescopes` → `telescope`), hyphen-free (`e-mail` → `email`) and British/American (`colour centre` → `color center`) variants; a quoted query stays a phrase search, its variants are searched as phrases too.",
         examples=["telescope", "اشتقاق"],
     ),
     include_descriptions: bool = Query(
@@ -657,12 +1048,21 @@ def search_aggregated(
     unclassified last), then by `tier` ascending (1 = most reliable), then
     bubbling entries without a Wikidata ID to the end.
 
-    Groups are sorted with exact matches first — a group where some
-    occurrence's Arabic/English/French translation (or one part of a
-    multi-translation field) equals the query exactly — then by the number of
-    distinct dictionaries that contain the term (desc), then by the sum of
-    relevance scores within the group (desc). This is the endpoint used by
-    the on-wiki gadget.
+    Groups are sorted with the suggested translation first (see below), then
+    exact matches — a group where some occurrence's Arabic/English/French
+    translation (or one part of a multi-translation field) equals the query
+    exactly, as typed before one of its variants (see `q`) — then by the
+    number of distinct dictionaries that contain the term (desc), then by the
+    sum of relevance scores within the group (desc). This is the endpoint
+    used by the on-wiki gadget.
+
+    **Suggested translation.** At most one group has `suggested: true`. Each
+    dictionary giving the query itself (or one of its variants) as a
+    translation of the group's Arabic term votes for it once, weighted by
+    reliability (`6 - tier`: 5 votes for
+    tier 1, 1 for tier 5 or unranked). The leading group is suggested when it
+    gathers at least 5 votes and at least 1.5 times the runner-up's; a query
+    with thin or contested evidence has no suggestion.
 
     Rows without an English value are ignored: they are data errors tracked in
     the arabterm repository. `/api/v1/search` still returns them.
@@ -691,8 +1091,9 @@ def search_aggregated(
     # How often clients go past the first page, and how slow those requests are.
     sentry_sdk.set_tag("search.offset", str(offset))
     logger.info(
-        "search_aggregated q=%r number_groups=%d offset=%d limit=%s",
+        "search_aggregated q=%r fulltext=%r number_groups=%d offset=%d limit=%s",
         q,
+        fulltext_query(q),
         number_groups,
         offset,
         limit,

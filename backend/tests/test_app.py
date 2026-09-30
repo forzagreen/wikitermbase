@@ -1,14 +1,28 @@
 import pytest
 from app import (
+    MATCH_AS_TYPED,
+    MATCH_VARIANT,
+    MAX_QUERY_LENGTH,
+    MAX_QUERY_VARIANTS,
+    NO_MATCH,
     aggregate_terms,
+    app,
     arabterm_url,
+    expand_query,
+    fulltext_query,
     normalise_arabic,
     normalise_english,
     normalise_french,
     paginate_groups,
+    query_match_rank,
     query_matches_term,
+    singular_candidates,
+    spelling_candidates,
     split_translations,
 )
+from fastapi.testclient import TestClient
+
+SEARCH_PATHS = ["/api/v1/search", "/api/v1/search/aggregated"]
 
 
 @pytest.mark.parametrize(
@@ -17,7 +31,8 @@ from app import (
         ("الكَلِمَةُ", "كلمة"),
         ("  كــلــمــة  ", "كلمة"),
         ("كلمة (قوس)", "كلمة"),
-        ("AB كلمة098 d", "كلمة"),
+        ("AB كلمة098 d", "AB كلمة d"),
+        ("ملّاح Netscape", "ملاح Netscape"),
         ("إنتاجية", "انتاجية"),
     ],
 )
@@ -316,7 +331,9 @@ def test_query_matches_term_exact_translation_part_case_insensitive():
     }
     assert query_matches_term(term, "Landslide") is True
     assert query_matches_term(term, "landslip") is True
-    assert query_matches_term(term, "landslides") is False
+    assert query_matches_term(term, "landing") is False
+    # A plural query matches through its singular variant (see expand_query).
+    assert query_matches_term(term, "landslides") is True
 
 
 def test_query_matches_term_strips_quoted_query():
@@ -332,6 +349,223 @@ def test_query_matches_term_not_fooled_by_compound_phrase():
 
 def test_query_matches_term_empty_query():
     assert query_matches_term({"english": "telescope"}, "") is False
+
+
+# --- Query expansion ---------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "token, expected",
+    [
+        # Regular -s, and -es only after a sibilant or -o (never "telescop").
+        ("telescopes", ["telescope"]),
+        ("boxes", ["boxe", "box", "boxis"]),
+        ("volcanoes", ["volcanoe", "volcano"]),
+        ("phases", ["phase", "phas", "phasis"]),
+        ("lenses", ["lense", "lens"]),
+        # Both readings of an ambiguous suffix; the database picks.
+        ("axes", ["axe", "ax", "axis"]),
+        ("analyses", ["analyse", "analys", "analysis"]),
+        ("categories", ["category"]),
+        ("formulae", ["formula"]),
+        ("radii", ["radius"]),
+        # Table entries: no "devix", no "valf".
+        ("matrices", ["matrix"]),
+        ("indices", ["index"]),
+        ("devices", ["device"]),
+        ("valves", ["valve"]),
+        ("leaves", ["leaf"]),
+        ("criteria", ["criterion"]),
+        ("data", ["datum"]),
+        # French: -s and -x plurals, -aux -> -au / -al.
+        ("données", ["donnée"]),
+        ("réseaux", ["réseau", "réseal"]),
+        ("chevaux", ["chevau", "cheval"]),
+        ("jeux", ["jeu"]),
+        # Not plurals.
+        ("boundary", []),
+        ("physics", []),
+        ("analysis", []),
+        ("virus", []),
+        ("glass", []),
+        ("bus", []),
+        ("gas", []),
+    ],
+)
+def test_singular_candidates(token, expected):
+    assert singular_candidates(token) == expected
+
+
+@pytest.mark.parametrize(
+    "token, expected",
+    [
+        ("colour", ["color"]),
+        ("color", ["colour"]),
+        # One candidate per applicable rule (-our and -meter here).
+        ("colourimeter", ["colorimeter", "colourimetre"]),
+        ("centre", ["center"]),
+        ("center", ["centre"]),
+        ("kilometres", ["kilometers"]),
+        ("fibre", ["fiber"]),
+        ("oxidised", ["oxidized"]),
+        ("oxidized", ["oxidised"]),
+        ("organisation", ["organization"]),
+        ("analyse", ["analyze"]),
+        ("analyze", ["analyse"]),
+        ("haemoglobin", ["hemoglobin"]),
+        ("hemoglobin", ["haemoglobin"]),
+        ("anaemia", ["anemia"]),
+        ("oesophagus", ["esophagus"]),
+        ("esophagus", ["oesophagus"]),
+        ("oestrogen", ["estrogen"]),  # not "ooestrogen"
+        ("estrogen", ["oestrogen"]),
+        ("paediatric", ["pediatric"]),
+        ("modelling", ["modeling"]),
+        ("modeling", ["modelling"]),
+        ("labelled", ["labeled"]),
+        ("catalogue", ["catalog"]),
+        ("catalog", ["catalogue"]),
+        ("programme", ["program"]),
+        ("program", ["programme"]),
+        ("defence", ["defense"]),
+        ("license", ["licence"]),
+        ("aluminium", ["aluminum"]),
+        ("sulphur", ["sulfur"]),
+        ("sulfate", ["sulphate"]),
+        ("grey", ["gray"]),
+        ("tyre", ["tire"]),
+        ("disc", ["disk"]),
+        # Suffixes that look British/American but are not.
+        ("vector", []),
+        ("science", []),
+        ("analogy", []),
+        ("entire", []),
+        ("discount", []),
+        ("sampling", []),
+        ("boundary", []),
+    ],
+)
+def test_spelling_candidates(token, expected):
+    assert spelling_candidates(token) == expected
+
+
+@pytest.mark.parametrize(
+    "query, expected",
+    [
+        # The query as typed comes first, bare of its quotes.
+        ('"telescopes"', ("telescopes", "telescope")),
+        ("Telescopes", ("Telescopes", "telescope")),
+        ("telescope", ("telescope",)),
+        ('"boundary conditions"', ("boundary conditions", "boundary condition")),
+        # Every combination, fewest changed tokens first.
+        (
+            "colour centre",
+            ("colour centre", "colour center", "color centre", "color center"),
+        ),
+        ("e-mails", ("e-mails", "emails", "e-mail", "email")),
+        ("3D printers", ("3D printers", "3d printer")),
+        # Untouched: Arabic, a query with its own phrase operators, empty.
+        ("مكتبات", ("مكتبات",)),
+        ('"مكتبات"', ("مكتبات",)),
+        ('"foo" "bar"', ('foo" "bar',)),
+        ("", ("",)),
+        ('""', ("",)),
+    ],
+)
+def test_expand_query(query, expected):
+    assert expand_query(query) == expected
+
+
+def test_expand_query_is_capped_and_keeps_single_changes_first():
+    variants = expand_query("the boundary conditions of the colour centres")
+    assert len(variants) == MAX_QUERY_VARIANTS
+    assert variants[0] == "the boundary conditions of the colour centres"
+    # Every one-token change makes the cut before any two-token change.
+    assert "the boundary condition of the colour centres" in variants
+    assert "the boundary conditions of the color centres" in variants
+    assert "the boundary conditions of the colour centre" in variants
+
+
+@pytest.mark.parametrize(
+    "query, expected",
+    [
+        # A quoted query stays a phrase search: every variant is a phrase.
+        ('"telescopes"', '"telescopes" "telescope"'),
+        (
+            '"colour centre"',
+            '"colour centre" "colour center" "color centre" "color center"',
+        ),
+        # An unquoted query is already an OR of tokens; the variants' tokens
+        # join the bag, without duplicates.
+        ("telescopes", "telescopes telescope"),
+        ("data systems", "data systems system datum"),
+        # Nothing to add: sent exactly as received, quoting included.
+        ('"telescope"', '"telescope"'),
+        ("telescope", "telescope"),
+        ('"مكتبات"', '"مكتبات"'),
+        ('"foo" "bar"', '"foo" "bar"'),
+        ("", ""),
+    ],
+)
+def test_fulltext_query(query, expected):
+    assert fulltext_query(query) == expected
+
+
+def test_query_match_rank_as_typed_above_variant():
+    assert (
+        query_match_rank({"english": "boundary conditions"}, '"boundary conditions"')
+        == MATCH_AS_TYPED
+    )
+    assert (
+        query_match_rank({"english": "boundary condition"}, '"boundary conditions"')
+        == MATCH_VARIANT
+    )
+    assert (
+        query_match_rank(
+            {"english": "Neumann boundary condition"}, '"boundary conditions"'
+        )
+        == NO_MATCH
+    )
+    # Both directions of a spelling pair, on any part of a packed field.
+    assert query_match_rank({"english": "color; hue"}, "colour") == MATCH_VARIANT
+    assert query_match_rank({"english": "colour"}, "color") == MATCH_VARIANT
+    # French goes through the same variants.
+    assert query_match_rank({"french": "réseau (m.)"}, "réseaux") == MATCH_VARIANT
+    # Arabic is matched as typed only.
+    assert query_match_rank({"arabic": "مكتبة"}, "مكتبة") == MATCH_AS_TYPED
+    assert query_match_rank({"arabic": "مكتبة"}, "مكتبات") == NO_MATCH
+
+
+def test_aggregate_terms_ranks_query_as_typed_above_its_variant():
+    plural_entry = _row("شروط حدية", "boundary conditions", 1, tier=5)
+    singular_a = _row("شرط حدي", "boundary condition", 2, tier=5)
+    singular_b = _row("شرط حدي", "boundary condition", 3, tier=5)
+    related = _row("شرط نويمان الحدي", "Neumann boundary condition", 4, tier=5)
+
+    groups = aggregate_terms(
+        [related, singular_a, singular_b, plural_entry], '"boundary conditions"'
+    )
+
+    # The as-typed match outranks the variant match despite fewer dictionaries,
+    # and the variant match outranks the merely related phrase.
+    assert [g["arabic_normalised"] for g in groups] == [
+        "شروط حدية",
+        "شرط حدي",
+        "شرط نويمان الحدي",
+    ]
+
+
+def test_suggested_counts_dictionaries_translating_a_variant():
+    # "telescopes": nobody lists the plural, but a tier-1 dictionary gives
+    # "telescope", which is what the user is after.
+    rows = [
+        _row("مقراب", "telescope", 1, tier=1),
+        _row("مرصد", "observatory", 2, tier=1),
+    ]
+
+    groups = aggregate_terms(rows, '"telescopes"')
+
+    assert _suggested(groups) == ["مقراب"]
 
 
 def test_aggregate_terms_packed_row_joins_each_variants_group_separately():
@@ -462,6 +696,122 @@ def test_aggregate_terms_ignores_rows_without_english(missing_english):
     assert aggregate_terms([without_english], "carillon") == []
 
 
+def _row(arabic, english, dictionary_id, tier=None, **extra):
+    row = {
+        "arabic": arabic,
+        "english": english,
+        "dictionary_id": dictionary_id,
+        "relevance": 10.0,
+        **extra,
+    }
+    if tier is not None:
+        row["dictionary_tier"] = tier
+    return row
+
+
+def _suggested(groups):
+    return [g["arabic_normalised"] for g in groups if g.get("suggested")]
+
+
+def test_suggested_ignores_groups_that_do_not_translate_the_query():
+    # The "Netscape" search: the only entry translating the query comes from a
+    # lone tier-5 web glossary, while a tier-1 dictionary lists a related
+    # phrase twice. The old rule (most occurrences) badged the latter.
+    rows = [
+        _row("نيتسكيب", "Netscape", 798, tier=5),
+        _row("واجهة برمجة تطبيقات مخدم Netscape", "NSAPI", 786, tier=1),
+        _row(
+            "واجهة برمجة تطبيقات مخدِّم Netscape",
+            "Netscape Server Application Programming Interface",
+            786,
+            tier=1,
+        ),
+    ]
+
+    groups = aggregate_terms(rows, '"Netscape"')
+
+    assert _suggested(groups) == []
+    assert groups[0]["arabic_normalised"] == "نيتسكيب"
+
+
+def test_suggested_counts_each_dictionary_once_and_weighs_by_tier():
+    rows = [
+        # Two tier-3 dictionaries agree: 3 + 3 votes.
+        _row("مقراب", "telescope", 1, tier=3),
+        _row("مِقراب", "Telescope", 2, tier=3),
+        # One tier-5 dictionary repeating itself still votes once: 1 vote.
+        _row("تلسكوب", "telescope", 3, tier=5),
+        _row("تلسكوب", "telescope", 3, tier=5),
+        _row("تلسكوب", "telescope", 3, tier=5),
+    ]
+
+    groups = aggregate_terms(rows, "telescope")
+
+    assert _suggested(groups) == ["مقراب"]
+    assert groups[0]["arabic_normalised"] == "مقراب"
+
+
+def test_suggested_accepts_a_single_tier_1_dictionary():
+    rows = [
+        _row("بُرَيْمِج Java", "Java applet", 786, tier=1),
+        _row("تطبيق جافا", "java applet", 798, tier=5),
+    ]
+
+    assert _suggested(aggregate_terms(rows, "Java applet")) == ["بُرَيْمِج Java"]
+
+
+def test_suggested_is_withheld_when_contested():
+    # "bank": two senses, equally well attested.
+    rows = [
+        _row("مصرف", "bank", 1, tier=1),
+        _row("مصرف", "bank", 2, tier=3),
+        _row("ضفة", "bank", 3, tier=1),
+        _row("ضفة", "bank", 4, tier=3),
+    ]
+
+    assert _suggested(aggregate_terms(rows, "bank")) == []
+
+
+def test_suggested_ranks_first_even_with_fewer_dictionaries():
+    rows = [
+        # Three dictionaries, but only one gives "software" itself.
+        _row("برمجيات", "software", 1, tier=5),
+        _row("برمجيات", "computer software", 2, tier=5),
+        _row("برمجيات", "software package", 3, tier=5),
+        # Two dictionaries, both translating the query.
+        _row("برمجية", "software", 4, tier=1),
+        _row("برمجية", "software", 5, tier=3),
+    ]
+
+    groups = aggregate_terms(rows, "software")
+
+    assert _suggested(groups) == ["برمجية"]
+    assert groups[0]["arabic_normalised"] == "برمجية"
+
+
+def test_suggested_for_arabic_query_is_the_group_of_that_term():
+    # The packed row matches "مقراب" exactly, but must not turn its other
+    # part (تلسكوب) into the suggested translation of "مقراب".
+    rows = [
+        _row("تلسكوب، مقراب", "telescope", 1, tier=1),
+        _row("تلسكوب", "telescope", 2, tier=1),
+        _row("مقراب", "telescope", 3, tier=3),
+    ]
+
+    assert _suggested(aggregate_terms(rows, "مقراب")) == ["مقراب"]
+
+
+def test_suggested_needs_an_arabic_term():
+    rows = [
+        {"english": "atom", "dictionary_id": 1, "dictionary_tier": 1, "relevance": 1.0}
+    ]
+
+    groups = aggregate_terms(rows, "atom")
+
+    assert len(groups) == 1
+    assert _suggested(groups) == []
+
+
 @pytest.mark.parametrize(
     "offset, limit, expected",
     [
@@ -487,3 +837,27 @@ def test_paginate_groups_windows_cover_every_group_once():
         for offset in range(0, len(groups), limit)
     ]
     assert [g for page in pages for g in page] == groups
+
+
+@pytest.fixture(scope="module")
+def client():
+    # Validation runs before the endpoint, so these tests never touch the DB.
+    return TestClient(app)
+
+
+@pytest.mark.parametrize("path", SEARCH_PATHS)
+def test_search_rejects_over_long_query(client, path):
+    # An article pasted into the search box used to reach InnoDB, which
+    # rejects phrases over 128 words with a 500.
+    response = client.get(path, params={"q": '"' + "a" * MAX_QUERY_LENGTH + '"'})
+    assert response.status_code == 422
+    (error,) = response.json()["detail"]
+    assert error["loc"] == ["query", "q"]
+    assert "at most" in error["msg"]
+
+
+@pytest.mark.parametrize("path", SEARCH_PATHS)
+def test_search_documents_query_length_limit(client, path):
+    parameters = client.get("/openapi.json").json()["paths"][path]["get"]["parameters"]
+    (q,) = [p for p in parameters if p["name"] == "q"]
+    assert q["schema"]["maxLength"] == MAX_QUERY_LENGTH

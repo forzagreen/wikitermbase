@@ -4,6 +4,10 @@
 
 - [Overview](#overview)
 - [Wiki Gadget](#wiki-gadget)
+  - [Design Constraints and Architecture](#design-constraints-and-architecture)
+  - [Selection Lookup Companion Gadget (`WikiTermSelection`)](#selection-lookup-companion-gadget-wikitermselection)
+  - [Recommended Gadget Definitions](#recommended-gadget-definitions)
+  - [Testing the Gadget](#testing-the-gadget)
 - [Backend](#backend)
   - [API](#api)
   - [API on Toolforge](#api-on-toolforge)
@@ -38,33 +42,61 @@ The Wikipedia gadget is built with [OOUI](https://www.mediawiki.org/wiki/OOUI) (
 The Wikipedia [gadget](https://en.wikipedia.org/wiki/Wikipedia:Gadget) can be activated in [user preferences](https://ar.wikipedia.org/wiki/خاص:تفضيلات#mw-prefsection-gadgets) -> "مسرد الويكي".
 
 The deployed version in Arabic Wikipedia:
-- Gadget definition: [gadget-WikiTerm](https://ar.wikipedia.org/wiki/خاص:إضافات#gadget-WikiTerm)
-- Gadget Javascript code: [Gadget-WikiTerm.js](https://ar.wikipedia.org/wiki/ميدياويكي:Gadget-WikiTerm.js)
-- Gadget CSS code: [Gadget-WikiTerm.css](https://ar.wikipedia.org/wiki/ميدياويكي:Gadget-WikiTerm.css)
+- **WikiTerm** (primary lookup dialog):
+  - Gadget definition: [gadget-WikiTerm](https://ar.wikipedia.org/wiki/خاص:إضافات#gadget-WikiTerm)
+  - Gadget Javascript code: [Gadget-WikiTerm.js](https://ar.wikipedia.org/wiki/ميدياويكي:Gadget-WikiTerm.js)
+  - Gadget CSS code: [Gadget-WikiTerm.css](https://ar.wikipedia.org/wiki/ميدياويكي:Gadget-WikiTerm.css)
+- **WikiTermSelection** (companion shortcut lookup):
+  - Gadget definition: [gadget-WikiTermSelection](https://ar.wikipedia.org/wiki/خاص:إضافات#gadget-WikiTermSelection)
+  - Gadget Javascript code: [Gadget-WikiTermSelection.js](https://ar.wikipedia.org/wiki/ميدياويكي:Gadget-WikiTermSelection.js)
 
 Files in [gadget/](gadget/):
-- [Gadget-WikiTerm.js](gadget/Gadget-WikiTerm.js) and [Gadget-WikiTerm.css](gadget/Gadget-WikiTerm.css) are the gadget, copied verbatim to the `MediaWiki:` pages above.
-- [SearchTerm.js](gadget/SearchTerm.js) is the [user script](https://en.wikipedia.org/wiki/Wikipedia:User_scripts) variant used for development: the same body as the gadget wrapped in `mw.loader.using( [ 'mediawiki.util' ] )` (only the first and last lines differ). Regenerate it after editing the gadget so both stay in sync.
+- [Gadget-WikiTerm.js](gadget/Gadget-WikiTerm.js) and [Gadget-WikiTerm.css](gadget/Gadget-WikiTerm.css) are the main gadget, copied verbatim to the `MediaWiki:` pages above.
+- [Gadget-WikiTermSelection.js](gadget/Gadget-WikiTermSelection.js) is the optional companion gadget that triggers term lookup directly from text selected in an editing surface using a keyboard shortcut (`Ctrl+Shift+K`).
+- [SearchTerm.js](gadget/SearchTerm.js) is the [user script](https://en.wikipedia.org/wiki/Wikipedia:User_scripts) variant used for development: the same body as the gadget wrapped in `mw.loader.using( [ 'mediawiki.util' ] )` (only the wrapper lines differ). Run `npm run sync` after editing the gadget so both stay in sync.
+- [tests/sync.js](gadget/tests/sync.js) synchronizes `SearchTerm.js` automatically by extracting the gadget body from `Gadget-WikiTerm.js`.
 
-Design constraints (the gadget is meant to be enabled by default, see the [default-gadget criteria](https://ar.wikipedia.org/wiki/ويكيبيديا:إضافات#معايير)):
-- The only page-load dependency is `mediawiki.util`. OOUI (about 90 KB gzipped) and the dialog are loaded on the first click via `mw.loader.using()`; no request reaches the WikiTermBase API until the user submits a search.
-- Entry points: an icon button in the header on Vector 2022 (and its sticky header), on Minerva and in the Content Translation tool (`Special:ContentTranslation` has its own skin); an item in the page-actions menu ("المزيد") on Vector legacy, MonoBook, Timeless and any other skin, via `mw.util.addPortletLink()`. Users of those skins who prefer the top personal toolbar can set `window.wikiTermConfig = { placement: 'personal' };` in their `common.js`.
-- Only ES2015 syntax (MediaWiki's Grade A baseline is ES2019, and `requiresES6` cannot be combined with `default`). No `console.*` calls.
-- Results are fetched 30 groups at a time (`limit` / `offset` on `/api/v1/search/aggregated`); "show more" requests the next window. Broad terms have thousands of groups and multi-megabyte full responses. A new request aborts the one in flight.
+### Design Constraints and Architecture
 
-Recommended gadget definition (registered users only, testable with `?withgadget=WikiTerm` before enabling it by default):
+The primary gadget is meant to be enabled by default (see the [default-gadget criteria](https://ar.wikipedia.org/wiki/ويكيبيديا:إضافات#معايير)):
+- **Lazy loading**: The only page-load dependency is `mediawiki.util`. OOUI (about 90 KB gzipped) and the dialog are loaded on the first click via `mw.loader.using()`; no request reaches the WikiTermBase API until the user submits a search.
+- **Entry points**: An icon button in the header on Vector 2022 (and its sticky header), on Minerva and in the Content Translation tool (`Special:ContentTranslation` has its own skin); an item in the page-actions menu ("المزيد") on Vector legacy, MonoBook, Timeless and any other skin, via `mw.util.addPortletLink()`. Users of those skins who prefer the top personal toolbar can set `window.wikiTermConfig = { placement: 'personal' };` in their `common.js`.
+- **Public API & pre-filling**: `Gadget-WikiTerm.js` exposes `mw.libs.wikiTerm = { openDialog: openDialog }`. Companion gadgets and user scripts can call `mw.libs.wikiTerm.openDialog(prefillText)` with an optional search term to open the dialog, pre-fill the search input, automatically trigger the search query, and select the search input text.
+- **Syntax and standards**: Only ES2015 syntax (MediaWiki's Grade A baseline is ES2019, and `requiresES6` cannot be combined with `default`). No `console.*` calls.
+- **Batched pagination**: Results are fetched 30 groups at a time (`limit` / `offset` on `/api/v1/search/aggregated`); "show more" requests the next window. Broad terms have thousands of groups and multi-megabyte full responses. A new request aborts the one in flight.
+
+### Selection Lookup Companion Gadget (`WikiTermSelection`)
+
+[Gadget-WikiTermSelection.js](gadget/Gadget-WikiTermSelection.js) enables an editor to highlight a word or phrase with the mouse in an editing surface, then press a keyboard shortcut to open the WikiTerm lookup dialog pre-filled with the selection — without leaving the editor or re-typing the term.
+
+- **Supported editing surfaces**:
+  - 2010 wikitext source editor (`#wpTextbox1`)
+  - WikiEditor / CodeMirror (`.cm-editor .cm-content`)
+  - VisualEditor surface (`.ve-ce-documentNode`)
+  - Content Translation segments (`.cx-segment`)
+- **Two-phase trigger sequence**:
+  1. `mouseup`: The user completes a mouse selection inside an allowed editing surface. This only *arms* the shortcut and checks `!selection.isCollapsed` — it does not read the selected text.
+  2. `keydown` (`Ctrl + Alt + W`): Fired while still focused in the surface. Only then is the selection text read and passed to `mw.libs.wikiTerm.openDialog(text)`.
+- **Scope & privacy**: Outside allowed editing surfaces, listeners bail out immediately without touching `window.getSelection()`. Starting a new mouse gesture (`mousedown`) disarms the shortcut until a fresh `mouseup` re-arms it, ensuring stale selections are never reused.
+
+### Recommended Gadget Definitions
+
+On `[[MediaWiki:Gadgets-definition]]`:
 
 ```
 * WikiTerm [default |rights=minoredit |supportsUrlLoad |dependencies=mediawiki.util] |WikiTerm.js |WikiTerm.css
+* WikiTermSelection [dependencies=ext.gadget.WikiTerm] |WikiTermSelection.js
 ```
 
-### Testing the gadget
+### Testing the Gadget
 
 Tooling lives in [gadget/package.json](gadget/package.json) (ESLint with the Wikimedia config, Playwright for a browser matrix):
 
 ```sh
 cd gadget && npm install
+npm run sync                              # synchronize SearchTerm.js body from Gadget-WikiTerm.js
 npm run lint                              # eslint-config-wikimedia: client/es6 + mediawiki + jquery
+npm run check                             # verify sync, enforce gzipped size budget, check for forbidden calls
 npx playwright install firefox webkit     # once; Chrome uses the installed Google Chrome
 npm run matrix                            # Chrome/Firefox/WebKit × Vector 2022 (light+night)/Vector 2010/MonoBook/Timeless/Minerva/Content Translation
 npm run summary                           # Markdown table from tests/out/matrix_results.json (screenshots in tests/out/shots/)
@@ -73,7 +105,7 @@ BROWSERS=chrome SKINS=vector npm run matrix   # subset
 
 The matrix opens a real ar.wikipedia article (logged out), injects the working-tree gadget, and drives it end to end: entry point → dialog (lazy OOUI load, bytes and time recorded) → search → expand → citation copy → "show more" → close, failing on any uncaught JavaScript error. `npm run check` is network-free: it verifies `SearchTerm.js` is in sync with the gadget, enforces a gzipped size budget (10 KB JS, 3 KB CSS) and rejects `console.*` calls.
 
-The same three commands run in GitHub Actions ([gadget.yml](.github/workflows/gadget.yml)) on every pull request touching `gadget/`, on pushes to `main`, and weekly. The run's job summary shows the results table and the screenshots + JSON are attached as a downloadable artifact, so the numbers can be checked and re-run by anyone from the [Actions tab](https://github.com/forzagreen/wikitermbase/actions/workflows/gadget.yml).
+The same checks run in GitHub Actions ([gadget.yml](.github/workflows/gadget.yml)) on every pull request touching `gadget/`, on pushes to `main`, and weekly. The run's job summary shows the results table and the screenshots + JSON are attached as a downloadable artifact, so the numbers can be checked and re-run by anyone from the [Actions tab](https://github.com/forzagreen/wikitermbase/actions/workflows/gadget.yml).
 
 To try the working-tree version on-wiki without deploying anything, disable the WikiTerm gadget in your preferences, open any page and paste in the browser console (replace `main` with your branch):
 
@@ -81,6 +113,9 @@ To try the working-tree version on-wiki without deploying anything, disable the 
 const base = 'https://raw.githubusercontent.com/forzagreen/wikitermbase/main/gadget/';
 fetch(base + 'Gadget-WikiTerm.css').then(r => r.text()).then(css => mw.util.addCSS(css));
 fetch(base + 'Gadget-WikiTerm.js').then(r => r.text()).then(js => $.globalEval(js));
+
+// To also test the selection shortcut companion gadget:
+fetch(base + 'Gadget-WikiTermSelection.js').then(r => r.text()).then(js => $.globalEval(js));
 ```
 
 Or install it as a user script: copy [gadget/SearchTerm.js](gadget/SearchTerm.js) to `User:You/SearchTerm.js`, the CSS to `User:You/SearchTerm.css`, and load both from your `common.js`.

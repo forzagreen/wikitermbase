@@ -22,16 +22,59 @@ jobs:
           make download_dump
           make fix_dump
 
+      # Says what the pull request is for: the arabterm commit message and the
+      # summary of the data changes, both sent by arabterm with the dispatch.
+      - name: Describe the change
+        id: describe
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.client_payload.arabterm_sha || github.event.inputs.arabterm_sha }}
+          MESSAGE: ${{ github.event.client_payload.message }}
+          SUMMARY: ${{ github.event.client_payload.summary }}
+        run: |
+          # A manual run only has the SHA: look the commit message up.
+          if [ -z "$MESSAGE" ] && [ -n "$SHA" ]; then
+            MESSAGE=$(gh api "repos/forzagreen/arabterm/commits/$SHA" --jq .commit.message || true)
+          fi
+          subject=${MESSAGE%%$'\n'*}
+
+          # A bare "#58" would link to an issue of this repository.
+          if [ -n "$subject" ]; then
+            title="chore: refresh DB dump — $(sed -E 's/#([0-9]+)/arabterm#\1/g' <<< "$subject")"
+          else
+            title="chore: refresh DB dump from arabterm@${SHA:-manual}"
+          fi
+          echo "title=$title" >> "$GITHUB_OUTPUT"
+
+          {
+            if [ -n "$SHA" ]; then
+              echo "Auto-generated from a data change in forzagreen/arabterm, commit [\`${SHA:0:7}\`](https://github.com/forzagreen/arabterm/commit/$SHA):"
+            else
+              echo "Auto-generated from the current \`main\` of forzagreen/arabterm."
+            fi
+            if [ -n "$MESSAGE" ]; then
+              echo
+              sed -E -e 's/(^|[^[:alnum:]\/])#([0-9]+)/\1forzagreen\/arabterm#\2/g' -e 's/^/> /' <<< "$MESSAGE"
+            fi
+            if [ -n "$SUMMARY" ]; then
+              echo
+              printf '%s\n' "$SUMMARY"
+            fi
+            echo
+            echo "---"
+            echo
+            echo "Ran \`make download_dump && make fix_dump\` against arabterm \`main\`. Review the diff to \`db/arabterm.sql\` and merge to trigger the production DB import."
+          } > "$RUNNER_TEMP/pr-body.md"
+          cat "$RUNNER_TEMP/pr-body.md" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Open PR
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.WIKITERMBASE_REFRESH_PAT }}
           branch: auto/update-dump-${{ github.event.client_payload.arabterm_sha || github.event.inputs.arabterm_sha || github.run_id }}
-          commit-message: "chore: refresh DB dump from arabterm@${{ github.event.client_payload.arabterm_sha || github.event.inputs.arabterm_sha || 'manual' }}"
-          title: "chore: refresh DB dump from arabterm@${{ github.event.client_payload.arabterm_sha || github.event.inputs.arabterm_sha || 'manual' }}"
-          body: |
-            Auto-generated from a data change in [forzagreen/arabterm](https://github.com/forzagreen/arabterm/commit/${{ github.event.client_payload.arabterm_sha || github.event.inputs.arabterm_sha }}).
-
-            Ran `make download_dump && make fix_dump` against arabterm `main`. Review the diff to `db/arabterm.sql` and merge to trigger the production DB import.
+          commit-message: ${{ steps.describe.outputs.title }}
+          title: ${{ steps.describe.outputs.title }}
+          body-path: ${{ runner.temp }}/pr-body.md
           add-paths: |
             db/arabterm.sql

@@ -4,9 +4,11 @@ from urllib.parse import parse_qs
 
 import httpx
 import pytest
+import wikidata_stats
 from wikidata_stats import (
     DICTIONARY,
     ITEM,
+    MAXLAG_WAIT,
     STATS_URL,
     build_statements,
     item_snak,
@@ -171,3 +173,43 @@ def test_sync_reports_why_an_edit_was_refused():
     }
     with pytest.raises(RuntimeError, match="Reasons: session-page-restricted"):
         run(FakeWikis(claims(), edit_error=error))
+
+
+class LaggingWikis(FakeWikis):
+    """Answers the first `lagging` Wikidata requests with a maxlag error."""
+
+    def __init__(self, item_claims, lagging):
+        super().__init__(item_claims)
+        self.lagging = lagging
+
+    def __call__(self, request):
+        if str(request.url) != STATS_URL and self.lagging:
+            self.lagging -= 1
+            error = {
+                "code": "maxlag",
+                "info": "Waiting for wdqs1014: 6.75 seconds lagged.",
+            }
+            return httpx.Response(
+                200, json={"error": error}, headers={"Retry-After": "5"}
+            )
+        return super().__call__(request)
+
+
+@pytest.fixture
+def slept(monkeypatch):
+    delays = []
+    monkeypatch.setattr(wikidata_stats.time, "sleep", delays.append)
+    return delays
+
+
+def test_sync_waits_out_maxlag(slept):
+    fake = LaggingWikis(claims(509871, 85), lagging=20)
+    assert run(fake) == 0
+    assert fake.actions == ["wbgetentities"]
+    assert sum(slept) == 100
+
+
+def test_sync_gives_up_when_wikidata_keeps_lagging(slept):
+    with pytest.raises(RuntimeError, match="still lagging after 600 s"):
+        run(LaggingWikis(claims(509871, 85), lagging=1000))
+    assert sum(slept) == MAXLAG_WAIT

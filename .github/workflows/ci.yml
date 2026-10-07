@@ -112,9 +112,13 @@ jobs:
           become wikitermbase bash << 'EOF'
           set -euo pipefail
 
-          echo "[DB] Pulling latest code from main"
+          echo "[DB] Syncing the checkout with main"
           cd ~/wikitermbase
-          git pull --ff-only origin main
+          # The checkout is a deploy mirror: match origin/main exactly, so that
+          # a leftover file (e.g. a dump downloaded by hand) can't block the
+          # update. Ignored files (var/) are kept.
+          git fetch origin main
+          git reset --hard origin/main
 
           echo "[DB] Importing db/arabterm.sql.gz"
           gzip -t db/arabterm.sql.gz

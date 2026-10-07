@@ -21,7 +21,7 @@ run:
 # Copy /api/v1/stats to the Wikidata item (run by CI after DB imports).
 # Preview without credentials: uv run python backend/wikidata_stats.py --dry-run
 wikidata_stats:
-	uv run python backend/wikidata_stats.py
+	uv run python -u backend/wikidata_stats.py
 
 build_frontend:
 	cd backend/frontend && npm install && npm run build

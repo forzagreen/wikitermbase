@@ -40,7 +40,9 @@ USER_AGENT = "wikitermbase-stats/1.0 (https://github.com/forzagreen/wikitermbase
 STATS_ATTEMPTS = 5
 STATS_RETRY_DELAY = 15
 MAXLAG = 5
-MAXLAG_ATTEMPTS = 5
+# Wikidata's lag (its query service's included) often stays around MAXLAG for
+# minutes: wait it out, as Wikimedia asks of bots, rather than fail the job.
+MAXLAG_WAIT = 600
 
 
 def snak(prop, value, value_type):
@@ -174,7 +176,8 @@ def fetch_stats(client):
 def wikidata(client, method, **params):
     """Call the Wikidata API, waiting out maxlag, raising on API errors."""
     params |= {"format": "json", "formatversion": 2, "maxlag": MAXLAG}
-    for _ in range(MAXLAG_ATTEMPTS):
+    waited = 0
+    while True:
         if method == "GET":
             response = client.get(WIKIDATA_API, params=params)
         else:
@@ -183,7 +186,14 @@ def wikidata(client, method, **params):
         body = response.json()
         error = body.get("error")
         if error and error.get("code") == "maxlag":
-            time.sleep(int(response.headers.get("Retry-After", MAXLAG)))
+            if waited >= MAXLAG_WAIT:
+                raise RuntimeError(
+                    f"Wikidata is still lagging after {waited} s, giving up: "
+                    f"{error.get('info')}"
+                )
+            delay = int(response.headers.get("Retry-After", MAXLAG))
+            time.sleep(delay)
+            waited += delay
             continue
         if error:
             # "info" is a generic sentence; Wikibase lists the actual reasons
@@ -194,7 +204,6 @@ def wikidata(client, method, **params):
                 + (f" Reasons: {', '.join(reasons)}" if reasons else "")
             )
         return body
-    raise RuntimeError("Wikidata is lagging, giving up")
 
 
 def login(client, username, password):

@@ -47,6 +47,12 @@ jobs:
           fi
           echo "title=$title" >> "$GITHUB_OUTPUT"
 
+          # The dump is committed gzipped, so the pull request shows no diff of
+          # it: count the changed SQL lines here (the rows are one per line).
+          diff <(git show HEAD:db/arabterm.sql.gz | gunzip -c) <(gunzip -c db/arabterm.sql.gz) > "$RUNNER_TEMP/dump.diff" || true
+          added=$(grep -c '^> ' "$RUNNER_TEMP/dump.diff" || true)
+          removed=$(grep -c '^< ' "$RUNNER_TEMP/dump.diff" || true)
+
           {
             if [ -n "$SHA" ]; then
               echo "Auto-generated from a data change in forzagreen/arabterm, commit [\`${SHA:0:7}\`](https://github.com/forzagreen/arabterm/commit/$SHA):"
@@ -64,7 +70,7 @@ jobs:
             echo
             echo "---"
             echo
-            echo "Ran \`make download_dump && make fix_dump\` against arabterm \`main\`. Review the diff to \`db/arabterm.sql\` and merge to trigger the production DB import."
+            echo "Ran \`make download_dump && make fix_dump\` against arabterm \`main\`: $added lines added to the SQL dump, $removed removed. \`db/arabterm.sql.gz\` is gzipped, so GitHub shows no diff of it; merge to trigger the production DB import."
           } > "$RUNNER_TEMP/pr-body.md"
           cat "$RUNNER_TEMP/pr-body.md" >> "$GITHUB_STEP_SUMMARY"
 
@@ -77,4 +83,4 @@ jobs:
           title: ${{ steps.describe.outputs.title }}
           body-path: ${{ runner.temp }}/pr-body.md
           add-paths: |
-            db/arabterm.sql
+            db/arabterm.sql.gz

@@ -29,9 +29,9 @@ jobs:
       with:
         filters: |
           data:
-            - 'db/arabterm.sql'
+            - 'db/arabterm.sql.gz'
           code:
-            - '!db/arabterm.sql'
+            - '!db/arabterm.sql.gz'
             - '!**/*.md'
             - '!gadget/**'
             - '!.github/workflows/gadget.yml'
@@ -116,8 +116,9 @@ jobs:
           cd ~/wikitermbase
           git pull --ff-only origin main
 
-          echo "[DB] Importing db/arabterm.sql"
-          mariadb --defaults-file="$HOME/replica.my.cnf" -h tools.db.svc.wikimedia.cloud s55953__arabterm < db/arabterm.sql
+          echo "[DB] Importing db/arabterm.sql.gz"
+          gzip -t db/arabterm.sql.gz
+          gunzip -c db/arabterm.sql.gz | mariadb --defaults-file="$HOME/replica.my.cnf" -h tools.db.svc.wikimedia.cloud s55953__arabterm
 
           echo "[DB] Import complete"
           EOF

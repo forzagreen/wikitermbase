@@ -2,6 +2,10 @@
 .ruff_cache/
 toolforge_env.json
 
+# The dump is committed gzipped (db/arabterm.sql.gz); these are local copies
+db/arabterm.sql
+db/arabterm.sql.gz.tmp
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

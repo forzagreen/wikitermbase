@@ -203,7 +203,7 @@ toolforge webservice buildservice restart
 
 ## Database: MariaDB
 
-Data lives in [forzagreen/arabterm](https://github.com/forzagreen/arabterm) — that's the source of truth and where dictionary edits happen. When a PR touching `db/mariadb/arabterm.sql.gz` is merged to arabterm's `main`, the cross-repo CI flow auto-opens a PR here with the regenerated `db/arabterm.sql`; merging that PR triggers the production DB import (see "Updating the Database" below). For the upstream dump-generation workflow (`make init_mariadb`, `make migrate_to_mariadb`, `make dump`), see arabterm's README.
+Data lives in [forzagreen/arabterm](https://github.com/forzagreen/arabterm) — that's the source of truth and where dictionary edits happen. When a PR touching `db/mariadb/arabterm.sql.gz` is merged to arabterm's `main`, the cross-repo CI flow auto-opens a PR here with the regenerated `db/arabterm.sql.gz`; merging that PR triggers the production DB import (see "Updating the Database" below). For the upstream dump-generation workflow (`make init_mariadb`, `make migrate_to_mariadb`, `make dump`), see arabterm's README.
 
 ### MariaDB on Toolforge
 
@@ -223,7 +223,7 @@ DB imports are automated. The flow is:
 
 1. Update data in [forzagreen/arabterm](https://github.com/forzagreen/arabterm) and merge to `main`. When `db/mariadb/arabterm.sql.gz` changes, arabterm's `notify-wikitermbase.yml` dispatches an event to this repo.
 2. wikitermbase's `refresh-dump.yml` runs `make download_dump && make fix_dump` and opens a PR titled `chore: refresh DB dump — <arabterm commit subject>`. Its description quotes the arabterm commit message and a summary of the data changes (dictionaries and terms added, removed or modified), both sent by arabterm with the event.
-3. Review the diff to `db/arabterm.sql` and merge. CI's `deploy-db` job SSHs into the bastion and runs `mariadb ... < db/arabterm.sql` automatically.
+3. Review and merge. The dump is committed gzipped (unpacked, it is over GitHub's limit of 100 MB per file), so the PR shows no diff of it: its description gives the data summary and the number of SQL lines added and removed. For the full diff, check the branch out and run `diff <(git show main:db/arabterm.sql.gz | gunzip -c) <(gunzip -c db/arabterm.sql.gz)`. CI's `deploy-db` job SSHs into the bastion and runs `gunzip -c db/arabterm.sql.gz | mariadb ...` automatically.
 4. CI's `wikidata-stats` job then copies the new counts from `/api/v1/stats` to the Wikidata item [Q133800945](https://www.wikidata.org/wiki/Q133800945) (P4876 = terms, P2670 dictionary + P1114 = dictionaries), which [the project page](https://ar.wikipedia.org/wiki/ويكيبيديا:مسرد_الويكي) displays. It needs the `WIKIDATA_USERNAME` / `WIKIDATA_PASSWORD` secrets, a [bot password](https://www.wikidata.org/wiki/Special:BotPasswords) with the "Edit existing pages" grant, stored in the `wikidata` environment (Settings → Environments), which only `main` may use. Preview the edit locally with `uv run python backend/wikidata_stats.py --dry-run`.
 
 Manual triggers:
@@ -234,7 +234,7 @@ Manual triggers:
   ```sh
   ssh toolforge && become wikitermbase
   cd ~/wikitermbase
-  mariadb --defaults-file=$HOME/replica.my.cnf -h tools.db.svc.wikimedia.cloud s55953__arabterm < db/arabterm.sql
+  gunzip -c db/arabterm.sql.gz | mariadb --defaults-file=$HOME/replica.my.cnf -h tools.db.svc.wikimedia.cloud s55953__arabterm
   ```
 
 

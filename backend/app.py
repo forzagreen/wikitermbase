@@ -1118,10 +1118,12 @@ def search_aggregated(
 def list_dicts():
     """Return every dictionary in the database with its full metadata.
 
+    Dictionaries are sorted by descending `id`, the most recently added first.
+
     Use the `id` of a dictionary to map `dictionary_id` values returned by the
     search endpoints back to a human-readable source name.
     """
-    result = execute_with_retry(text("SELECT * FROM dictionary"))
+    result = execute_with_retry(text("SELECT * FROM dictionary ORDER BY id DESC"))
     dictionaries = [
         {**row, "arabterm_url": arabterm_url(row.get("name_tech"))}
         for row in result.mappings().all()

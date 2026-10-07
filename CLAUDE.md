@@ -30,7 +30,7 @@ make fix_dump         # Fix SQL dump compatibility issues, in the gzipped file
 - `/api/v1/search?q=<term>` - Raw search results
 - `/api/v1/search/aggregated?q=<term>` - Results grouped by normalized Arabic term. Optional `limit` (1–100) / `offset` page the groups; `number_groups` is always the total. **No `limit` returns every group** — keep it that way: on-wiki gadget copies that predate pagination send only `q`. Pagination is applied after grouping and is stateless (each page re-runs the query); don't move it into SQL, relevance ties are too massive (see [docs/ideas/search-robustness.md](docs/ideas/search-robustness.md)).
 - Both search endpoints reject `q` longer than `MAX_QUERY_LENGTH` (256) with a 422: InnoDB answers phrases over 128 words with a 500 ("Too many words in a FTS phrase"), which pasted articles used to trigger. The gadget and the UI cap the typed text at 200 (the quotes they add must still fit).
-- `/api/v1/dicts` - List all dictionaries
+- `/api/v1/dicts` - List all dictionaries, most recently added first (`ORDER BY id DESC`); the `/dictionaries` page shows them in that order
 - `/api/v1/stats` - Database statistics
 - `/docs` and `/redoc` - Auto-generated OpenAPI docs
 

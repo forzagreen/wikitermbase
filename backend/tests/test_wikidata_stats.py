@@ -9,6 +9,7 @@ from wikidata_stats import (
     DICTIONARY,
     ITEM,
     MAXLAG_WAIT,
+    RETRY_WAIT,
     STATS_URL,
     build_statements,
     item_snak,
@@ -91,6 +92,12 @@ def test_build_statements_creates_missing_ones():
         assert s["rank"] == "normal"
 
 
+def request_params(request):
+    return dict(request.url.params) | {
+        k: v[0] for k, v in parse_qs(request.content.decode()).items()
+    }
+
+
 class FakeWikis:
     """Serves the stats endpoint and just enough of the Wikidata API."""
 
@@ -99,14 +106,14 @@ class FakeWikis:
         self.stats = stats
         self.edit_error = edit_error
         self.actions = []
+        self.requests = []
         self.edit = None
 
     def __call__(self, request):
         if str(request.url) == STATS_URL:
             return httpx.Response(200, json=self.stats)
-        params = dict(request.url.params) | {
-            k: v[0] for k, v in parse_qs(request.content.decode()).items()
-        }
+        params = request_params(request)
+        self.requests.append(params)
         action = params.get("action")
         self.actions.append(f"{params['type']}token" if action == "query" else action)
         if action == "wbgetentities":
@@ -151,6 +158,8 @@ def test_sync_edits_both_statements_in_one_revision():
     assert fake.edit["assert"] == "user"
     sent = json.loads(fake.edit["data"])["claims"]
     assert [s["id"] for s in sent] == [f"{ITEM}$terms", f"{ITEM}$dicts"]
+    # maxlag is for the edit only: reads, tokens and login must not wait on it.
+    assert [r.get("maxlag") for r in fake.requests] == [None] * 4 + ["5"]
 
 
 def test_sync_dry_run_does_not_log_in():
@@ -176,14 +185,14 @@ def test_sync_reports_why_an_edit_was_refused():
 
 
 class LaggingWikis(FakeWikis):
-    """Answers the first `lagging` Wikidata requests with a maxlag error."""
+    """Answers the first `lagging` requests sent with maxlag with a maxlag error."""
 
     def __init__(self, item_claims, lagging):
         super().__init__(item_claims)
         self.lagging = lagging
 
     def __call__(self, request):
-        if str(request.url) != STATS_URL and self.lagging:
+        if "maxlag" in request_params(request) and self.lagging:
             self.lagging -= 1
             error = {
                 "code": "maxlag",
@@ -203,13 +212,52 @@ def slept(monkeypatch):
 
 
 def test_sync_waits_out_maxlag(slept):
-    fake = LaggingWikis(claims(509871, 85), lagging=20)
+    fake = LaggingWikis(claims(500000, 85), lagging=20)
     assert run(fake) == 0
-    assert fake.actions == ["wbgetentities"]
+    assert fake.actions[-1] == "wbeditentity"
+    assert fake.edit["maxlag"] == "5"
     assert sum(slept) == 100
 
 
-def test_sync_gives_up_when_wikidata_keeps_lagging(slept):
-    with pytest.raises(RuntimeError, match="still lagging after 600 s"):
-        run(LaggingWikis(claims(509871, 85), lagging=1000))
+def test_sync_edits_without_maxlag_when_wikidata_keeps_lagging(slept):
+    fake = LaggingWikis(claims(500000, 85), lagging=1000)
+    assert run(fake) == 0
+    assert "maxlag" not in fake.edit
     assert sum(slept) == MAXLAG_WAIT
+
+
+def test_sync_does_not_wait_on_maxlag_when_up_to_date(slept):
+    fake = LaggingWikis(claims(509871, 85), lagging=1000)
+    assert run(fake) == 0
+    assert slept == []
+
+
+class RateLimitedWikis(FakeWikis):
+    """Answers the first `limited` Wikidata requests with a 429."""
+
+    def __init__(self, item_claims, limited):
+        super().__init__(item_claims)
+        self.limited = limited
+
+    def __call__(self, request):
+        if str(request.url) != STATS_URL and self.limited:
+            self.limited -= 1
+            return httpx.Response(
+                429,
+                text="You are making too many requests",
+                headers={"Retry-After": "29"},
+            )
+        return super().__call__(request)
+
+
+def test_sync_retries_after_rate_limit(slept):
+    fake = RateLimitedWikis(claims(500000, 85), limited=3)
+    assert run(fake) == 0
+    assert fake.actions[-1] == "wbeditentity"
+    assert slept == [29, 29, 29]
+
+
+def test_sync_gives_up_when_rate_limited_for_too_long(slept):
+    with pytest.raises(httpx.HTTPStatusError):
+        run(RateLimitedWikis(claims(500000, 85), limited=1000))
+    assert sum(slept) <= RETRY_WAIT

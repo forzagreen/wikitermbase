@@ -52,7 +52,7 @@ The deployed version in Arabic Wikipedia:
 
 Files in [gadget/](gadget/):
 - [Gadget-WikiTerm.js](gadget/Gadget-WikiTerm.js) and [Gadget-WikiTerm.css](gadget/Gadget-WikiTerm.css) are the main gadget, copied verbatim to the `MediaWiki:` pages above.
-- [Gadget-WikiTermSelection.js](gadget/Gadget-WikiTermSelection.js) is the optional companion gadget that triggers term lookup directly from text selected in an editing surface using a keyboard shortcut (`Ctrl+Shift+K`).
+- [Gadget-WikiTermSelection.js](gadget/Gadget-WikiTermSelection.js) is the optional companion gadget that triggers term lookup directly from text selected in an editing surface using a keyboard shortcut (`Ctrl+Alt+A`, or `⌥⌘A` on macOS).
 - [SearchTerm.js](gadget/SearchTerm.js) is the [user script](https://en.wikipedia.org/wiki/Wikipedia:User_scripts) variant used for development: the same body as the gadget wrapped in `mw.loader.using( [ 'mediawiki.util' ] )` (only the wrapper lines differ). Run `npm run sync` after editing the gadget so both stay in sync.
 - [tests/sync.js](gadget/tests/sync.js) synchronizes `SearchTerm.js` automatically by extracting the gadget body from `Gadget-WikiTerm.js`.
 
@@ -76,7 +76,7 @@ The primary gadget is meant to be enabled by default (see the [default-gadget cr
   - Content Translation segments (`.cx-segment`)
 - **Two-phase trigger sequence**:
   1. `mouseup`: The user completes a mouse selection inside an allowed editing surface. This only *arms* the shortcut and checks `!selection.isCollapsed` — it does not read the selected text.
-  2. `keydown` (`Ctrl + Alt + W`): Fired while still focused in the surface. Only then is the selection text read and passed to `mw.libs.wikiTerm.openDialog(text)`.
+  2. `keydown` (`Ctrl + Alt + A`, or `Option + Command + A` on macOS): Fired while still focused in the surface. Only then is the selection text read and passed to `mw.libs.wikiTerm.openDialog(text)`.
 - **Scope & privacy**: Outside allowed editing surfaces, listeners bail out immediately without touching `window.getSelection()`. Starting a new mouse gesture (`mousedown`) disarms the shortcut until a fresh `mouseup` re-arms it, ensuring stale selections are never reused.
 
 ### Recommended Gadget Definitions

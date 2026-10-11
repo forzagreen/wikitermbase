@@ -6,7 +6,8 @@
  *
  * Trigger sequence:
  *   1. mouseup arms the shortcut after a non-collapsed mouse selection.
- *   2. keydown (Ctrl + Alt + W) opens the WikiTerm dialog with the selection.
+ *   2. keydown (Ctrl + Alt + A, or Option + Command + A on macOS) opens the
+ *      WikiTerm dialog with the selection.
  * Both steps are required and must occur in an allowed editing surface.
  * A new mousedown disarms any previous selection.
  *
@@ -27,7 +28,12 @@
 	];
 	const ALLOWED_SELECTOR = ALLOWED_SELECTORS.join( ',' );
 
-	const SHORTCUT = { ctrlKey: true, shiftKey: false, altKey: true, metaKey: false, key: 'KeyW' };
+	// Ctrl+Alt+A, or Option+Command+A on macOS. "A" is the one letter that is
+	// free with these modifiers everywhere the gadget runs: MediaWiki has no
+	// access key "a" (macOS browsers trigger access keys with Control+Option,
+	// so Ctrl+Alt+W toggled "watch" there), and neither VisualEditor,
+	// CodeMirror, WikiEditor nor Chrome, Firefox, Safari and Edge bind it.
+	const SHORTCUT_KEY_CODE = 65; // A
 	// The dependency name Gadget-WikiTerm.js is registered under; adjust to
 	// match the actual gadget/module name if it differs on this wiki.
 	const WIKITERM_MODULE = 'ext.gadget.WikiTerm';
@@ -57,11 +63,13 @@
 	}
 
 	function matchesShortcut( e ) {
-		return e.ctrlKey === SHORTCUT.ctrlKey &&
-            e.shiftKey === SHORTCUT.shiftKey &&
-            e.altKey === SHORTCUT.altKey &&
-            e.metaKey === SHORTCUT.metaKey &&
-            e.code === SHORTCUT.key;
+		// Alt with exactly one of Ctrl and Cmd: Ctrl+Alt+A on every system, and
+		// Option+Command+A, the form Mac users expect.
+		return e.altKey && !e.shiftKey && e.ctrlKey !== e.metaKey &&
+			// keyCode rather than e.key, which is "ش" on an Arabic layout and
+			// "å" once Option is held on macOS, or e.code, which names the
+			// QWERTY position and so is the key labelled Q on AZERTY keyboards.
+			e.keyCode === SHORTCUT_KEY_CODE;
 	}
 
 	function onKeyDown( e ) {
@@ -88,6 +96,12 @@
 		e.preventDefault();
 		e.stopPropagation();
 
+		if ( mw.libs.wikiTerm ) {
+			// Already running, possibly as a user script: loading the gadget
+			// module as well would add a second icon to the page.
+			mw.libs.wikiTerm.openDialog( text );
+			return;
+		}
 		mw.loader.using( WIKITERM_MODULE ).then( () => {
 			mw.libs.wikiTerm.openDialog( text );
 		}, ( err ) => {

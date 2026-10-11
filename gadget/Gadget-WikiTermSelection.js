@@ -96,6 +96,12 @@
 		e.preventDefault();
 		e.stopPropagation();
 
+		if ( mw.libs.wikiTerm ) {
+			// Already running, possibly as a user script: loading the gadget
+			// module as well would add a second icon to the page.
+			mw.libs.wikiTerm.openDialog( text );
+			return;
+		}
 		mw.loader.using( WIKITERM_MODULE ).then( () => {
 			mw.libs.wikiTerm.openDialog( text );
 		}, ( err ) => {

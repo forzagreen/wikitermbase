@@ -226,6 +226,8 @@ def search_terms_mariadb(
             d.wikidata_id as dictionary_wikidata_id,
             d.dict_type as dictionary_dict_type,
             d.tier as dictionary_tier,
+            d.archive_org_url as dictionary_archive_org_url,
+            d.page_offset as dictionary_page_offset,
             MATCH(t.arabic, t.english, t.french, t.description)
             AGAINST(:query IN NATURAL LANGUAGE MODE) as relevance
         FROM term t
@@ -242,10 +244,40 @@ def search_terms_mariadb(
     excluded_fields = {"created_at", "updated_at"}
     if (not include_descriptions) or DISABLE_DESCRIPTIONS:
         excluded_fields.add("description")
-    return [
+    terms = [
         {k: v for k, v in row.items() if k not in excluded_fields and v is not None}
         for row in results
     ]
+    # The scan's URL and offset are only needed to build `page_url`; they
+    # would repeat the same two values in every row of a dictionary.
+    for term in terms:
+        page_url = archive_page_url(
+            term.pop("dictionary_archive_org_url", None),
+            term.pop("dictionary_page_offset", None),
+            term.get("page"),
+        )
+        if page_url:
+            term["page_url"] = page_url
+    return terms
+
+
+def archive_page_url(
+    archive_org_url: str | None, page_offset: int | None, page: int | None
+) -> str | None:
+    """Link to the printed `page` in a dictionary's archive.org scan.
+
+    archive.org numbers the pages of the file from 0 (`n0` is the first page)
+    and printed page p is page p + page_offset of the file (Wikidata's "file
+    page offset", P8330), so the page is `n{p + page_offset - 1}`. The Cite Q
+    module on Arabic Wikipedia builds the same link for {{استشهاد بويكي بيانات}}.
+    None when the dictionary has no scan or no offset, or the term no page.
+    """
+    if not archive_org_url or page_offset is None or page is None:
+        return None
+    n = page + page_offset - 1
+    if n < 0:
+        return archive_org_url
+    return f"{archive_org_url}/page/n{n}/mode/1up"
 
 
 # Each dictionary has a browsable page on the arabterm GitHub Pages site,
@@ -898,6 +930,13 @@ class TermResult(BaseModel):
     english: str | None = None
     french: str | None = None
     description: str | None = None
+    page: int | None = Field(
+        None, description="Printed page of the term in the paper dictionary."
+    )
+    page_url: str | None = Field(
+        None,
+        description="The `page` in the dictionary's scan on archive.org, when it has one.",
+    )
     relevance: float
     dictionary_name_arabic: str
     dictionary_name_tech: str | None = None
@@ -951,6 +990,13 @@ class Dictionary(BaseModel):
     wikidata_id: str | None = None
     dict_type: str | None = None
     tier: int | None = None
+    archive_org_url: str | None = Field(
+        None, description="Scan of the paper dictionary on archive.org."
+    )
+    page_offset: int | None = Field(
+        None,
+        description="Printed page p is page p + page_offset of the scan (Wikidata P8330).",
+    )
     arabterm_url: str | None = None
 
 

@@ -8,6 +8,7 @@ from app import (
     aggregate_terms,
     app,
     arabterm_url,
+    archive_page_url,
     expand_query,
     fulltext_query,
     normalise_arabic,
@@ -16,6 +17,7 @@ from app import (
     paginate_groups,
     query_match_rank,
     query_matches_term,
+    search_terms_mariadb,
     singular_candidates,
     spelling_candidates,
     split_translations,
@@ -314,6 +316,93 @@ def test_arabterm_url():
     )
     assert arabterm_url(None) is None
     assert arabterm_url("") is None
+
+
+@pytest.mark.parametrize(
+    "archive_org_url, page_offset, page, expected",
+    [
+        # Printed page 5 of a scan with 120 pages of front matter: file page
+        # 125, which archive.org numbers n124.
+        (
+            "https://archive.org/details/Ara1989ENFRAR",
+            120,
+            5,
+            "https://archive.org/details/Ara1989ENFRAR/page/n124/mode/1up",
+        ),
+        # A negative offset: the scan lacks the first printed pages.
+        (
+            "https://archive.org/details/DAM2015ENAR",
+            -3,
+            7,
+            "https://archive.org/details/DAM2015ENAR/page/n3/mode/1up",
+        ),
+        # One volume (file) of a multi-volume item.
+        (
+            "https://archive.org/details/DBS1982ENAR/1-%20vol",
+            44,
+            1,
+            "https://archive.org/details/DBS1982ENAR/1-%20vol/page/n44/mode/1up",
+        ),
+        # A page before the start of the file: the scan itself.
+        (
+            "https://archive.org/details/X",
+            -3,
+            1,
+            "https://archive.org/details/X",
+        ),
+        ("https://archive.org/details/X", None, 5, None),
+        (None, 0, 5, None),
+        ("https://archive.org/details/X", 0, None, None),
+    ],
+)
+def test_archive_page_url(archive_org_url, page_offset, page, expected):
+    assert archive_page_url(archive_org_url, page_offset, page) == expected
+
+
+class FakeResult:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def mappings(self):
+        return self
+
+    def all(self):
+        return self.rows
+
+
+def test_search_terms_links_pages_to_the_scan(monkeypatch):
+    common = {"relevance": 1.0, "created_at": None, "updated_at": None}
+    rows = [
+        {
+            "id": 1,
+            "english": "telescope",
+            "page": 5,
+            "dictionary_archive_org_url": "https://archive.org/details/Ara1989ENFRAR",
+            "dictionary_page_offset": 120,
+            **common,
+        },
+        # A paper dictionary without a scan.
+        {
+            "id": 2,
+            "english": "telescope",
+            "page": 12,
+            "dictionary_archive_org_url": None,
+            "dictionary_page_offset": None,
+            **common,
+        },
+    ]
+    monkeypatch.setattr(
+        "app.execute_with_retry", lambda query, params=None: FakeResult(rows)
+    )
+    first, second = search_terms_mariadb('"telescope"')
+    assert first["page_url"] == (
+        "https://archive.org/details/Ara1989ENFRAR/page/n124/mode/1up"
+    )
+    assert "page_url" not in second
+    # Only page_url reaches the response, not what it was built from.
+    for term in (first, second):
+        assert "dictionary_archive_org_url" not in term
+        assert "dictionary_page_offset" not in term
 
 
 def test_query_matches_term_exact_arabic_part():

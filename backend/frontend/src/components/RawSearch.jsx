@@ -207,7 +207,19 @@ const RawSearch = () => {
                 {item.page && (
                   <>
                     <span>•</span>
-                    <span>ص. {item.page}</span>
+                    {item.page_url ? (
+                      <a
+                        href={item.page_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                        title="افتح الصفحة في النسخة المصوّرة (archive.org)"
+                      >
+                        ص. {item.page}
+                      </a>
+                    ) : (
+                      <span>ص. {item.page}</span>
+                    )}
                   </>
                 )}
                 {item.dictionary_wikidata_id && (

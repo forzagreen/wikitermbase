@@ -202,8 +202,24 @@ const DictionaryApp = () => {
       )
     );
 
+    // The page links to that page of the dictionary's scan on archive.org,
+    // when the API has one (`page_url`).
     if (occurrence.page) {
-      parts.push(`ص. ${occurrence.page}`);
+      parts.push(
+        occurrence.page_url ? (
+          <a
+            href={occurrence.page_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
+            title="افتح الصفحة في النسخة المصوّرة (archive.org)"
+          >
+            ص. {occurrence.page}
+          </a>
+        ) : (
+          `ص. ${occurrence.page}`
+        )
+      );
     }
     
     if (occurrence.dictionary_wikidata_id) {

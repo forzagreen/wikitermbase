@@ -7,7 +7,7 @@
 // counts as news, and how "seen" is remembered, is in ../whatsNew.js.
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router';
-import { Sparkles, X } from 'lucide-react';
+import { ArrowLeft, Sparkles, X } from 'lucide-react';
 import { FEATURES, useWhatsNew } from '../whatsNew';
 
 // "أكتوبر 2026": Arabic month name, Western digits like the rest of the site.
@@ -153,6 +153,16 @@ const WhatsNew = () => {
                 <h3 className="font-semibold text-gray-800 dark:text-gray-100">{f.title}</h3>
                 <p className="text-xs text-gray-400 dark:text-gray-500">{formatMonth(f.date)}</p>
                 <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{f.body}</p>
+                {f.link && (
+                  <Link
+                    to={f.link.to}
+                    onClick={close}
+                    className="mt-1.5 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    {f.link.label}
+                    <ArrowLeft size={14} />
+                  </Link>
+                )}
                 {f.Media && <f.Media />}
               </section>
             ))}

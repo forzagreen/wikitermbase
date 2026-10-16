@@ -8,7 +8,8 @@
 //    plain Arabic, no code or version talk. The entries are shown newest
 //    first; drop an entry once it is a few months old, the list is meant to
 //    stay short. `Media` is an optional component shown under the text,
-//    e.g. a small animation of the feature.
+//    e.g. a small animation of the feature; `link` an optional page of the
+//    site to open from the entry.
 //
 //  * Dictionaries: not listed here at all. The panel compares the dictionary
 //    ids the API returns with the largest one the visitor has seen, so a new
@@ -32,6 +33,14 @@ export const FEATURES = [
     body:
       'في المعاجم الورقية صار رقم الصفحة (ص. 412) رابطًا: اضغط عليه لتفتح الصفحة نفسها من النسخة المصوّرة للمعجم على archive.org، فتتحقّق من المصطلح في مصدره مباشرة.',
     Media: PageLinkDemo,
+  },
+  {
+    id: 'tools-page',
+    date: '2026-09-14',
+    title: 'صفحة منظومة حوسبة اللغة العربية',
+    body:
+      'مسرد الويكي جزء من منظومة أدوات مفتوحة المصدر لحوسبة اللغة العربية: محلّل صرفي، ومصرّف أفعال يمكنك تجربته في الصفحة نفسها، وجداول تصريف، وأداة لمراجعة المعاني. صفحة واحدة تجمعها كلّها.',
+    link: { to: '/tools', label: 'استعرض الأدوات' },
   },
 ];
 

@@ -8,6 +8,7 @@ import { Link, NavLink } from 'react-router';
 import { BookOpen, Wrench, HelpCircle } from 'lucide-react';
 import Logo from './Logo';
 import ThemeToggle from './ThemeToggle';
+import WhatsNew from './WhatsNew';
 import { WIKI_GADGET_URL } from '../siteLinks';
 
 const NAV_ITEMS = [
@@ -41,6 +42,7 @@ const SiteHeader = ({ title }) => (
               <span className="hidden sm:inline">{label}</span>
             </NavLink>
           ))}
+          <WhatsNew />
           <a
             href={WIKI_GADGET_URL}
             target="_blank"

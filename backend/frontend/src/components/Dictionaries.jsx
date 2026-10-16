@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { ExternalLink, BookOpen } from 'lucide-react';
 import SiteHeader from './SiteHeader';
 import SiteFooter from './SiteFooter';
+import { fetchDicts, fetchStats } from '../api';
 
 const Dictionaries = () => {
   const [dictionaries, setDictionaries] = useState([]);
@@ -13,30 +14,17 @@ const Dictionaries = () => {
   // Total term count comes from /api/v1/stats (same source as the home
   // page), so the two numbers always agree; failure just shows '-'.
   useEffect(() => {
-    fetch('/api/v1/stats')
-      .then((r) => (r.ok ? r.json() : null))
+    fetchStats()
       .then(setStats)
       .catch(() => setStats(null));
   }, []);
 
   // Fetch dictionaries on mount
   useEffect(() => {
-    const fetchDictionaries = async () => {
-      try {
-        const response = await fetch('/api/v1/dicts');
-        if (!response.ok) {
-          throw new Error('حدث خطأ في تحميل المعاجم');
-        }
-        const data = await response.json();
-        setDictionaries(data.dictionaries || []);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDictionaries();
+    fetchDicts()
+      .then(setDictionaries)
+      .catch(() => setError('حدث خطأ في تحميل المعاجم'))
+      .finally(() => setLoading(false));
   }, []);
 
   const themeClasses = 'bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white';

@@ -4,7 +4,9 @@ import { Link } from 'react-router';
 import { Search, ExternalLink, ChevronDown, ChevronUp, Quote, Copy, Check, BookOpen, Wrench, ArrowLeft } from 'lucide-react';
 import SiteHeader from './SiteHeader';
 import SiteFooter from './SiteFooter';
+import GroupedCitation from './GroupedCitation';
 import { fetchStats } from '../api';
+import { citationTemplate, groupCitations } from '../citations';
 
 const formatNumber = (num) =>
   num === null || num === undefined ? '…' : num.toLocaleString('en-US');
@@ -258,12 +260,8 @@ const DictionaryApp = () => {
                     className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 transition-colors"
                     onClick={async (e) => {
                       e.stopPropagation();
-                      const citation = occurrence.page 
-                        ? `{{استشهاد بويكي بيانات|${occurrence.dictionary_wikidata_id}|ص=${occurrence.page}}}`
-                        : `{{استشهاد بويكي بيانات|${occurrence.dictionary_wikidata_id}}}`;
-                      
                       try {
-                        await navigator.clipboard.writeText(citation);
+                        await navigator.clipboard.writeText(citationTemplate(occurrence));
                         setCopiedId(occurrence.id);
                         setTimeout(() => setCopiedId(null), 2000);
                       } catch (err) {
@@ -285,10 +283,7 @@ const DictionaryApp = () => {
                   </button>
                 </div>
                 <div className="bg-gray-50 dark:bg-gray-900 p-2 rounded text-sm font-mono text-gray-800 dark:text-gray-200 overflow-x-auto border border-gray-100 dark:border-gray-700 break-all">
-                  {occurrence.page 
-                    ? `{{استشهاد بويكي بيانات|${occurrence.dictionary_wikidata_id}|ص=${occurrence.page}}}`
-                    : `{{استشهاد بويكي بيانات|${occurrence.dictionary_wikidata_id}}}`
-                  }
+                  {citationTemplate(occurrence)}
                 </div>
               </div>
             )}
@@ -487,6 +482,8 @@ const DictionaryApp = () => {
         {results.map((group, index) => {
           // Elected by the API over all the groups of the query (at most one).
           const isTopResult = group.suggested === true;
+          const citations = groupCitations(group.occurences);
+          const groupPopupId = `group-${index}`;
 
           return (
           <div key={index} className={`${cardClasses} rounded-lg mb-6 p-6 ${isTopResult ? 'border-2 border-blue-500' : ''}`}>
@@ -527,12 +524,21 @@ const DictionaryApp = () => {
                 <p className="text-gray-500">
                   {formatDictionaryCount(group.occurences)}
                 </p>
-                <button
-                  onClick={() => toggleGroup(index)}
-                  className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                >
-                  {expandedGroups[index] ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                </button>
+                <div className="flex items-center gap-4">
+                  {citations.length > 1 && (
+                    <GroupedCitation
+                      citations={citations}
+                      open={openPopupId === groupPopupId}
+                      onToggle={() => setOpenPopupId(openPopupId === groupPopupId ? null : groupPopupId)}
+                    />
+                  )}
+                  <button
+                    onClick={() => toggleGroup(index)}
+                    className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                  >
+                    {expandedGroups[index] ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                  </button>
+                </div>
               </div>
               
               {expandedGroups[index] && group.occurences.map((occurrence, occIndex) => (

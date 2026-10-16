@@ -38,6 +38,8 @@
 	// devices and nobody reads past the first few dozen anyway.
 	const PAGE_SIZE = 30;
 	const DESCRIPTION_LIMIT = 200;
+	// Module:ترقيم استشهادات numbers 20 citations and silently drops the rest.
+	const MAX_GROUPED_CITATIONS = 20;
 	const USER_CONFIG = window.wikiTermConfig || {};
 
 	// Loaded on demand (first click), never at page load.
@@ -88,12 +90,30 @@
 		return '{{استشهاد بويكي بيانات|' + wikidataId + '}}';
 	}
 
-	function createGroupedCitationTemplate( terms ) {
-		const citations = terms.map( ( term, index ) => {
-			return '|م' + ( index + 1 ) + '=' + createCitationTemplate( term );
+	// The citable entries of a result group: one per dictionary and page, in
+	// the order they are listed (a dictionary can list a term twice on a page).
+	function groupCitations( terms ) {
+		const seen = new Set();
+		const citations = [];
+		terms.forEach( ( term ) => {
+			const template = createCitationTemplate( term );
+			if ( term.dictionary_wikidata_id && !seen.has( template ) ) {
+				seen.add( template );
+				citations.push( { term: term, template: template } );
+			}
 		} );
+		return citations;
+	}
 
-		return '{{ترقيم استشهادات\n' + citations.join( '\n' ) + '\n}}';
+	// One {{ترقيم استشهادات}} reference numbering the given citations, in the
+	// style most articles use ([أ] [ب] [جـ] …). A single citation needs none.
+	function createGroupedCitationTemplate( templates ) {
+		if ( templates.length < 2 ) {
+			return templates.join( '' );
+		}
+		return '{{ترقيم استشهادات|نمط=محرف عربي\n' +
+			templates.map( ( template, i ) => '|م' + ( i + 1 ) + '=' + template ).join( '\n' ) +
+			'\n}}';
 	}
 
 	function translationSpan( langTag, text, cls ) {
@@ -352,35 +372,32 @@
 				$translations.append( translationSpan( 'FR', group.french_normalised, 'wikiterm-translation wikiterm-fr' ) );
 			}
 
-			const chevron = new OO.ui.IconWidget( { icon: 'expand', title: 'توسيع' } );
+			// The chevron is the disclosure button, for the keyboard and screen
+			// readers; the rest of the header is a larger target for the mouse.
+			// The header itself cannot be the button: it holds the grouped
+			// citation button, and buttons do not nest.
+			const chevron = new OO.ui.ButtonWidget( {
+				icon: 'expand',
+				label: 'توسيع',
+				invisibleLabel: true,
+				title: 'توسيع',
+				framed: false,
+				classes: [ 'wikiterm-expand-button' ]
+			} );
+			chevron.$button.attr( 'aria-expanded', 'false' );
 
-			// The whole header is one keyboard-operable disclosure button.
+			const citations = groupCitations( group.occurences );
 			const $header = $( '<div>' )
 				.addClass( 'wikiterm-result-header' )
-				.attr( { role: 'button', tabindex: 0, 'aria-expanded': 'false' } )
 				.append(
 					$( '<span>' ).addClass( 'wikiterm-arabic-term' ).text( group.arabic_normalised ),
 					$translations,
+					citations.length > 1 ? this.createGroupCitationButton( citations ) : null,
 					$( '<div>' ).addClass( 'wikiterm-dictionary-count' )
 						.text( formatDictionaryCount( group.dictionary_ids.length ) ),
 					chevron.$element
 				);
-
 			const $details = $( '<div>' ).addClass( 'wikiterm-result-details wikiterm-hidden' );
-
-			const $groupCitationBtn = new OO.ui.ButtonWidget( {
-				label: 'تجميع الاستشهادات',
-				icon: 'reference',
-				framed: false,
-				classes: [ 'wikiterm-group-citation-button' ]
-			} );
-
-			$groupCitationBtn.on( 'click', ( e ) => {
-				e.stopPropagation();
-				this.showGroupedCitationPopup( $groupCitationBtn.$element, group.occurences );
-			} );
-
-			$details.append( $groupCitationBtn.$element );
 			$card.append( $header, $details );
 
 			let expanded = false;
@@ -397,23 +414,37 @@
 					built = true;
 				}
 				$details.toggleClass( 'wikiterm-hidden', !expanded );
-				$header.attr( 'aria-expanded', String( expanded ) );
-				chevron.setIcon( expanded ? 'collapse' : 'expand' ).setTitle( expanded ? 'تصغير' : 'توسيع' );
+				chevron.setIcon( expanded ? 'collapse' : 'expand' )
+					.setLabel( expanded ? 'تصغير' : 'توسيع' )
+					.setTitle( expanded ? 'تصغير' : 'توسيع' );
+				chevron.$button.attr( 'aria-expanded', String( expanded ) );
 				this.updateSize();
 			};
+			chevron.on( 'click', toggle );
+			// OOUI buttons are links too, and handle their own clicks.
 			$header.on( 'click', ( e ) => {
 				if ( !$( e.target ).closest( 'a' ).length ) {
 					toggle();
 				}
 			} );
-			$header.on( 'keydown', ( e ) => {
-				if ( e.key === 'Enter' || e.key === ' ' ) {
-					e.preventDefault();
-					toggle();
-				}
-			} );
 
 			return $card;
+		};
+
+		// Cites the whole group at once, without opening it.
+		WikiTermDialog.prototype.createGroupCitationButton = function ( citations ) {
+			const button = new OO.ui.ButtonWidget( {
+				icon: 'reference',
+				label: 'تجميع الاستشهادات',
+				invisibleLabel: true,
+				title: 'تجميع الاستشهادات',
+				framed: false,
+				classes: [ 'wikiterm-group-citation-button' ]
+			} );
+			button.on( 'click', () => {
+				this.showGroupedCitationPopup( button.$element, citations );
+			} );
+			return button.$element;
 		};
 
 		WikiTermDialog.prototype.createVariantItem = function ( term ) {
@@ -477,7 +508,7 @@
 					classes: [ 'wikiterm-citation-button' ]
 				} );
 				citationBtn.on( 'click', () => {
-					this.showCitationPopup( citationBtn.$element, term );
+					this.showCitationPopup( citationBtn.$element, 'رمز الاستشهاد', createCitationTemplate( term ) );
 				} );
 				$dictInfo.append( citationBtn.$element );
 			}
@@ -532,14 +563,18 @@
 			return $description.append( $toggle );
 		};
 
-		WikiTermDialog.prototype.showCitationPopup = function ( $target, term ) {
+		// A popup below `$target` with read-only wikitext and a copy button,
+		// and `$extra`, if given, above the text. Returns a function replacing
+		// the text.
+		WikiTermDialog.prototype.showCitationPopup = function ( $target, title, text, $extra ) {
 			this.closeActivePopup();
-			const template = createCitationTemplate( term );
 
 			const textarea = new OO.ui.MultilineTextInputWidget( {
-				value: template,
+				value: text,
 				readOnly: true,
 				rows: 3,
+				autosize: true,
+				maxRows: 8,
 				classes: [ 'wikiterm-citation-text' ]
 			} );
 			const copyBtn = new OO.ui.ButtonWidget( {
@@ -561,14 +596,15 @@
 			};
 			copyBtn.on( 'click', () => {
 				if ( navigator.clipboard && navigator.clipboard.writeText ) {
-					navigator.clipboard.writeText( template ).then( onCopied, copyFallback );
+					navigator.clipboard.writeText( text ).then( onCopied, copyFallback );
 				} else {
 					copyFallback();
 				}
 			} );
 
 			const $content = $( '<div>' ).append(
-				new OO.ui.LabelWidget( { label: 'رمز الاستشهاد', classes: [ 'wikiterm-citation-title' ] } ).$element,
+				new OO.ui.LabelWidget( { label: title, classes: [ 'wikiterm-citation-title' ] } ).$element,
+				$extra,
 				textarea.$element,
 				$( '<div>' ).addClass( 'wikiterm-citation-actions' ).append( copyBtn.$element )
 			);
@@ -576,7 +612,8 @@
 				$content: $content,
 				$floatableContainer: $target,
 				padded: true,
-				width: 300,
+				// Phones are narrower than the grouped popup.
+				width: $extra ? Math.min( 400, window.innerWidth - 40 ) : 300,
 				align: 'forwards',
 				position: 'below',
 				autoClose: true,
@@ -590,74 +627,42 @@
 			setTimeout( () => {
 				textarea.focus().select();
 			}, 100 );
+
+			return ( newText ) => {
+				text = newText;
+				textarea.setValue( newText );
+				copyBtn.setDisabled( !newText );
+			};
 		};
 
-		WikiTermDialog.prototype.showGroupedCitationPopup = function ( $target, terms ) {
-			this.closeActivePopup();
-			const template = createGroupedCitationTemplate( terms );
-
-			const textarea = new OO.ui.MultilineTextInputWidget( {
-				value: template,
-				readOnly: true,
-				rows: 6,
-				classes: [ 'wikiterm-citation-text' ]
+		// The group's citations in one numbered reference. A checklist leaves
+		// some out; all are ticked at first, up to the template's limit.
+		WikiTermDialog.prototype.showGroupedCitationPopup = function ( $target, citations ) {
+			const checklist = new OO.ui.CheckboxMultiselectWidget( {
+				items: citations.map( ( citation, i ) => new OO.ui.CheckboxMultioptionWidget( {
+					data: citation.template,
+					label: ( citation.term.dictionary_name_arabic || 'قاموس' ) +
+						( citation.term.page ? '، ص. ' + citation.term.page : '' ),
+					selected: i < MAX_GROUPED_CITATIONS
+				} ) ),
+				classes: [ 'wikiterm-citation-checklist' ]
 			} );
-
-			const copyBtn = new OO.ui.ButtonWidget( {
-				label: 'نسخ',
-				icon: 'copy',
-				flags: [ 'progressive' ]
-			} );
-
-			const onCopied = () => {
-				copyBtn.setLabel( 'نُسِخت!' );
-				setTimeout( () => {
-					copyBtn.setLabel( 'نسخ' );
-				}, 2000 );
+			let $extra = checklist.$element;
+			if ( citations.length > MAX_GROUPED_CITATIONS ) {
+				$extra = $extra.add( $( '<div>' ).addClass( 'wikiterm-citation-note' )
+					.text( 'يجمع القالب ' + MAX_GROUPED_CITATIONS + ' استشهادًا على الأكثر.' ) );
+			}
+			const setText = this.showCitationPopup( $target, 'رمز الاستشهادات المجمّعة', '', $extra );
+			const update = () => {
+				const selected = checklist.findSelectedItemsData();
+				const full = selected.length >= MAX_GROUPED_CITATIONS;
+				checklist.getItems().forEach( ( item ) => {
+					item.setDisabled( full && !item.isSelected() );
+				} );
+				setText( createGroupedCitationTemplate( selected ) );
 			};
-
-			const copyFallback = () => {
-				textarea.select();
-				document.execCommand( 'copy' );
-				onCopied();
-			};
-
-			copyBtn.on( 'click', () => {
-				if ( navigator.clipboard && navigator.clipboard.writeText ) {
-					navigator.clipboard.writeText( template ).then( onCopied, copyFallback );
-				} else {
-					copyFallback();
-				}
-			} );
-
-			const $content = $( '<div>' ).append(
-				new OO.ui.LabelWidget( {
-					label: 'رمز الاستشهادات المجمعة',
-					classes: [ 'wikiterm-citation-title' ]
-				} ).$element,
-				textarea.$element,
-				$( '<div>' ).addClass( 'wikiterm-citation-actions' ).append( copyBtn.$element )
-			);
-
-			const popup = new OO.ui.PopupWidget( {
-				$content: $content,
-				$floatableContainer: $target,
-				padded: true,
-				width: 400,
-				align: 'forwards',
-				position: 'below',
-				autoClose: true,
-				head: false,
-				classes: [ 'wikiterm-citation-popup' ]
-			} );
-
-			this.$element.append( popup.$element );
-			popup.toggle( true );
-			this.activePopup = popup;
-
-			setTimeout( () => {
-				textarea.focus().select();
-			}, 100 );
+			checklist.on( 'select', update );
+			update();
 		};
 
 		WikiTermDialog.prototype.closeActivePopup = function () {

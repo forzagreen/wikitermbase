@@ -2,3 +2,46 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* The "what's new" demo (components/PageLinkDemo.jsx): one 6 s loop in which
+   the pointer comes in, clicks the page number, and the scan opens below. */
+.wn-demo {
+  --wn-highlight: rgb(219 234 254); /* blue-100 */
+}
+.dark .wn-demo {
+  --wn-highlight: rgb(30 58 138 / 0.6); /* blue-900 */
+}
+.wn-cursor {
+  animation: wn-cursor 6s ease-in-out infinite;
+}
+.wn-link {
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  animation: wn-link 6s linear infinite;
+}
+.wn-scan {
+  animation: wn-scan 6s ease-out infinite;
+}
+@keyframes wn-cursor {
+  0%, 8%    { opacity: 0; transform: translate(2.75rem, 2rem); }
+  16%       { opacity: 1; transform: translate(2.75rem, 2rem); }
+  32%, 36%  { opacity: 1; transform: translate(0, 0) scale(1); }
+  39%       { opacity: 1; transform: translate(0, 0) scale(0.8); }
+  42%, 84%  { opacity: 1; transform: translate(0, 0) scale(1); }
+  92%, 100% { opacity: 0; transform: translate(0, 0) scale(1); }
+}
+@keyframes wn-link {
+  0%, 38%   { background-color: transparent; text-decoration-color: transparent; }
+  40%, 88%  { background-color: var(--wn-highlight); text-decoration-color: currentColor; }
+  94%, 100% { background-color: transparent; text-decoration-color: transparent; }
+}
+@keyframes wn-scan {
+  0%, 42%   { opacity: 0; transform: translateY(0.4rem); }
+  50%, 88%  { opacity: 1; transform: none; }
+  96%, 100% { opacity: 0; transform: translateY(0.4rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wn-cursor { display: none; }
+  .wn-link { animation: none; text-decoration-color: currentColor; }
+  .wn-scan { animation: none; }
+}

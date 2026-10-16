@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 import { Search, ExternalLink, ChevronDown, ChevronUp, Quote, Copy, Check, BookOpen, Wrench, ArrowLeft } from 'lucide-react';
 import SiteHeader from './SiteHeader';
 import SiteFooter from './SiteFooter';
+import { fetchStats } from '../api';
 
 const formatNumber = (num) =>
   num === null || num === undefined ? '…' : num.toLocaleString('en-US');
@@ -114,8 +115,7 @@ const DictionaryApp = () => {
 
   // Counts for the landing cards; failure just leaves the placeholders.
   useEffect(() => {
-    fetch('/api/v1/stats')
-      .then((r) => (r.ok ? r.json() : null))
+    fetchStats()
       .then(setStats)
       .catch(() => setStats(null));
   }, []);

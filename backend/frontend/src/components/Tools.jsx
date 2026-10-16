@@ -11,6 +11,7 @@ import {
 import SiteHeader from './SiteHeader';
 import SiteFooter from './SiteFooter';
 import MaziniTryIt from './MaziniTryIt';
+import { fetchStats } from '../api';
 
 const formatNumber = (num) =>
   num === null || num === undefined ? '…' : num.toLocaleString('en-US');
@@ -236,8 +237,7 @@ const Tools = () => {
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
-    fetch('/api/v1/stats')
-      .then((r) => (r.ok ? r.json() : null))
+    fetchStats()
       .then(setStats)
       .catch(() => setStats(null));
   }, []);

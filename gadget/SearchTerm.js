@@ -412,9 +412,23 @@ mw.loader.using( [ 'mediawiki.util' ] ).then( () => {
 			$dictInfo.append( $dictName );
 
 			if ( term.page ) {
-				$dictInfo.append(
-					$( '<span>' ).addClass( 'wikiterm-dictionary-page' ).text( 'ص. ' + term.page )
-				);
+				const $page = $( '<span>' ).addClass( 'wikiterm-dictionary-page' );
+				// The page of the dictionary's scan on archive.org, when it has one.
+				if ( term.page_url ) {
+					$page.append(
+						$( '<a>' )
+							.attr( {
+								href: term.page_url,
+								target: '_blank',
+								rel: 'noopener',
+								title: 'افتح الصفحة في النسخة المصوّرة (archive.org)'
+							} )
+							.text( 'ص. ' + term.page )
+					);
+				} else {
+					$page.text( 'ص. ' + term.page );
+				}
+				$dictInfo.append( $page );
 			}
 
 			if ( term.dictionary_wikidata_id ) {

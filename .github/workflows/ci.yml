@@ -29,9 +29,9 @@ jobs:
       with:
         filters: |
           data:
-            - 'db/arabterm.sql'
+            - 'db/arabterm.sql.gz'
           code:
-            - '!db/arabterm.sql'
+            - '!db/arabterm.sql.gz'
             - '!**/*.md'
             - '!gadget/**'
             - '!.github/workflows/gadget.yml'
@@ -112,12 +112,44 @@ jobs:
           become wikitermbase bash << 'EOF'
           set -euo pipefail
 
-          echo "[DB] Pulling latest code from main"
+          echo "[DB] Syncing the checkout with main"
           cd ~/wikitermbase
-          git pull --ff-only origin main
+          # The checkout is a deploy mirror: match origin/main exactly, so that
+          # a leftover file (e.g. a dump downloaded by hand) can't block the
+          # update. Ignored files (var/) are kept.
+          git fetch origin main
+          git reset --hard origin/main
 
-          echo "[DB] Importing db/arabterm.sql"
-          mariadb --defaults-file="$HOME/replica.my.cnf" -h tools.db.svc.wikimedia.cloud s55953__arabterm < db/arabterm.sql
+          echo "[DB] Importing db/arabterm.sql.gz"
+          gzip -t db/arabterm.sql.gz
+          gunzip -c db/arabterm.sql.gz | mariadb --defaults-file="$HOME/replica.my.cnf" -h tools.db.svc.wikimedia.cloud s55953__arabterm
 
           echo "[DB] Import complete"
           EOF
+
+  wikidata-stats:
+    # Copy /api/v1/stats to Wikidata (Q133800945), where ويكيبيديا:مسرد_الويكي
+    # reads its figures. Runs after each DB import, and on "Run workflow" to
+    # re-sync by hand; waits for deploy-code so it doesn't hit the restart.
+    needs: [deploy-code, deploy-db]
+    if: |
+      !cancelled() && !contains(needs.*.result, 'failure') &&
+      github.ref == 'refs/heads/main' &&
+      (needs.deploy-db.result == 'success' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    # The Wikidata secrets live in this environment, which only main may use,
+    # so a workflow pushed on another branch can't read them.
+    environment: wikidata
+    concurrency:
+      group: wikidata-stats
+      cancel-in-progress: false
+    steps:
+    - uses: actions/checkout@v7
+    - uses: astral-sh/setup-uv@v10.1.0
+      with:
+        python-version: '3.13'
+    - run: make init
+    - run: make wikidata_stats
+      env:
+        WIKIDATA_USERNAME: ${{ secrets.WIKIDATA_USERNAME }}
+        WIKIDATA_PASSWORD: ${{ secrets.WIKIDATA_PASSWORD }}

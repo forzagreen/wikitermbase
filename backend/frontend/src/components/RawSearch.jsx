@@ -3,6 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { Search, ExternalLink, ChevronDown, ChevronUp, Link2, Loader2, Quote, Check, Copy } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 
+// The API rejects longer queries (a pasted paragraph is not a term).
+const MAX_QUERY_LENGTH = 200;
+
 const RawSearch = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -104,6 +107,7 @@ const RawSearch = () => {
             <input
               type="text"
               placeholder="ابحث عن مصطلح..."
+              maxLength={MAX_QUERY_LENGTH}
               className="w-full p-4 pl-12 text-lg rounded-lg border border-gray-300 dark:border-gray-600 
                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
                       dark:bg-gray-800 dark:text-white dark:placeholder-gray-400"
@@ -203,7 +207,19 @@ const RawSearch = () => {
                 {item.page && (
                   <>
                     <span>•</span>
-                    <span>ص. {item.page}</span>
+                    {item.page_url ? (
+                      <a
+                        href={item.page_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                        title="افتح الصفحة في النسخة المصوّرة (archive.org)"
+                      >
+                        ص. {item.page}
+                      </a>
+                    ) : (
+                      <span>ص. {item.page}</span>
+                    )}
                   </>
                 )}
                 {item.dictionary_wikidata_id && (

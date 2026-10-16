@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 import { Search, ExternalLink, ChevronDown, ChevronUp, Quote, Copy, Check, BookOpen, Wrench, ArrowLeft } from 'lucide-react';
 import SiteHeader from './SiteHeader';
 import SiteFooter from './SiteFooter';
+import { fetchStats } from '../api';
 
 const formatNumber = (num) =>
   num === null || num === undefined ? '…' : num.toLocaleString('en-US');
@@ -11,6 +12,8 @@ const formatNumber = (num) =>
 // Result groups fetched per request (same step as the on-wiki gadget). Broad
 // queries have thousands of groups; downloading them all took several seconds.
 const PAGE_SIZE = 30;
+// The API rejects longer queries (a pasted paragraph is not a term).
+const MAX_QUERY_LENGTH = 200;
 
 // Shown under the search box while it is empty: points first-time visitors
 // to the two other pages and fills what would otherwise be a blank screen.
@@ -112,8 +115,7 @@ const DictionaryApp = () => {
 
   // Counts for the landing cards; failure just leaves the placeholders.
   useEffect(() => {
-    fetch('/api/v1/stats')
-      .then((r) => (r.ok ? r.json() : null))
+    fetchStats()
       .then(setStats)
       .catch(() => setStats(null));
   }, []);
@@ -200,8 +202,24 @@ const DictionaryApp = () => {
       )
     );
 
+    // The page links to that page of the dictionary's scan on archive.org,
+    // when the API has one (`page_url`).
     if (occurrence.page) {
-      parts.push(`ص. ${occurrence.page}`);
+      parts.push(
+        occurrence.page_url ? (
+          <a
+            href={occurrence.page_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"
+            title="افتح الصفحة في النسخة المصوّرة (archive.org)"
+          >
+            ص. {occurrence.page}
+          </a>
+        ) : (
+          `ص. ${occurrence.page}`
+        )
+      );
     }
     
     if (occurrence.dictionary_wikidata_id) {
@@ -427,6 +445,7 @@ const DictionaryApp = () => {
             type="text"
             className={`w-full px-5 py-4 text-lg rounded-xl border shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${inputClasses}`}
             placeholder="ابحث عن مصطلح (بالإنجليزية أو الفرنسية أو العربية)..."
+            maxLength={MAX_QUERY_LENGTH}
             value={searchTerm}
             onChange={handleSearchInputChange}
           />

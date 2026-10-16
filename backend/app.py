@@ -226,6 +226,8 @@ def search_terms_mariadb(
             d.wikidata_id as dictionary_wikidata_id,
             d.dict_type as dictionary_dict_type,
             d.tier as dictionary_tier,
+            d.archive_org_url as dictionary_archive_org_url,
+            d.page_offset as dictionary_page_offset,
             MATCH(t.arabic, t.english, t.french, t.description)
             AGAINST(:query IN NATURAL LANGUAGE MODE) as relevance
         FROM term t
@@ -242,10 +244,40 @@ def search_terms_mariadb(
     excluded_fields = {"created_at", "updated_at"}
     if (not include_descriptions) or DISABLE_DESCRIPTIONS:
         excluded_fields.add("description")
-    return [
+    terms = [
         {k: v for k, v in row.items() if k not in excluded_fields and v is not None}
         for row in results
     ]
+    # The scan's URL and offset are only needed to build `page_url`; they
+    # would repeat the same two values in every row of a dictionary.
+    for term in terms:
+        page_url = archive_page_url(
+            term.pop("dictionary_archive_org_url", None),
+            term.pop("dictionary_page_offset", None),
+            term.get("page"),
+        )
+        if page_url:
+            term["page_url"] = page_url
+    return terms
+
+
+def archive_page_url(
+    archive_org_url: str | None, page_offset: int | None, page: int | None
+) -> str | None:
+    """Link to the printed `page` in a dictionary's archive.org scan.
+
+    archive.org numbers the pages of the file from 0 (`n0` is the first page)
+    and printed page p is page p + page_offset of the file (Wikidata's "file
+    page offset", P8330), so the page is `n{p + page_offset - 1}`. The Cite Q
+    module on Arabic Wikipedia builds the same link for {{استشهاد بويكي بيانات}}.
+    None when the dictionary has no scan or no offset, or the term no page.
+    """
+    if not archive_org_url or page_offset is None or page is None:
+        return None
+    n = page + page_offset - 1
+    if n < 0:
+        return archive_org_url
+    return f"{archive_org_url}/page/n{n}/mode/1up"
 
 
 # Each dictionary has a browsable page on the arabterm GitHub Pages site,
@@ -344,6 +376,12 @@ MAX_QUERY_VARIANTS = 8
 # Product of the per-token candidates that is sorted and capped; bounds the
 # work on long queries.
 MAX_VARIANT_COMBINATIONS = 64
+
+# Longest `q` the search endpoints accept. A term is a few words; a pasted
+# article is not a query, and InnoDB rejects phrases over 128 words with a
+# 500 ("Too many words in a FTS phrase or proximity search"). The gadget and
+# the UI cap the typed text at 200 so the quotes they add around it still fit.
+MAX_QUERY_LENGTH = 256
 
 # Plurals no suffix rule gets right: Greek and Latin neuters, -ix/-ex words
 # (a rule would turn "devices" into "devix") and -f/-fe words (likewise
@@ -892,6 +930,13 @@ class TermResult(BaseModel):
     english: str | None = None
     french: str | None = None
     description: str | None = None
+    page: int | None = Field(
+        None, description="Printed page of the term in the paper dictionary."
+    )
+    page_url: str | None = Field(
+        None,
+        description="The `page` in the dictionary's scan on archive.org, when it has one.",
+    )
     relevance: float
     dictionary_name_arabic: str
     dictionary_name_tech: str | None = None
@@ -945,6 +990,13 @@ class Dictionary(BaseModel):
     wikidata_id: str | None = None
     dict_type: str | None = None
     tier: int | None = None
+    archive_org_url: str | None = Field(
+        None, description="Scan of the paper dictionary on archive.org."
+    )
+    page_offset: int | None = Field(
+        None,
+        description="Printed page p is page p + page_offset of the scan (Wikidata P8330).",
+    )
     arabterm_url: str | None = None
 
 
@@ -974,7 +1026,8 @@ class HealthResponse(BaseModel):
 def search(
     q: str = Query(
         ...,
-        description="Free-text query. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode. Wrap it in double quotes for a phrase search. Latin-script queries are also searched as their singular (`telescopes` → `telescope`), hyphen-free (`e-mail` → `email`) and British/American (`colour centre` → `color center`) variants; a quoted query stays a phrase search, its variants are searched as phrases too.",
+        max_length=MAX_QUERY_LENGTH,
+        description="Free-text query, at most 256 characters. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode. Wrap it in double quotes for a phrase search. Latin-script queries are also searched as their singular (`telescopes` → `telescope`), hyphen-free (`e-mail` → `email`) and British/American (`colour centre` → `color center`) variants; a quoted query stays a phrase search, its variants are searched as phrases too.",
         examples=["telescope", "اشتقاق"],
     ),
     include_descriptions: bool = Query(
@@ -1003,7 +1056,8 @@ def search(
 def search_aggregated(
     q: str = Query(
         ...,
-        description="Free-text query. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode. Wrap it in double quotes for a phrase search. Latin-script queries are also searched as their singular (`telescopes` → `telescope`), hyphen-free (`e-mail` → `email`) and British/American (`colour centre` → `color center`) variants; a quoted query stays a phrase search, its variants are searched as phrases too.",
+        max_length=MAX_QUERY_LENGTH,
+        description="Free-text query, at most 256 characters. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode. Wrap it in double quotes for a phrase search. Latin-script queries are also searched as their singular (`telescopes` → `telescope`), hyphen-free (`e-mail` → `email`) and British/American (`colour centre` → `color center`) variants; a quoted query stays a phrase search, its variants are searched as phrases too.",
         examples=["telescope", "اشتقاق"],
     ),
     include_descriptions: bool = Query(
@@ -1110,10 +1164,12 @@ def search_aggregated(
 def list_dicts():
     """Return every dictionary in the database with its full metadata.
 
+    Dictionaries are sorted by descending `id`, the most recently added first.
+
     Use the `id` of a dictionary to map `dictionary_id` values returned by the
     search endpoints back to a human-readable source name.
     """
-    result = execute_with_retry(text("SELECT * FROM dictionary"))
+    result = execute_with_retry(text("SELECT * FROM dictionary ORDER BY id DESC"))
     dictionaries = [
         {**row, "arabterm_url": arabterm_url(row.get("name_tech"))}
         for row in result.mappings().all()

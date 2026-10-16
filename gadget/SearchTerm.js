@@ -17,6 +17,8 @@ mw.loader.using( [ 'mediawiki.util' ] ).then( () => {
 	const LABEL = 'مسرد الويكي';
 	const TOOLTIP = 'ابحث عن مصطلح في مسرد الويكي';
 	const MIN_QUERY_LENGTH = 3;
+	// The API rejects longer queries (a pasted paragraph is not a term).
+	const MAX_QUERY_LENGTH = 200;
 	const REQUEST_TIMEOUT_MS = 20000;
 	// Result groups rendered per "show more" step. Broad queries can return
 	// several hundred groups; rendering them all at once is slow on low-end
@@ -170,6 +172,10 @@ mw.loader.using( [ 'mediawiki.util' ] ).then( () => {
 			}
 			if ( query.length < MIN_QUERY_LENGTH ) {
 				this.showNotice( 'يرجى إدخال ' + MIN_QUERY_LENGTH + ' أحرف على الأقل للبحث.' );
+				return;
+			}
+			if ( query.length > MAX_QUERY_LENGTH ) {
+				this.showNotice( 'يرجى إدخال ' + MAX_QUERY_LENGTH + ' حرفًا على الأكثر للبحث.' );
 				return;
 			}
 
@@ -406,9 +412,23 @@ mw.loader.using( [ 'mediawiki.util' ] ).then( () => {
 			$dictInfo.append( $dictName );
 
 			if ( term.page ) {
-				$dictInfo.append(
-					$( '<span>' ).addClass( 'wikiterm-dictionary-page' ).text( 'ص. ' + term.page )
-				);
+				const $page = $( '<span>' ).addClass( 'wikiterm-dictionary-page' );
+				// The page of the dictionary's scan on archive.org, when it has one.
+				if ( term.page_url ) {
+					$page.append(
+						$( '<a>' )
+							.attr( {
+								href: term.page_url,
+								target: '_blank',
+								rel: 'noopener',
+								title: 'افتح الصفحة في النسخة المصوّرة (archive.org)'
+							} )
+							.text( 'ص. ' + term.page )
+					);
+				} else {
+					$page.text( 'ص. ' + term.page );
+				}
+				$dictInfo.append( $page );
 			}
 
 			if ( term.dictionary_wikidata_id ) {
@@ -547,7 +567,16 @@ mw.loader.using( [ 'mediawiki.util' ] ).then( () => {
 		WikiTermDialog.prototype.getReadyProcess = function ( data ) {
 			return WikiTermDialog.super.prototype.getReadyProcess.call( this, data )
 				.next( () => {
-					this.searchInput.focus();
+					const prefill = data && data.prefill;
+					if ( prefill ) {
+						this.searchInput.setValue( prefill );
+						this.performSearch();
+						// Cursor at the end, whole term selected, so the user
+						// can immediately retype if the wrong text was picked up.
+						this.searchInput.$input.trigger( 'focus' ).trigger( 'select' );
+					} else {
+						this.searchInput.focus();
+					}
 				} );
 		};
 
@@ -567,7 +596,7 @@ mw.loader.using( [ 'mediawiki.util' ] ).then( () => {
 
 	let dialogPromise = null;
 
-	function openDialog() {
+	function openDialog( prefillText ) {
 		if ( !dialogPromise ) {
 			dialogPromise = mw.loader.using( DIALOG_MODULES ).then( () => {
 				const WikiTermDialog = defineDialogClass();
@@ -579,7 +608,7 @@ mw.loader.using( [ 'mediawiki.util' ] ).then( () => {
 			} );
 		}
 		return dialogPromise.then( ( ui ) => {
-			ui.windowManager.openWindow( ui.dialog );
+			ui.windowManager.openWindow( ui.dialog, { prefill: prefillText } );
 		}, ( err ) => {
 			// Let the next click retry the download.
 			dialogPromise = null;
@@ -672,6 +701,16 @@ mw.loader.using( [ 'mediawiki.util' ] ).then( () => {
 		}
 		return false;
 	}
+
+	// Exposed so companion gadgets — such as a selection-based keyboard-
+	// shortcut trigger loaded as a separate script — can open the dialog
+	// pre-filled with a term, without duplicating the OOUI-loading/dialog
+	// construction logic above. This follows the common mw.libs.* convention
+	// used for cross-gadget public interfaces on Wikimedia wikis.
+	mw.libs = mw.libs || {};
+	mw.libs.wikiTerm = {
+		openDialog: openDialog
+	};
 
 	function init() {
 		const skin = mw.config.get( 'skin' );

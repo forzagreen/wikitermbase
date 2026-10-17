@@ -82,10 +82,15 @@
 		return count + ' معجما';
 	}
 
+	// A page is cited for every source but web glossaries («مسرد وب»): a
+	// dictionary entry with no page number asks for one with {{بلص}}, the
+	// short redirect to {{بحاجة لرقم الصفحة}}.
 	function createCitationTemplate( term ) {
 		const wikidataId = term.dictionary_wikidata_id || '';
-		if ( term.page ) {
-			return '{{استشهاد بويكي بيانات|' + wikidataId + '|ص=' + term.page + '}}';
+		const page = term.page ||
+			( term.dictionary_dict_type === 'thesaurus' ? '' : '{{بلص}}' );
+		if ( page ) {
+			return '{{استشهاد بويكي بيانات|' + wikidataId + '|ص=' + page + '}}';
 		}
 		return '{{استشهاد بويكي بيانات|' + wikidataId + '}}';
 	}
@@ -652,7 +657,7 @@
 				$extra = $extra.add( $( '<div>' ).addClass( 'wikiterm-citation-note' )
 					.text( 'يجمع القالب ' + MAX_GROUPED_CITATIONS + ' استشهادًا على الأكثر.' ) );
 			}
-			const setText = this.showCitationPopup( $target, 'رمز الاستشهادات المجمّعة', '', $extra );
+			const setText = this.showCitationPopup( $target, 'اختر استشهادات لتجميعها:', '', $extra );
 			const update = () => {
 				const selected = checklist.findSelectedItemsData();
 				const full = selected.length >= MAX_GROUPED_CITATIONS;

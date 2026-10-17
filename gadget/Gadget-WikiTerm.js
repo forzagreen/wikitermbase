@@ -13,6 +13,10 @@
  * moves the entry from the page-actions menu to the personal toolbar at the
  * top of the page on Vector legacy, MonoBook and Timeless.
  *
+ * The same file also works as a user script: copy it to User:You/WikiTerm.js
+ * and Gadget-WikiTerm.css to User:You/WikiTerm.css, then load both from your
+ * common.js.
+ *
  * The page-load footprint is deliberately minimal:
  *   - the only hard dependency is mediawiki.util;
  *   - OOUI (about 90 KB gzipped) and the dialog code are loaded lazily, on
@@ -841,6 +845,10 @@
 		}
 	}
 
-	$( init );
+	// A gadget gets mediawiki.util from its definition, a user script does
+	// not: waiting for it here lets this same file run as either.
+	mw.loader.using( 'mediawiki.util' ).then( () => {
+		$( init );
+	} );
 }() );
 // </nowiki>

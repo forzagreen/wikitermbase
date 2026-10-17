@@ -53,8 +53,7 @@ The deployed version in Arabic Wikipedia:
 Files in [gadget/](gadget/):
 - [Gadget-WikiTerm.js](gadget/Gadget-WikiTerm.js) and [Gadget-WikiTerm.css](gadget/Gadget-WikiTerm.css) are the main gadget, copied verbatim to the `MediaWiki:` pages above.
 - [Gadget-WikiTermSelection.js](gadget/Gadget-WikiTermSelection.js) is the optional companion gadget that triggers term lookup directly from text selected in an editing surface using a keyboard shortcut (`Ctrl+Alt+A`, or `⌥⌘A` on macOS).
-- [SearchTerm.js](gadget/SearchTerm.js) is the [user script](https://en.wikipedia.org/wiki/Wikipedia:User_scripts) variant used for development: the same body as the gadget wrapped in `mw.loader.using( [ 'mediawiki.util' ] )` (only the wrapper lines differ). Run `npm run sync` after editing the gadget so both stay in sync.
-- [tests/sync.js](gadget/tests/sync.js) synchronizes `SearchTerm.js` automatically by extracting the gadget body from `Gadget-WikiTerm.js`.
+- `Gadget-WikiTerm.js` also works as a [user script](https://en.wikipedia.org/wiki/Wikipedia:User_scripts): it waits for `mediawiki.util` itself instead of relying on the gadget definition, so there is no separate user-script copy to keep in sync.
 
 ### Design Constraints and Architecture
 
@@ -94,16 +93,15 @@ Tooling lives in [gadget/package.json](gadget/package.json) (ESLint with the Wik
 
 ```sh
 cd gadget && npm install
-npm run sync                              # synchronize SearchTerm.js body from Gadget-WikiTerm.js
 npm run lint                              # eslint-config-wikimedia: client/es6 + mediawiki + jquery
-npm run check                             # verify sync, enforce gzipped size budget, check for forbidden calls
+npm run check                             # enforce gzipped size budget, check for forbidden calls
 npx playwright install firefox webkit     # once; Chrome uses the installed Google Chrome
 npm run matrix                            # Chrome/Firefox/WebKit × Vector 2022 (light+night)/Vector 2010/MonoBook/Timeless/Minerva/Content Translation
 npm run summary                           # Markdown table from tests/out/matrix_results.json (screenshots in tests/out/shots/)
 BROWSERS=chrome SKINS=vector npm run matrix   # subset
 ```
 
-The matrix opens a real ar.wikipedia article (logged out), injects the working-tree gadget, and drives it end to end: entry point → dialog (lazy OOUI load, bytes and time recorded) → search → expand → citation copy → "show more" → close, failing on any uncaught JavaScript error. `npm run check` is network-free: it verifies `SearchTerm.js` is in sync with the gadget, enforces a gzipped size budget (10 KB JS, 3 KB CSS) and rejects `console.*` calls.
+The matrix opens a real ar.wikipedia article (logged out), injects the working-tree gadget, and drives it end to end: entry point → dialog (lazy OOUI load, bytes and time recorded) → search → expand → citation copy → "show more" → close, failing on any uncaught JavaScript error. `npm run check` is network-free: it enforces a gzipped size budget (10 KB JS, 3 KB CSS) and rejects `console.*` calls.
 
 The same checks run in GitHub Actions ([gadget.yml](.github/workflows/gadget.yml)) on every pull request touching `gadget/`, on pushes to `main`, and weekly. The run's job summary shows the results table and the screenshots + JSON are attached as a downloadable artifact, so the numbers can be checked and re-run by anyone from the [Actions tab](https://github.com/forzagreen/wikitermbase/actions/workflows/gadget.yml).
 
@@ -118,7 +116,14 @@ fetch(base + 'Gadget-WikiTerm.js').then(r => r.text()).then(js => $.globalEval(j
 fetch(base + 'Gadget-WikiTermSelection.js').then(r => r.text()).then(js => $.globalEval(js));
 ```
 
-Or install it as a user script: copy [gadget/SearchTerm.js](gadget/SearchTerm.js) to `User:You/SearchTerm.js`, the CSS to `User:You/SearchTerm.css`, and load both from your `common.js`.
+Or install it as a user script, by adding these two lines to your [common.js](https://ar.wikipedia.org/wiki/Special:MyPage/common.js). They load the deployed gadget pages, nothing to copy:
+
+```js
+mw.loader.load( '//ar.wikipedia.org/w/index.php?title=MediaWiki:Gadget-WikiTerm.js&action=raw&ctype=text/javascript' );
+mw.loader.load( '//ar.wikipedia.org/w/index.php?title=MediaWiki:Gadget-WikiTerm.css&action=raw&ctype=text/css', 'text/css' );
+```
+
+For development, copy [gadget/Gadget-WikiTerm.js](gadget/Gadget-WikiTerm.js) and [Gadget-WikiTerm.css](gadget/Gadget-WikiTerm.css) to `User:You/WikiTerm.js` and `User:You/WikiTerm.css` (pages in your user namespace only you can edit) and load those instead, with `title=User:You/WikiTerm.js` and `title=User:You/WikiTerm.css` in the two lines above. If the WikiTerm gadget is also enabled in your preferences, disable it there, otherwise two entry points appear.
 
 Reproducible footprint checks anyone can run in the browser console on ar.wikipedia:
 - `mw.loader.getState('oojs-ui-core')` — `registered` means OOUI is not loaded; the old definition makes it `ready` on every page, the new one only after the first click.

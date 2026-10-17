@@ -31,7 +31,7 @@ const GroupedCitationPopup = ({ citations }) => {
   return (
     <div className="fixed sm:absolute left-4 right-4 sm:right-auto sm:left-0 bottom-4 sm:bottom-auto sm:top-full sm:mt-2 w-auto sm:w-[28rem] max-h-[80vh] overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 z-10 citation-popup">
       <div className="flex justify-between items-center mb-2">
-        <span className="font-semibold text-gray-900 dark:text-gray-100">رمز الاستشهادات المجمّعة</span>
+        <span className="font-semibold text-gray-900 dark:text-gray-100">اختر استشهادات لتجميعها:</span>
         <button
           className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 transition-colors disabled:opacity-50"
           onClick={copy}

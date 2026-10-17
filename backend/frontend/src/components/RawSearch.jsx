@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, ExternalLink, ChevronDown, ChevronUp, Link2, Loader2, Quote, Check, Copy } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
+import { citationTemplate } from '../citations';
 
 // The API rejects longer queries (a pasted paragraph is not a term).
 const MAX_QUERY_LENGTH = 200;
@@ -265,10 +266,7 @@ const RawSearch = () => {
                                       flex items-center gap-1 transition-colors"
                               onClick={async (e) => {
                                 e.stopPropagation();
-                                const citation = item.page 
-                                  ? `{{استشهاد بويكي بيانات|${item.dictionary_wikidata_id}|ص=${item.page}}}`
-                                  : `{{استشهاد بويكي بيانات|${item.dictionary_wikidata_id}}}`;
-                                
+                                const citation = citationTemplate(item);
                                 try {
                                   await navigator.clipboard.writeText(citation);
                                   setCopiedId(item.id);
@@ -293,10 +291,7 @@ const RawSearch = () => {
                           </div>
                           <div className="bg-gray-50 dark:bg-gray-900 p-2 rounded text-sm font-mono text-gray-800 
                                         dark:text-gray-200 overflow-x-auto border border-gray-100 dark:border-gray-700 break-all">
-                            {item.page 
-                              ? `{{استشهاد بويكي بيانات|${item.dictionary_wikidata_id}|ص=${item.page}}}`
-                              : `{{استشهاد بويكي بيانات|${item.dictionary_wikidata_id}}}`
-                            }
+                            {citationTemplate(item)}
                           </div>
                         </div>
                       )}

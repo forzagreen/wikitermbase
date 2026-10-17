@@ -27,6 +27,13 @@ import PageLinkDemo from './components/PageLinkDemo';
 export const FEATURES = [
   {
     // Keep the ids stable: they are what the browser remembers having seen.
+    id: 'grouped-citations',
+    date: '2026-10-16',
+    title: 'تجميع استشهادات المعاجم في مرجع واحد',
+    body:
+      'إذا ورد المصطلح في أكثر من معجم، فزرّ «تجميع الاستشهادات» يعطيك مرجعًا واحدًا يضمّ المعاجم التي تختارها مرقّمةً (أ، ب، جـ…)، جاهزًا للّصق في مقالة ويكيبيديا، بدل مرجع منفصل لكل معجم.',
+  },
+  {
     id: 'page-links',
     date: '2026-10-16',
     title: 'رقم الصفحة يفتح المعجم المصوّر',

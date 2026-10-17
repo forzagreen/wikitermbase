@@ -5,7 +5,7 @@
 // Filter with BROWSERS=chrome,firefox and SKINS=vector,minerva.
 // Loads a real ar.wikipedia article (anonymous), injects the gadget from the
 // working tree, and drives it: entry point -> dialog (lazy OOUI load) ->
-// search -> expand -> citation popup -> "show more".
+// search -> grouped citation -> expand -> citation popup -> "show more".
 const fs = require('fs');
 const path = require('path');
 const pw = require('playwright');
@@ -17,7 +17,7 @@ const PAGE = 'https://ar.wikipedia.org/wiki/%D8%AD%D8%A7%D8%B3%D9%88%D8%A8'; // 
 const OUT = path.join(__dirname, 'out');
 const SHOTS = path.join(OUT, 'shots');
 fs.mkdirSync(SHOTS, { recursive: true });
-const QUERY = 'computer';
+const QUERY = process.env.QUERY || 'computer';
 
 // Google Chrome when installed (macOS dev machines, GitHub runners), else Playwright's Chromium.
 const launchChrome = () => pw.chromium.launch({ channel: 'chrome' }).catch(() => pw.chromium.launch());
@@ -100,9 +100,32 @@ async function runCase(browserName, browser, c) {
     r.steps.cardsRendered = await page.locator('.wikiterm-result-card').count();
     r.steps.showMoreVisible = await page.locator('.wikiterm-show-more').first().isVisible();
 
+    // Grouped citation, from the header of a card that stays closed; unticking
+    // a dictionary must drop its citation from the text.
+    const groupCite = card.locator('.wikiterm-group-citation-button a').first();
+    if (await groupCite.count()) {
+      await groupCite.click();
+      const ta = page.locator('.wikiterm-citation-popup textarea').first();
+      await ta.waitFor({ state: 'visible', timeout: 15000 });
+      const refs = async () => ((await ta.inputValue()).match(/\|م\d+=/g) || []).length;
+      const g = { firstLine: (await ta.inputValue()).split('\n')[0], refs: await refs() };
+      g.entries = await page.locator('.wikiterm-citation-checklist .oo-ui-checkboxMultioptionWidget').count();
+      await page.locator('.wikiterm-citation-checklist input[type=checkbox]').first().click();
+      // OOUI applies a checkbox change on the next tick.
+      await page.waitForFunction((n) => {
+        const t = document.querySelector('.wikiterm-citation-popup textarea');
+        return (t.value.match(/\|م\d+=/g) || []).length !== n;
+      }, g.refs, { timeout: 5000 }).catch(() => {});
+      g.refsAfterUntick = await refs();
+      g.cardStayedClosed = await card.locator('.wikiterm-result-details').evaluate((el) => el.classList.contains('wikiterm-hidden'));
+      r.steps.groupedCitation = g;
+      await shot('-grouped');
+    }
+
     await card.locator('.wikiterm-result-header').click();
     await card.locator('.wikiterm-variant-item').first().waitFor({ state: 'visible', timeout: 15000 });
     r.steps.variantsShown = await card.locator('.wikiterm-variant-item').count();
+    r.steps.chevronAriaExpanded = await card.locator('.wikiterm-expand-button a').getAttribute('aria-expanded');
 
     const cite = card.locator('.wikiterm-citation-button a').first();
     if (await cite.count()) {

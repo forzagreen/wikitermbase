@@ -65,7 +65,6 @@ const loadMazini = () => {
 };
 
 const spacedRoot = (root) => [...root].join(' ');
-const stripDiacritics = (text) => text.normalize('NFD').replace(/[ً-ْٰ]/g, '').normalize('NFC');
 
 const Chip = ({ children, muted = false, title }) => (
   <span
@@ -509,11 +508,6 @@ const MorphologySection = ({ group }) => {
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 dark:text-gray-200">
         <FlaskConical size={15} className="text-sky-600 dark:text-sky-400" />
         تحليل صرفي
-        {data && stripDiacritics(term) !== group.arabic_normalised && (
-          <span className="text-xs font-normal text-gray-400" title="الصيغة الأكثر ورودًا في المعاجم هي التي حُلّلت">
-            ({term})
-          </span>
-        )}
       </h3>
       {(status === 'idle' || status === 'loading') && <p className="mt-1 text-xs text-gray-400">جارٍ التحليل…</p>}
       {status === 'error' && (

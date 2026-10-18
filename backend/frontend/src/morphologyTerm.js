@@ -39,7 +39,10 @@ const candidates = (arabic) =>
     .map(stripParentheses)
     .filter(Boolean);
 
+// '' when the group has no Arabic title (an entry with no Arabic value is
+// still a group of its own; the API leaves the field out).
 export const termToAnalyze = (group) => {
+  if (!group.arabic_normalised) return '';
   // Compared normalised on both sides: a group key is not always fully
   // normalised itself (the one above keeps its parentheses).
   const key = normaliseArabic(group.arabic_normalised);

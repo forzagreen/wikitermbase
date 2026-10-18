@@ -174,8 +174,13 @@ def analyze_word(word: str) -> dict:
     }
 
 
+# A parenthesised part of an entry is a gloss or an elision mark, not part of
+# the headword: «مدرسة (ال…) التقسيمية», «خلية (نباتية)».
+PARENTHESES_RE = re.compile(r"\([^()]*\)")
+
+
 def term_words(term: str) -> list[str]:
-    return ARABIC_WORD_RE.findall(term)[:MAX_WORDS]
+    return ARABIC_WORD_RE.findall(PARENTHESES_RE.sub(" ", term))[:MAX_WORDS]
 
 
 def analyze_term(term: str) -> dict:

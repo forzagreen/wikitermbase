@@ -20,7 +20,9 @@ def test_canonical_root(root, expected):
 
 
 def test_term_words_keeps_arabic_only_and_caps_their_number():
-    assert morphology.term_words("خلية (نباتية) cell") == ["خلية", "نباتية"]
+    # Parenthesised glosses and elision marks are not part of the headword.
+    assert morphology.term_words("خلية (نباتية) cell") == ["خلية"]
+    assert morphology.term_words("مدرسة (ال…) التقسيمية") == ["مدرسة", "التقسيمية"]
     # Vowelled entries stay whole words (the vowels narrow the readings).
     assert morphology.term_words("خَلِيَّة جِذْعِيَّة، كــلمة") == ["خَلِيَّة", "جِذْعِيَّة", "كــلمة"]
 

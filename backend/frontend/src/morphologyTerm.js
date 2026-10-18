@@ -29,22 +29,29 @@ export const normaliseArabic = (text) =>
     .trim()
     .replace(/\s+/g, ' ');
 
+// Parenthesised parts: a gloss or an elision mark («خلية (نباتية)»,
+// «مدرسة (ال…) التقسيمية»), never analyzed.
+const stripParentheses = (text) => text.replace(PARENS_RE, ' ').replace(/\s+/g, ' ').trim();
+
 const candidates = (arabic) =>
   (arabic ?? '')
     .split(SEPARATOR_RE)
-    .map((part) => part.replace(PARENS_RE, ' ').replace(/\s+/g, ' ').trim())
+    .map(stripParentheses)
     .filter(Boolean);
 
 export const termToAnalyze = (group) => {
+  // Compared normalised on both sides: a group key is not always fully
+  // normalised itself (the one above keeps its parentheses).
+  const key = normaliseArabic(group.arabic_normalised);
   const counts = new Map();
   for (const occurrence of group.occurences ?? []) {
     for (const text of candidates(occurrence.arabic)) {
-      if (normaliseArabic(text) === group.arabic_normalised) {
+      if (normaliseArabic(text) === key) {
         counts.set(text, (counts.get(text) ?? 0) + 1);
       }
     }
   }
-  let best = group.arabic_normalised;
+  let best = stripParentheses(group.arabic_normalised);
   let bestCount = 0;
   for (const [text, count] of counts) {
     if (count > bestCount) [best, bestCount] = [text, count];

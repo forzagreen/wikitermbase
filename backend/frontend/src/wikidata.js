@@ -145,9 +145,10 @@ export const fetchRootLexemes = (root) => {
 };
 
 export const wikidataLexemeUrl = (id) => `https://www.wikidata.org/wiki/Lexeme:${id}`;
+// A sense's anchor on the lexeme page is its local part (L123-S2 → #S2).
 export const wikidataSenseUrl = (senseId) => {
-  const [lexeme] = senseId.split('-');
-  return `https://www.wikidata.org/wiki/Lexeme:${lexeme}#${senseId}`;
+  const [lexeme, sense] = senseId.split('-');
+  return `https://www.wikidata.org/wiki/Lexeme:${lexeme}#${sense}`;
 };
 // The page name keeps the tashkeel (كَتَبَ, not كتب).
 export const wiktionaryUrl = (lemma) => `https://ar.wiktionary.org/wiki/${encodeURIComponent(fullKey(lemma))}`;

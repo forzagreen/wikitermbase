@@ -9,7 +9,8 @@
 //    first; drop an entry once it is a few months old, the list is meant to
 //    stay short. `Media` is an optional component shown under the text,
 //    e.g. a small animation of the feature; `link` an optional page of the
-//    site to open from the entry.
+//    site (`to`) or external site (`href`, opens in a new tab) to open from
+//    the entry.
 //
 //  * Dictionaries: not listed here at all. The panel compares the dictionary
 //    ids the API returns with the largest one the visitor has seen, so a new
@@ -27,6 +28,14 @@ import PageLinkDemo from './components/PageLinkDemo';
 export const FEATURES = [
   {
     // Keep the ids stable: they are what the browser remembers having seen.
+    id: 'gen-ar',
+    date: '2026-10-18',
+    title: 'أداة جديدة: توليد الكلمات العربية',
+    body:
+      'أداة تقترح ألفاظًا عربية لمصطلح إنجليزي أو فرنسي، باشتقاقها من الجذور والأوزان، وتبيّن ما ورد منها في المعاجم.',
+    link: { href: 'https://genar.waeltellat.com/', label: 'جرّب الأداة' },
+  },
+  {
     id: 'morphology',
     date: '2026-10-18',
     title: 'تحليل صرفي اختياري تحت كل نتيجة',

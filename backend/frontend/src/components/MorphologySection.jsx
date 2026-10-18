@@ -258,7 +258,18 @@ const VerbDetails = ({ root, verb, entries, lexemes, lexemesStatus }) => {
         {lexemesStatus === 'ok' && <Senses lexemes={lexemes} root={root} />}
       </div>
       <div>
-        <Subheading>التصريف (المازني)</Subheading>
+        <Subheading>
+          التصريف (
+          <a
+            href="https://forzagreen.github.io/mazini-js/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:underline dark:text-blue-400"
+          >
+            المازني
+          </a>
+          )
+        </Subheading>
         <Conjugation root={root} patterns={patterns} />
       </div>
     </div>
@@ -345,11 +356,11 @@ const RootVerbs = ({ root, verbs }) => {
   );
 };
 
-// Arabic count agreement for "N readings".
+// Arabic count agreement for "N possible vocalizations".
 const readingCountLabel = (count) => {
-  if (count === 2) return 'قراءتان';
-  if (count <= 10) return `${count} قراءات`;
-  return `${count} قراءة`;
+  if (count === 2) return 'ضبطان مُحتمَلان';
+  if (count <= 10) return `${count} ضبوط مُحتمَلة`;
+  return `${count} ضبطًا مُحتمَلا`;
 };
 
 const Dash = () => <span className="text-gray-400">—</span>;
@@ -366,7 +377,7 @@ const WordDetails = ({ word, reading, readingIndex, onPickReading, verbsByRoot }
     <div className="space-y-3 rounded bg-gray-50 p-3 dark:bg-gray-800/60">
       {word.readings.length > 1 && (
         <div>
-          <Subheading>القراءات الممكنة ({word.readings.length}) — اختر إحداها:</Subheading>
+          <Subheading>صيغ مُحتمَلة ({word.readings.length}) — انقر على إحداها:</Subheading>
           <div className="flex flex-wrap gap-1.5">
             {readings.map((r, i) => (
               <button
@@ -430,7 +441,7 @@ const WordDetails = ({ word, reading, readingIndex, onPickReading, verbsByRoot }
 
       {reading.root && (
         <div>
-          <Subheading>الأفعال المشتقة من الجذر {spacedRoot(reading.root)}</Subheading>
+          <Subheading>الأفعال المشتقة من الجذر ({spacedRoot(reading.root)})</Subheading>
           <RootVerbs root={reading.root} verbs={verbsByRoot[reading.root] ?? []} />
         </div>
       )}

@@ -13,9 +13,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, ExternalLink, FlaskConical } from 'lucide-react';
 import {
+  arSensesReviewUrl,
   arSensesSearchUrl,
   fetchRootLexemes,
-  lemmaKey,
+  lexemesForVerb,
   wikidataLexemeUrl,
   wikidataSenseUrl,
   wiktionaryUrl,
@@ -179,7 +180,7 @@ const Senses = ({ lexemes, root }) => {
   }
   return (
     <div className="space-y-3">
-      {lexemes.map((lexeme, index) => (
+      {lexemes.map((lexeme) => (
         <div key={lexeme.id}>
           {lexeme.senses.length === 0 ? (
             <p className="text-xs text-gray-500 dark:text-gray-400">المفردة {lexeme.id} في ويكي بيانات بلا معانٍ بعد.</p>
@@ -212,9 +213,13 @@ const Senses = ({ lexemes, root }) => {
             <ExternalChip href={wikidataLexemeUrl(lexeme.id)} title="المفردة في ويكي بيانات">
               ويكي بيانات {lexeme.id}
             </ExternalChip>
-            {index === 0 && (
+            {lexeme.wiktionary !== false ? (
               <ExternalChip href={wiktionaryUrl(lexeme.lemma)} title="مدخل الفعل في ويكاموس">
                 ويكاموس
+              </ExternalChip>
+            ) : (
+              <ExternalChip href={arSensesReviewUrl(lexeme.id)} title="لا مدخل في ويكاموس بعد: راجع المعاني وانشرها من أداة ar-senses">
+                مراجعة ونشر في ويكاموس
               </ExternalChip>
             )}
           </div>
@@ -308,7 +313,7 @@ const RootVerbs = ({ root, verbs }) => {
           root={root}
           verb={verb}
           entries={entries}
-          lexemes={lexemes?.get(lemmaKey(verb)) ?? []}
+          lexemes={lexemesForVerb(lexemes, verb)}
           lexemesStatus={lexemesStatus}
         />
       ))}

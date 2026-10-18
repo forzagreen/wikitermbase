@@ -16,16 +16,6 @@ const ROOT = 'wd:Q111029';
 const VERB = 'wd:Q24905';
 
 const HAMZA_RE = /[أإآؤئ]/g;
-// Case and mood marks, sukun, tanween, hamza marks, superscript alef:
-// everything but the shadda, which distinguishes كَتَبَ from كَتَّبَ.
-const NON_SHADDA_MARKS_RE = /[\u064B-\u0650\u0652-\u0655\u0670]/g;
-const WASLA_RE = /\u0671/g;
-
-// The key under which a verb from the arabic-morphology table and a Wikidata
-// lemma meet: consonants plus shadda.
-export const lemmaKey = (lemma) =>
-  lemma.normalize('NFD').replace(WASLA_RE, 'ا').replace(NON_SHADDA_MARKS_RE, '').normalize('NFC');
-
 export const rootLemmaVariants = (root) => {
   const canonical = root.replace(HAMZA_RE, 'ء');
   const variants = new Set([canonical, canonical.replace(/ء/g, 'أ')]);
@@ -54,7 +44,7 @@ const entityId = (uri) => uri.slice(uri.lastIndexOf('/') + 1);
 const cache = new Map();
 
 // One lemma can have several lexemes (an old entry with English glosses and
-// the one ar-senses created): the Map lists them all, the ones with Arabic
+// the one ar-senses created): a key lists them all, the ones with Arabic
 // glosses first.
 const hasArabicGloss = (lexeme) => lexeme.senses.some((s) => s.gloss);
 const sortLexemes = (lexemes) =>
@@ -62,7 +52,55 @@ const sortLexemes = (lexemes) =>
     (a, b) => Number(hasArabicGloss(b)) - Number(hasArabicGloss(a)) || b.senses.length - a.senses.length
   );
 
-// root -> Promise<Map<lemmaKey, [{ id, lemma, senses: [{ id, gloss, glossEn }] }]>>
+const fullKey = (lemma) => lemma.normalize('NFC');
+
+const groupBy = (lexemes, keyOf) => {
+  const map = new Map();
+  for (const lexeme of lexemes) {
+    const key = keyOf(lexeme.lemma);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(lexeme);
+  }
+  map.forEach(sortLexemes);
+  return map;
+};
+
+// Lexemes by vowelled lemma: قَرَبَ, قَرِبَ and قَرُبَ are three verbs, and the
+// table and ar-senses vowel a verb the same way (both follow mazini), so an
+// exact match is the right one and a consonantal fallback would borrow
+// another باب.
+export const indexLexemes = (lexemes) => groupBy(lexemes, fullKey);
+
+// The lexemes of a verb of the arabic-morphology table; [] when unpublished.
+export const lexemesForVerb = (index, verb) => index?.get(fullKey(verb)) ?? [];
+
+const WIKTIONARY_API = 'https://ar.wiktionary.org/w/api.php';
+
+// Arabic Wiktionary keeps the tashkeel in its page names; which of these
+// titles exist, in one request (the API takes 50 titles).
+const fetchWiktionaryPages = async (titles) => {
+  const existing = new Set();
+  for (let i = 0; i < titles.length; i += 50) {
+    const params = new URLSearchParams({
+      action: 'query',
+      titles: titles.slice(i, i + 50).join('|'),
+      format: 'json',
+      formatversion: '2',
+      origin: '*',
+    });
+    const r = await fetch(`${WIKTIONARY_API}?${params}`);
+    if (!r.ok) throw new Error(`Wiktionary: HTTP ${r.status}`);
+    const data = await r.json();
+    for (const page of data.query?.pages ?? []) {
+      if (!page.missing) existing.add(fullKey(page.title));
+    }
+  }
+  return existing;
+};
+
+// root -> Promise<Map<vowelled lemma, lexeme[]>>; each lexeme is
+// { id, lemma, senses: [{ id, gloss, glossEn }], wiktionary: true | false | null }
+// (null: Wiktionary could not be asked).
 export const fetchRootLexemes = (root) => {
   if (!cache.has(root)) {
     const url = `${SPARQL_ENDPOINT}?format=json&query=${encodeURIComponent(buildQuery(root))}`;
@@ -71,11 +109,11 @@ export const fetchRootLexemes = (root) => {
         if (!r.ok) throw new Error(`WDQS: HTTP ${r.status}`);
         return r.json();
       })
-      .then((data) => {
+      .then(async (data) => {
         const byId = new Map();
         for (const row of data.results.bindings) {
           const id = entityId(row.verb.value);
-          if (!byId.has(id)) byId.set(id, { id, lemma: row.lemma.value, senses: [] });
+          if (!byId.has(id)) byId.set(id, { id, lemma: row.lemma.value, senses: [], wiktionary: null });
           const lexeme = byId.get(id);
           if (row.sense) {
             const senseId = entityId(row.sense.value);
@@ -88,14 +126,14 @@ export const fetchRootLexemes = (root) => {
             }
           }
         }
-        const byLemma = new Map();
-        for (const lexeme of byId.values()) {
-          const key = lemmaKey(lexeme.lemma);
-          if (!byLemma.has(key)) byLemma.set(key, []);
-          byLemma.get(key).push(lexeme);
+        const lexemes = [...byId.values()];
+        try {
+          const existing = await fetchWiktionaryPages([...new Set(lexemes.map((l) => l.lemma))]);
+          for (const lexeme of lexemes) lexeme.wiktionary = existing.has(fullKey(lexeme.lemma));
+        } catch {
+          /* the Wikidata part is still worth showing */
         }
-        byLemma.forEach(sortLexemes);
-        return byLemma;
+        return indexLexemes(lexemes);
       })
       .catch((err) => {
         cache.delete(root);
@@ -111,7 +149,8 @@ export const wikidataSenseUrl = (senseId) => {
   const [lexeme] = senseId.split('-');
   return `https://www.wikidata.org/wiki/Lexeme:${lexeme}#${senseId}`;
 };
-export const wiktionaryUrl = (lemma) =>
-  `https://ar.wiktionary.org/wiki/${encodeURIComponent(lemma.normalize('NFD').replace(/[ً-ْٰ]/g, '').normalize('NFC'))}`;
+// The page name keeps the tashkeel (كَتَبَ, not كتب).
+export const wiktionaryUrl = (lemma) => `https://ar.wiktionary.org/wiki/${encodeURIComponent(fullKey(lemma))}`;
+export const arSensesReviewUrl = (lexemeId) => `https://ar-senses.toolforge.org/review/${lexemeId}`;
 export const arSensesSearchUrl = (root) =>
   `https://ar-senses.toolforge.org/lexemes?status=all&q=${encodeURIComponent(root.replace(HAMZA_RE, 'أ'))}`;

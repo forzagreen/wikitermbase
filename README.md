@@ -194,6 +194,20 @@ GET /api/v1/search?q=اشتقاق
 ```
 
 
+#### Morphological analysis
+
+```
+GET /api/v1/morphology?q=حاسوب
+```
+
+Each Arabic word of the term with its readings (root, pattern, part of speech, clitics) from
+[farahidi](https://github.com/forzagreen/farahidi), and the verbs of every proposed root from the
+[arabic-morphology](https://github.com/M-Bakni/arabic-morphology) tables (CC BY 4.0). Computed
+locally, no database. The site shows it under each result when «التحليل الصرفي» is enabled in the
+settings panel (⚙), pairing the verbs with their senses on Wikidata and conjugating them with
+[mazini](https://github.com/forzagreen/mazini-js). Rebuild the verbs index with
+`uv run python backend/build_verbs_index.py`.
+
 ### API on Toolforge (Build Service)
 
 ASGI applications cannot run on Toolforge's legacy `python3.13` uWSGI webservice — they require the **Build Service** backend, which uses Cloud Native Buildpacks to build a container image directly from the public GitHub repo and runs it according to the [Procfile](Procfile). Frontend assets (`backend/frontend/dist/`) are committed to git so the Python buildpack alone is sufficient — no Node.js step in the build pipeline.

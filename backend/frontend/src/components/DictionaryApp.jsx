@@ -5,6 +5,8 @@ import { Search, ExternalLink, ChevronDown, ChevronUp, Quote, Copy, Check, BookO
 import SiteHeader from './SiteHeader';
 import SiteFooter from './SiteFooter';
 import GroupedCitation from './GroupedCitation';
+import MorphologySection from './MorphologySection';
+import { useSettings } from '../settings';
 import { fetchStats } from '../api';
 import { citationTemplate, groupCitations } from '../citations';
 
@@ -101,6 +103,8 @@ const DictionaryApp = () => {
   const [openPopupId, setOpenPopupId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [stats, setStats] = useState(null);
+  // Optional «تحليل صرفي» section under every group (settings panel).
+  const [settings] = useSettings();
   const searchInputRef = useRef(null);
   const searchTimeoutRef = useRef(null);
   // Only one request in flight: a new search cancels the previous one, so a
@@ -591,6 +595,7 @@ const DictionaryApp = () => {
               ))}
             </div>
 
+            {settings.morphology && <MorphologySection group={group} />}
           </div>
         )})}
 

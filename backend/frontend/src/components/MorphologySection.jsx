@@ -22,6 +22,8 @@ import {
   wikidataSenseUrl,
   wiktionaryUrl,
 } from '../wikidata';
+import wikidataIcon from '../assets/wikidata.svg';
+import wiktionaryIcon from '../assets/wiktionary.svg';
 import { termToAnalyze } from '../morphologyTerm';
 
 const TRANS_LABEL = { l: 'لازم', m: 'متعدٍّ', k: 'لازم ومتعدٍّ' };
@@ -90,7 +92,7 @@ const InlineHeading = ({ children }) => (
   <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">{children}</h4>
 );
 
-const ExternalChip = ({ href, children, title }) => (
+const ExternalChip = ({ href, children, title, icon }) => (
   <a
     href={href}
     target="_blank"
@@ -98,7 +100,7 @@ const ExternalChip = ({ href, children, title }) => (
     title={title}
     className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
   >
-    <ExternalLink size={11} />
+    {icon ? <img src={icon} alt="" className="h-3 w-3 object-contain" /> : <ExternalLink size={11} />}
     <span>{children}</span>
   </a>
 );
@@ -216,11 +218,11 @@ const Senses = ({ lexemes, root }) => {
             </ol>
           )}
           <div className="mt-2 flex flex-wrap gap-1.5">
-            <ExternalChip href={wikidataLexemeUrl(lexeme.id)} title="المفردة في ويكي بيانات">
+            <ExternalChip href={wikidataLexemeUrl(lexeme.id)} title="المفردة في ويكي بيانات" icon={wikidataIcon}>
               ويكي بيانات {lexeme.id}
             </ExternalChip>
             {lexeme.wiktionary !== false ? (
-              <ExternalChip href={wiktionaryUrl(lexeme.lemma)} title="مدخل الفعل في ويكاموس">
+              <ExternalChip href={wiktionaryUrl(lexeme.lemma)} title="مدخل الفعل في ويكاموس" icon={wiktionaryIcon}>
                 ويكاموس
               </ExternalChip>
             ) : (

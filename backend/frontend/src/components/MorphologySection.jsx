@@ -544,7 +544,7 @@ const MorphologySectionBody = ({ group }) => {
   return (
     <section ref={rootRef} className="mt-4 border-t border-gray-200 pt-3 dark:border-gray-700" aria-label="تحليل صرفي">
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 dark:text-gray-200">
-        <FaalIcon className="-my-1.5 h-8 w-auto" />
+        <FaalIcon className="h-5 w-auto text-sky-600 dark:text-sky-400" />
         تحليل صرفي
       </h3>
       {(status === 'idle' || status === 'loading') && <p className="mt-1 text-xs text-gray-400">جارٍ التحليل…</p>}

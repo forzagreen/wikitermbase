@@ -22,6 +22,8 @@ import {
   wikidataSenseUrl,
   wiktionaryUrl,
 } from '../wikidata';
+import wikidataIcon from '../assets/wikidata.svg';
+import wiktionaryIcon from '../assets/wiktionary.svg';
 import { termToAnalyze } from '../morphologyTerm';
 
 const TRANS_LABEL = { l: 'لازم', m: 'متعدٍّ', k: 'لازم ومتعدٍّ' };
@@ -90,7 +92,7 @@ const InlineHeading = ({ children }) => (
   <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">{children}</h4>
 );
 
-const ExternalChip = ({ href, children, title }) => (
+const ExternalChip = ({ href, children, title, icon }) => (
   <a
     href={href}
     target="_blank"
@@ -98,7 +100,7 @@ const ExternalChip = ({ href, children, title }) => (
     title={title}
     className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
   >
-    <ExternalLink size={11} />
+    {icon ? <img src={icon} alt="" className="h-3 w-3 object-contain" /> : <ExternalLink size={11} />}
     <span>{children}</span>
   </a>
 );
@@ -216,11 +218,11 @@ const Senses = ({ lexemes, root }) => {
             </ol>
           )}
           <div className="mt-2 flex flex-wrap gap-1.5">
-            <ExternalChip href={wikidataLexemeUrl(lexeme.id)} title="المفردة في ويكي بيانات">
+            <ExternalChip href={wikidataLexemeUrl(lexeme.id)} title="المفردة في ويكي بيانات" icon={wikidataIcon}>
               ويكي بيانات {lexeme.id}
             </ExternalChip>
             {lexeme.wiktionary !== false ? (
-              <ExternalChip href={wiktionaryUrl(lexeme.lemma)} title="مدخل الفعل في ويكاموس">
+              <ExternalChip href={wiktionaryUrl(lexeme.lemma)} title="مدخل الفعل في ويكاموس" icon={wiktionaryIcon}>
                 ويكاموس
               </ExternalChip>
             ) : (
@@ -258,7 +260,18 @@ const VerbDetails = ({ root, verb, entries, lexemes, lexemesStatus }) => {
         {lexemesStatus === 'ok' && <Senses lexemes={lexemes} root={root} />}
       </div>
       <div>
-        <Subheading>التصريف (المازني)</Subheading>
+        <Subheading>
+          التصريف (
+          <a
+            href="https://forzagreen.github.io/mazini-js/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:underline dark:text-blue-400"
+          >
+            المازني
+          </a>
+          )
+        </Subheading>
         <Conjugation root={root} patterns={patterns} />
       </div>
     </div>
@@ -345,11 +358,11 @@ const RootVerbs = ({ root, verbs }) => {
   );
 };
 
-// Arabic count agreement for "N readings".
+// Arabic count agreement for "N possible vocalizations".
 const readingCountLabel = (count) => {
-  if (count === 2) return 'قراءتان';
-  if (count <= 10) return `${count} قراءات`;
-  return `${count} قراءة`;
+  if (count === 2) return 'ضبطان مُحتمَلان';
+  if (count <= 10) return `${count} ضبوط مُحتمَلة`;
+  return `${count} ضبطًا مُحتمَلا`;
 };
 
 const Dash = () => <span className="text-gray-400">—</span>;
@@ -366,7 +379,7 @@ const WordDetails = ({ word, reading, readingIndex, onPickReading, verbsByRoot }
     <div className="space-y-3 rounded bg-gray-50 p-3 dark:bg-gray-800/60">
       {word.readings.length > 1 && (
         <div>
-          <Subheading>القراءات الممكنة ({word.readings.length}) — اختر إحداها:</Subheading>
+          <Subheading>صيغ مُحتمَلة ({word.readings.length}) — انقر على إحداها:</Subheading>
           <div className="flex flex-wrap gap-1.5">
             {readings.map((r, i) => (
               <button
@@ -430,7 +443,7 @@ const WordDetails = ({ word, reading, readingIndex, onPickReading, verbsByRoot }
 
       {reading.root && (
         <div>
-          <Subheading>الأفعال المشتقة من الجذر {spacedRoot(reading.root)}</Subheading>
+          <Subheading>الأفعال المشتقة من الجذر ({spacedRoot(reading.root)})</Subheading>
           <RootVerbs root={reading.root} verbs={verbsByRoot[reading.root] ?? []} />
         </div>
       )}

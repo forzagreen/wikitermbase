@@ -11,7 +11,8 @@
 // Everything loads lazily: the analysis when the group scrolls into view,
 // Wikidata and mazini on the first expansion that needs them.
 import { Component, useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, ExternalLink, FlaskConical } from 'lucide-react';
+import { ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import FaalIcon from './FaalIcon';
 import {
   arSensesReviewUrl,
   arSensesSearchUrl,
@@ -543,7 +544,7 @@ const MorphologySectionBody = ({ group }) => {
   return (
     <section ref={rootRef} className="mt-4 border-t border-gray-200 pt-3 dark:border-gray-700" aria-label="تحليل صرفي">
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 dark:text-gray-200">
-        <FlaskConical size={15} className="text-sky-600 dark:text-sky-400" />
+        <FaalIcon className="-my-1.5 h-8 w-auto" />
         تحليل صرفي
       </h3>
       {(status === 'idle' || status === 'loading') && <p className="mt-1 text-xs text-gray-400">جارٍ التحليل…</p>}
@@ -585,7 +586,11 @@ const MorphologySectionBody = ({ group }) => {
             <a href="https://github.com/forzagreen/mazini-js" target="_blank" rel="noopener noreferrer" className="hover:underline">
               المازني
             </a>
-            .
+            . رسم «فعل» مقتبس من{' '}
+            <a href="https://commons.wikimedia.org/wiki/File:F3l-caligraphy.svg" target="_blank" rel="noopener noreferrer" className="hover:underline">
+              عمل <bdi>Zieben007</bdi>
+            </a>{' '}
+            <span className="whitespace-nowrap">(<bdi>CC BY-SA 4.0</bdi>).</span>
           </p>
         </>
       )}

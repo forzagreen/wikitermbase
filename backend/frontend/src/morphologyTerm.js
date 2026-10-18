@@ -51,10 +51,15 @@ export const termToAnalyze = (group) => {
       }
     }
   }
+  // Most common spelling; on a tie, the one without the article (the
+  // analyzer would only split it off again), then the first entry.
+  const hasArticle = (text) => /^ال/.test(text);
   let best = stripParentheses(group.arabic_normalised);
   let bestCount = 0;
   for (const [text, count] of counts) {
-    if (count > bestCount) [best, bestCount] = [text, count];
+    if (count > bestCount || (count === bestCount && hasArticle(best) && !hasArticle(text))) {
+      [best, bestCount] = [text, count];
+    }
   }
   return best;
 };

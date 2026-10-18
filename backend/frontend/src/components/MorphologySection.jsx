@@ -10,7 +10,7 @@
 //
 // Everything loads lazily: the analysis when the group scrolls into view,
 // Wikidata and mazini on the first expansion that needs them.
-import { useEffect, useRef, useState } from 'react';
+import { Component, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, ExternalLink, FlaskConical } from 'lucide-react';
 import {
   arSensesReviewUrl,
@@ -467,7 +467,36 @@ const WordRow = ({ word, verbsByRoot }) => {
   );
 };
 
-const MorphologySection = ({ group }) => {
+// A bug in this optional section must never take the results page down
+// with it (React would otherwise unmount the whole tree): it fails alone,
+// with a one-line note.
+class SectionErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error) {
+    console.error('MorphologySection failed:', error);
+  }
+
+  render() {
+    if (this.state.failed) {
+      return (
+        <section className="mt-4 border-t border-gray-200 pt-3 text-xs text-red-600 dark:border-gray-700 dark:text-red-400">
+          تعذّر عرض التحليل الصرفي لهذه النتيجة.
+        </section>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const MorphologySectionBody = ({ group }) => {
   const term = termToAnalyze(group);
   const rootRef = useRef(null);
   const [state, setState] = useState({ status: 'idle', data: null });
@@ -507,6 +536,9 @@ const MorphologySection = ({ group }) => {
   }, [term]);
 
   const { status, data } = state;
+
+  // Nothing to analyze (a group without an Arabic title).
+  if (!term) return null;
 
   return (
     <section ref={rootRef} className="mt-4 border-t border-gray-200 pt-3 dark:border-gray-700" aria-label="تحليل صرفي">
@@ -560,5 +592,11 @@ const MorphologySection = ({ group }) => {
     </section>
   );
 };
+
+const MorphologySection = ({ group }) => (
+  <SectionErrorBoundary>
+    <MorphologySectionBody group={group} />
+  </SectionErrorBoundary>
+);
 
 export default MorphologySection;

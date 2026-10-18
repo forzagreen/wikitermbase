@@ -118,7 +118,7 @@ const SettingsPanel = () => {
           <section className="pt-3">
             <div className="flex items-start justify-between gap-3">
               <label htmlFor="setting-morphology" className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                التحليل الصرفي
+                التحليل الصرفي والدلالي
               </label>
               <Switch
                 id="setting-morphology"

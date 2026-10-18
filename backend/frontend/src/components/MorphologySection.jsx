@@ -208,10 +208,11 @@ const Senses = ({ lexemes, root }) => {
                     href={wikidataSenseUrl(sense.id)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
-                    title="المعنى في ويكي بيانات"
+                    className="inline-block align-middle text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+                    title={`المعنى في ويكي بيانات (${sense.id})`}
+                    aria-label={`المعنى في ويكي بيانات (${sense.id})`}
                   >
-                    {sense.id}
+                    <ExternalLink size={12} />
                   </a>
                 </li>
               ))}

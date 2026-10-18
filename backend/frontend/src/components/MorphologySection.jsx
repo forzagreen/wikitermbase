@@ -2,8 +2,8 @@
 //
 // «تحليل صرفي»: the optional section at the end of a result group (settings
 // panel → التحليل الصرفي). One row per Arabic word of the headword, with its
-// root and pattern from /api/v1/morphology (farahidi). A row expands to the
-// other readings, the morphological features, the clitics and affixes, and
+// root, pattern and features from /api/v1/morphology (farahidi). A row
+// expands to the other readings, the clitics and affixes, and
 // the verbs of the root (arabic-morphology tables, served by the same
 // endpoint); a verb expands to its senses on Wikidata (one SPARQL query per
 // root, wikidata.js) and its main forms conjugated by mazini in the browser.
@@ -235,54 +235,43 @@ const Senses = ({ lexemes, root }) => {
   );
 };
 
-// One verb form of the root with its patterns; expands to senses + conjugation.
-const VerbItem = ({ root, verb, entries, lexemes, lexemesStatus }) => {
-  const [expanded, setExpanded] = useState(false);
+// The details of the verb picked in the chip row: its patterns, its senses on
+// Wikidata and its headline conjugation.
+const VerbDetails = ({ root, verb, entries, lexemes, lexemesStatus }) => {
   const patterns = entries.map((e) => e.pattern);
-  const senseCount = lexemes.reduce((n, l) => n + l.senses.length, 0);
-
   return (
-    <li className="rounded border border-gray-200 dark:border-gray-600">
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
-        className="flex w-full flex-wrap items-center gap-2 px-2 py-1.5 text-right hover:bg-gray-100 dark:hover:bg-gray-700"
-      >
+    <div className="space-y-3 rounded border border-gray-200 px-3 py-2 dark:border-gray-600">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="text-base font-semibold">{verb}</span>
         {entries.map((e) => (
           <Chip key={e.pattern} title={`${DERIV_LABEL[e.deriv] ?? ''} ${e.type}`.trim()}>
             {e.pattern} · {TRANS_LABEL[e.trans] ?? e.trans}
           </Chip>
         ))}
-        <span className="mr-auto flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-          {lexemesStatus === 'ok' && (lexemes.length > 0 ? senseCountLabel(senseCount) : 'غير منشور')}
-          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </span>
-      </button>
-      {expanded && (
-        <div className="space-y-3 border-t border-gray-200 px-3 py-2 dark:border-gray-600">
-          <div>
-            <Subheading>المعاني (ويكي بيانات)</Subheading>
-            {lexemesStatus === 'loading' && <p className="text-xs text-gray-400">جارٍ التحميل من ويكي بيانات…</p>}
-            {lexemesStatus === 'error' && (
-              <p className="text-xs text-red-600 dark:text-red-400">تعذّر الاتصال بويكي بيانات.</p>
-            )}
-            {lexemesStatus === 'ok' && <Senses lexemes={lexemes} root={root} />}
-          </div>
-          <div>
-            <Subheading>التصريف (المازني)</Subheading>
-            <Conjugation root={root} patterns={patterns} />
-          </div>
-        </div>
-      )}
-    </li>
+      </div>
+      <div>
+        <Subheading>المعاني (ويكي بيانات)</Subheading>
+        {lexemesStatus === 'loading' && <p className="text-xs text-gray-400">جارٍ التحميل من ويكي بيانات…</p>}
+        {lexemesStatus === 'error' && (
+          <p className="text-xs text-red-600 dark:text-red-400">تعذّر الاتصال بويكي بيانات.</p>
+        )}
+        {lexemesStatus === 'ok' && <Senses lexemes={lexemes} root={root} />}
+      </div>
+      <div>
+        <Subheading>التصريف (المازني)</Subheading>
+        <Conjugation root={root} patterns={patterns} />
+      </div>
+    </div>
   );
 };
 
+// The verbs of the root as a row of chips (verb + pattern, and how many
+// senses Wikidata has once known); the picked one opens its details below
+// the row, one verb at a time, like the readings above.
 const RootVerbs = ({ root, verbs }) => {
   const [lexemes, setLexemes] = useState(null);
   const [lexemesStatus, setLexemesStatus] = useState('loading');
+  const [picked, setPicked] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -301,7 +290,7 @@ const RootVerbs = ({ root, verbs }) => {
     };
   }, [root]);
 
-  // One item per verb form; كَتَبَ has two بابs, both listed on its line.
+  // One chip per verb form; كَتَبَ has two بابs, both on its chip.
   const byForm = new Map();
   for (const v of verbs) {
     if (!byForm.has(v.verb)) byForm.set(v.verb, []);
@@ -311,21 +300,59 @@ const RootVerbs = ({ root, verbs }) => {
   if (byForm.size === 0) {
     return <p className="text-xs text-gray-500 dark:text-gray-400">لا أفعال معروفة لهذا الجذر في جداول الأفعال.</p>;
   }
+  const pickedEntries = picked === null ? null : byForm.get(picked);
   return (
-    <ul className="space-y-1.5">
-      {[...byForm].map(([verb, entries]) => (
-        <VerbItem
-          key={verb}
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        {[...byForm].map(([verb, entries]) => {
+          const verbLexemes = lexemesForVerb(lexemes, verb);
+          const senseCount = verbLexemes.reduce((n, l) => n + l.senses.length, 0);
+          const chosen = verb === picked;
+          return (
+            <button
+              key={verb}
+              type="button"
+              onClick={() => setPicked(chosen ? null : verb)}
+              aria-pressed={chosen}
+              className={`rounded border px-2 py-0.5 text-xs ${
+                chosen
+                  ? 'border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-900/40 dark:text-blue-100'
+                  : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              <span className="text-sm font-semibold">{verb}</span>
+              <span className="text-gray-500 dark:text-gray-400"> {entries.map((e) => e.pattern).join(' / ')}</span>
+              {lexemesStatus === 'ok' && senseCount > 0 && (
+                <span className="text-gray-400" title={senseCountLabel(senseCount)}>
+                  {' '}
+                  · {senseCount}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {pickedEntries && (
+        <VerbDetails
           root={root}
-          verb={verb}
-          entries={entries}
-          lexemes={lexemesForVerb(lexemes, verb)}
+          verb={picked}
+          entries={pickedEntries}
+          lexemes={lexemesForVerb(lexemes, picked)}
           lexemesStatus={lexemesStatus}
         />
-      ))}
-    </ul>
+      )}
+    </div>
   );
 };
+
+// Arabic count agreement for "N readings".
+const readingCountLabel = (count) => {
+  if (count === 2) return 'قراءتان';
+  if (count <= 10) return `${count} قراءات`;
+  return `${count} قراءة`;
+};
+
+const Dash = () => <span className="text-gray-400">—</span>;
 
 const readingLabel = (reading) =>
   [reading.lemma, reading.pattern && `(${reading.pattern})`, reading.type ?? reading.pos].filter(Boolean).join(' ');
@@ -370,7 +397,8 @@ const WordDetails = ({ word, reading, readingIndex, onPickReading, verbsByRoot }
         </div>
       )}
 
-      <div className="flex flex-wrap items-baseline gap-x-2">
+      {/* Wide screens read the features and the lemma off the summary row. */}
+      <div className="flex flex-wrap items-baseline gap-x-2 sm:hidden">
         <InlineHeading>السمات الصرفية:</InlineHeading>
         <p className="text-sm">
           <span className="font-semibold">{reading.lemma}</span>
@@ -410,32 +438,48 @@ const WordDetails = ({ word, reading, readingIndex, onPickReading, verbsByRoot }
   );
 };
 
+// The summary row of a word: the chosen reading's word (with its lemma when
+// affixes hide it: الْمَرْصَد ← مَرْصَد), root, pattern and features (the
+// features on wide screens only; narrow ones get them in the details). The
+// whole row toggles the details; the chevron is there for the keyboard.
 const WordRow = ({ word, verbsByRoot }) => {
   const [expanded, setExpanded] = useState(false);
   const [readingIndex, setReadingIndex] = useState(0);
   const reading = word.readings[readingIndex] ?? null;
   const cell = 'px-2 py-1.5 align-top';
+  const toggle = () => setExpanded((v) => !v);
 
   return (
     <>
-      <tr className="border-t border-gray-100 dark:border-gray-700">
+      <tr
+        onClick={reading ? toggle : undefined}
+        className={`border-t border-gray-100 dark:border-gray-700 ${
+          reading ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50' : ''
+        }`}
+      >
         <td className={`${cell} font-semibold`} title={word.word}>
           {reading ? reading.diacritized : word.word}
+          {reading && reading.lemma !== reading.diacritized && (
+            <span className="mr-2 font-normal text-gray-500 dark:text-gray-400" title="الأصل">
+              ({reading.lemma})
+            </span>
+          )}
+          {word.readings.length > 1 && (
+            <span className="mr-2 whitespace-nowrap text-xs font-normal text-gray-400">
+              {readingCountLabel(word.readings.length)}
+            </span>
+          )}
         </td>
         {reading ? (
           <>
-            <td className={cell}>
-              {reading.root ? spacedRoot(reading.root) : <span className="text-gray-400">—</span>}
-              {word.roots.length > 1 && (
-                <sup className="mr-1 text-xs text-gray-400" title="قراءات أخرى تعطي جذرًا مختلفًا">
-                  +{word.roots.length - 1}
-                </sup>
-              )}
+            <td className={cell}>{reading.root ? spacedRoot(reading.root) : <Dash />}</td>
+            <td className={cell}>{reading.pattern ?? <Dash />}</td>
+            <td className={`${cell} hidden text-gray-600 sm:table-cell dark:text-gray-300`}>
+              {reading.features.length > 0 ? reading.features.join(' · ') : <Dash />}
             </td>
-            <td className={cell}>{reading.pattern ?? <span className="text-gray-400">—</span>}</td>
           </>
         ) : (
-          <td className={`${cell} text-xs text-gray-500 dark:text-gray-400`} colSpan={2}>
+          <td className={`${cell} text-xs text-gray-500 dark:text-gray-400`} colSpan={3}>
             لم يتعرّف المحلّل على الكلمة (ربما دخيلة أو اسم علم)
           </td>
         )}
@@ -443,7 +487,10 @@ const WordRow = ({ word, verbsByRoot }) => {
           {reading && (
             <button
               type="button"
-              onClick={() => setExpanded((v) => !v)}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggle();
+              }}
               aria-expanded={expanded}
               aria-label={expanded ? 'أقل' : 'المزيد'}
               title={expanded ? 'أقل' : 'المزيد'}
@@ -456,7 +503,7 @@ const WordRow = ({ word, verbsByRoot }) => {
       </tr>
       {expanded && reading && (
         <tr>
-          <td colSpan={4} className="px-0 pb-2">
+          <td colSpan={5} className="px-0 pb-2">
             <WordDetails
               word={word}
               reading={reading}
@@ -564,6 +611,7 @@ const MorphologySectionBody = ({ group }) => {
               <th className="px-2 py-1 text-right font-medium">الكلمة</th>
               <th className="px-2 py-1 text-right font-medium">الجذر</th>
               <th className="px-2 py-1 text-right font-medium">الوزن</th>
+              <th className="hidden px-2 py-1 text-right font-medium sm:table-cell">السمات الصرفية</th>
               <th className="w-10 px-2 py-1 text-left font-medium">
                 <span className="sr-only">المزيد</span>
               </th>

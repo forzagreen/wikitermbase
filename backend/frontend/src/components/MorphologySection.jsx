@@ -1,7 +1,7 @@
 // src/components/MorphologySection.jsx
 //
 // «تحليل صرفي»: the optional section at the end of a result group (settings
-// panel → التحليل الصرفي). One row per Arabic word of the headword, with its
+// panel → التحليل الصرفي والدلالي). One row per Arabic word of the headword, with its
 // root, pattern and features from /api/v1/morphology (farahidi). A row
 // expands to the other readings, the clitics and affixes, and
 // the verbs of the root (arabic-morphology tables, served by the same
@@ -218,23 +218,46 @@ const Senses = ({ lexemes, root }) => {
               ))}
             </ol>
           )}
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <ExternalChip href={wikidataLexemeUrl(lexeme.id)} title="المفردة في ويكي بيانات" icon={wikidataIcon}>
-              ويكي بيانات {lexeme.id}
-            </ExternalChip>
-            {lexeme.wiktionary !== false ? (
-              <ExternalChip href={wiktionaryUrl(lexeme.lemma)} title="مدخل الفعل في ويكاموس" icon={wiktionaryIcon}>
-                ويكاموس
-              </ExternalChip>
-            ) : (
-              <ExternalChip href={arSensesReviewUrl(lexeme.id)} title="لا مدخل في ويكاموس بعد: راجع المعاني وانشرها من أداة ar-senses">
-                مراجعة ونشر في ويكاموس
-              </ExternalChip>
-            )}
-          </div>
         </div>
       ))}
     </div>
+  );
+};
+
+// The verb's links, on its header line: each Wikidata lexeme, and the
+// Wiktionary entry once per lemma (duplicate lexemes share it), or the
+// ar-senses review of a lexeme whose lemma has no entry yet.
+const LexemeChips = ({ lexemes }) => {
+  const wiktionaryLemmas = [...new Set(lexemes.filter((l) => l.wiktionary !== false).map((l) => l.lemma))];
+  return (
+    <>
+      {lexemes.map((lexeme) => (
+        <ExternalChip
+          key={lexeme.id}
+          href={wikidataLexemeUrl(lexeme.id)}
+          title="المفردة في ويكي بيانات"
+          icon={wikidataIcon}
+        >
+          ويكي بيانات {lexeme.id}
+        </ExternalChip>
+      ))}
+      {wiktionaryLemmas.map((lemma) => (
+        <ExternalChip key={lemma} href={wiktionaryUrl(lemma)} title="مدخل الفعل في ويكاموس" icon={wiktionaryIcon}>
+          ويكاموس
+        </ExternalChip>
+      ))}
+      {lexemes
+        .filter((l) => l.wiktionary === false)
+        .map((lexeme) => (
+          <ExternalChip
+            key={`review-${lexeme.id}`}
+            href={arSensesReviewUrl(lexeme.id)}
+            title="لا مدخل في ويكاموس بعد: راجع المعاني وانشرها من أداة ar-senses"
+          >
+            مراجعة ونشر في ويكاموس
+          </ExternalChip>
+        ))}
+    </>
   );
 };
 
@@ -251,6 +274,7 @@ const VerbDetails = ({ root, verb, entries, lexemes, lexemesStatus }) => {
             {e.pattern} · {TRANS_LABEL[e.trans] ?? e.trans}
           </Chip>
         ))}
+        {lexemesStatus === 'ok' && <LexemeChips lexemes={lexemes} />}
       </div>
       <div>
         <Subheading>المعاني (ويكي بيانات)</Subheading>

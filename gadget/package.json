@@ -13,5 +13,8 @@
     "eslint": "^8.57.1",
     "eslint-config-wikimedia": "^0.32.6",
     "playwright": "^1.63.0"
+  },
+  "overrides": {
+    "postcss-selector-parser": "^7.1.6"
   }
 }

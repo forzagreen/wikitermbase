@@ -153,7 +153,18 @@ const WhatsNew = () => {
                 <h3 className="font-semibold text-gray-800 dark:text-gray-100">{f.title}</h3>
                 <p className="text-xs text-gray-400 dark:text-gray-500">{formatMonth(f.date)}</p>
                 <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{f.body}</p>
-                {f.link && (
+                {f.link && f.link.href && (
+                  <a
+                    href={f.link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1.5 inline-flex items-center gap-1 text-sm text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    {f.link.label}
+                    <ArrowLeft size={14} />
+                  </a>
+                )}
+                {f.link && f.link.to && (
                   <Link
                     to={f.link.to}
                     onClick={close}

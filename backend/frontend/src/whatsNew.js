@@ -9,7 +9,8 @@
 //    first; drop an entry once it is a few months old, the list is meant to
 //    stay short. `Media` is an optional component shown under the text,
 //    e.g. a small animation of the feature; `link` an optional page of the
-//    site to open from the entry.
+//    site (`to`) or external site (`href`, opens in a new tab) to open from
+//    the entry.
 //
 //  * Dictionaries: not listed here at all. The panel compares the dictionary
 //    ids the API returns with the largest one the visitor has seen, so a new
@@ -27,6 +28,14 @@ import PageLinkDemo from './components/PageLinkDemo';
 export const FEATURES = [
   {
     // Keep the ids stable: they are what the browser remembers having seen.
+    id: 'gen-ar',
+    date: '2026-10-18',
+    title: 'أداة جديدة: توليد الكلمات العربية',
+    body:
+      'لم تجد في المعاجم مقابلًا لمصطلح إنجليزي أو فرنسي؟ أداة «توليد الكلمات العربية» تقترح له ألفاظًا عربية باشتقاقها من الجذور والأوزان، وتبيّن لكل مقترح هل ورد في المعاجم (الدوحة، الشارقة، سِوار، الوسيط، المعاصرة، ويكاموس…) وبأي معنى، لتختار اللفظ الذي يؤدّي المعنى ولا يلتبس بغيره. وفيها معجم الأوزان الصرفية وبحث عن الجذور بالمعنى.',
+    link: { href: 'https://genar.waeltellat.com/', label: 'جرّب الأداة' },
+  },
+  {
     id: 'morphology',
     date: '2026-10-18',
     title: 'تحليل صرفي اختياري تحت كل نتيجة',

@@ -1,6 +1,6 @@
 // src/components/DictionaryApp.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { Search, ExternalLink, ChevronDown, ChevronUp, Quote, Copy, Check, BookOpen, Wrench, ArrowLeft } from 'lucide-react';
 import SiteHeader from './SiteHeader';
 import SiteFooter from './SiteFooter';
@@ -90,8 +90,13 @@ const ExpandableText = ({ text, charLimit = 200 }) => {
   );
 };
 
+// The term of a search is also the page's `?q=`, so a result can be shared or
+// reloaded; a URL longer than the input allows is cut to what the API accepts.
+const termFromParams = (params) => (params.get('q') ?? '').slice(0, MAX_QUERY_LENGTH);
+
 const DictionaryApp = () => {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(() => termFromParams(searchParams));
   const [expandedGroups, setExpandedGroups] = useState({});
   const [results, setResults] = useState([]);
   // Total groups for the current query; `results` holds the pages loaded so far.
@@ -115,6 +120,9 @@ const DictionaryApp = () => {
   // Term the displayed results belong to. "Show more" must page that one, not
   // whatever is in the input while the debounce is still pending.
   const resultsTermRef = useRef('');
+  // Term last written to (or read from) `?q=`, so that a search this component
+  // started does not come back through the URL as a second search.
+  const urlTermRef = useRef(termFromParams(searchParams));
 
   // Focus search input on mount
   useEffect(() => {
@@ -333,9 +341,18 @@ const DictionaryApp = () => {
     return controller;
   };
 
+  // Keeps `?q=` equal to the searched term; replaces the history entry, so
+  // that typing a word letter by letter does not leave one entry per keystroke.
+  const syncUrl = (term) => {
+    if (term === urlTermRef.current) return;
+    urlTermRef.current = term;
+    setSearchParams(term ? { q: term } : {}, { replace: true });
+  };
+
   // Search function with debouncing
   const handleSearch = async (term) => {
     if (term.trim().length < 3) {
+      syncUrl('');
       abortRef.current?.abort();
       abortRef.current = null;
       setLoading(false);
@@ -345,6 +362,7 @@ const DictionaryApp = () => {
       return;
     }
 
+    syncUrl(term.trim());
     const controller = startRequest();
     setLoading(true);
     setLoadingMore(false);
@@ -410,6 +428,26 @@ const DictionaryApp = () => {
       }
     }
   };
+
+  // A term arriving through the URL (page load, back/forward) is searched at
+  // once, without the typing debounce.
+  const urlTerm = termFromParams(searchParams);
+  useEffect(() => {
+    if (urlTerm === urlTermRef.current) return;
+    urlTermRef.current = urlTerm;
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    setSearchTerm(urlTerm);
+    handleSearch(urlTerm);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlTerm]);
+
+  // The initial `?q=` is searched on mount.
+  useEffect(() => {
+    if (urlTermRef.current) handleSearch(urlTermRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSearchInputChange = (e) => {
     const newTerm = e.target.value;

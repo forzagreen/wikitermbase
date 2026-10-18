@@ -28,6 +28,14 @@ import PageLinkDemo from './components/PageLinkDemo';
 export const FEATURES = [
   {
     // Keep the ids stable: they are what the browser remembers having seen.
+    id: 'search-url',
+    date: '2026-10-19',
+    title: 'رابط لكل بحث',
+    body:
+      'صار المصطلح الذي تبحث عنه جزءًا من عنوان الصفحة في المتصفح. انسخ العنوان وأرسله لزميل أو ضعه في نقاش، فيفتح على النتائج نفسها مباشرة.',
+    link: { to: '/?q=شبكة عصبية', label: 'مثال: شبكة عصبية' },
+  },
+  {
     id: 'gen-ar',
     date: '2026-10-18',
     title: 'أداة جديدة: توليد الكلمات العربية',

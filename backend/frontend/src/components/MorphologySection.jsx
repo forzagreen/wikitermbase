@@ -85,6 +85,11 @@ const Subheading = ({ children }) => (
   <h4 className="mb-1 text-xs font-semibold text-gray-500 dark:text-gray-400">{children}</h4>
 );
 
+// A Subheading followed by its value on the same line.
+const InlineHeading = ({ children }) => (
+  <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400">{children}</h4>
+);
+
 const ExternalChip = ({ href, children, title }) => (
   <a
     href={href}
@@ -365,20 +370,18 @@ const WordDetails = ({ word, reading, readingIndex, onPickReading, verbsByRoot }
         </div>
       )}
 
-      <div>
-        <Subheading>السمات الصرفية</Subheading>
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <InlineHeading>السمات الصرفية:</InlineHeading>
         <p className="text-sm">
           <span className="font-semibold">{reading.lemma}</span>
           <span className="text-gray-500 dark:text-gray-400"> · {reading.features.join(' · ')}</span>
         </p>
       </div>
 
-      <div>
-        <Subheading>السوابق واللواحق</Subheading>
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <InlineHeading>السوابق واللواحق:</InlineHeading>
         {affixGroups.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            لا سوابق ولا لواحق: الكلمة هي الجذع <span className="font-semibold">{reading.diacritized}</span>
-          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">لا توجد</p>
         ) : (
           <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             {affixGroups.map(([key, label]) => (
@@ -555,44 +558,23 @@ const MorphologySectionBody = ({ group }) => {
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">لا كلمات عربية في هذا المصطلح.</p>
       )}
       {status === 'ok' && data.words.length > 0 && (
-        <>
-          <table className="mt-1 w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-500 dark:text-gray-400">
-                <th className="px-2 py-1 text-right font-medium">الكلمة</th>
-                <th className="px-2 py-1 text-right font-medium">الجذر</th>
-                <th className="px-2 py-1 text-right font-medium">الوزن</th>
-                <th className="w-10 px-2 py-1 text-left font-medium">
-                  <span className="sr-only">المزيد</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.words.map((word, i) => (
-                <WordRow key={`${word.word}-${i}`} word={word} verbsByRoot={data.verbs} />
-              ))}
-            </tbody>
-          </table>
-          <p className="mt-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-            التحليل من محلّل{' '}
-            <a href="https://github.com/forzagreen/farahidi" target="_blank" rel="noopener noreferrer" className="hover:underline">
-              الفراهيدي
-            </a>{' '}
-            (قد يخطئ)، والأفعال من{' '}
-            <a href="https://github.com/M-Bakni/arabic-morphology" target="_blank" rel="noopener noreferrer" className="hover:underline">
-              جداول الأفعال العربية
-            </a>
-            ، والمعاني من ويكي بيانات، والتصريف من{' '}
-            <a href="https://github.com/forzagreen/mazini-js" target="_blank" rel="noopener noreferrer" className="hover:underline">
-              المازني
-            </a>
-            . رسم «فعل» مقتبس من{' '}
-            <a href="https://commons.wikimedia.org/wiki/File:F3l-caligraphy.svg" target="_blank" rel="noopener noreferrer" className="hover:underline">
-              عمل <bdi>Zieben007</bdi>
-            </a>{' '}
-            <span className="whitespace-nowrap">(<bdi>CC BY-SA 4.0</bdi>).</span>
-          </p>
-        </>
+        <table className="mt-1 w-full text-sm">
+          <thead>
+            <tr className="text-xs text-gray-500 dark:text-gray-400">
+              <th className="px-2 py-1 text-right font-medium">الكلمة</th>
+              <th className="px-2 py-1 text-right font-medium">الجذر</th>
+              <th className="px-2 py-1 text-right font-medium">الوزن</th>
+              <th className="w-10 px-2 py-1 text-left font-medium">
+                <span className="sr-only">المزيد</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.words.map((word, i) => (
+              <WordRow key={`${word.word}-${i}`} word={word} verbsByRoot={data.verbs} />
+            ))}
+          </tbody>
+        </table>
       )}
     </section>
   );

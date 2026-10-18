@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import {
   ExternalLink, BookOpen, Github, Play, Database, Code, FlaskConical,
-  Layers, Languages, Sparkles, Hammer, Search, ArrowLeft,
+  Layers, Languages, Sparkles, Hammer, Search, ArrowLeft, WandSparkles,
 } from 'lucide-react';
 import SiteHeader from './SiteHeader';
 import SiteFooter from './SiteFooter';
@@ -199,6 +199,15 @@ const LEVELS = [
           { kind: 'api', href: '/docs' },
           { kind: 'wiki', href: 'https://ar.wikipedia.org/wiki/ويكيبيديا:مسرد_الويكي', label: 'أداة ويكيبيديا' },
         ],
+      },
+      {
+        name: 'توليد الكلمات العربية',
+        latin: 'gen-ar',
+        icon: WandSparkles,
+        description:
+          'يقترح ألفاظاً عربية لمصطلح إنجليزي أو فرنسي لم تسعفه المعاجم، باشتقاقها من الجذور والأوزان، ويبيّن لكل مقترح هل ورد في المعاجم (الدوحة، الشارقة، سِوار، الوسيط، المعاصرة، arabterm، ويكاموس) وبأي معنى. يضمّ معجم الأوزان الصرفية وبحثاً عن الجذور بالمعنى.',
+        facts: ['اشتقاق من الجذر والوزن', 'تحقّق من المعاجم'],
+        links: [{ kind: 'site', href: 'https://genar.waeltellat.com/' }],
       },
       {
         name: 'قاعدة المعاجم',

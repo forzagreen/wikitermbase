@@ -8,8 +8,12 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      // Proxy API endpoints to port 5001
+      // Everything FastAPI serves besides the SPA shell goes to the backend on
+      // port 5001: the API and its OpenAPI docs.
       '/api': 'http://localhost:5001',
+      '/docs': 'http://localhost:5001',
+      '/redoc': 'http://localhost:5001',
+      '/openapi.json': 'http://localhost:5001',
     }
   }
 })

@@ -1,5 +1,6 @@
 // src/components/RawSearch.jsx
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router';
 import { Search, ExternalLink, ChevronDown, ChevronUp, Link2, Loader2, Quote, Check, Copy } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import { citationTemplate } from '../citations';
@@ -8,7 +9,11 @@ import { citationTemplate } from '../citations';
 const MAX_QUERY_LENGTH = 200;
 
 const RawSearch = () => {
-  const [searchQuery, setSearchQuery] = useState('');
+  // The searched term is also the page's `?q=`, so a result can be shared.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState(
+    () => (searchParams.get('q') ?? '').slice(0, MAX_QUERY_LENGTH)
+  );
   const [results, setResults] = useState([]);
   const [morphResults, setMorphResults] = useState(null);
   const [expandedItems, setExpandedItems] = useState(new Set());
@@ -31,6 +36,14 @@ const RawSearch = () => {
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
+      const term = searchQuery.trim();
+      setSearchParams(
+        (prev) => {
+          if ((prev.get('q') ?? '') === (term.length >= 3 ? term : '')) return prev;
+          return term.length >= 3 ? { q: term } : {};
+        },
+        { replace: true }
+      );
       if (searchQuery.trim().length >= 3) {
         performSearch(searchQuery);
         if (isArabic(searchQuery)) {
@@ -45,6 +58,7 @@ const RawSearch = () => {
     }, 300);
 
     return () => clearTimeout(debounceTimer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
   // Other utility functions remain the same...

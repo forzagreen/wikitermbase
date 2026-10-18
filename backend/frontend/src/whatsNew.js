@@ -27,6 +27,13 @@ import PageLinkDemo from './components/PageLinkDemo';
 export const FEATURES = [
   {
     // Keep the ids stable: they are what the browser remembers having seen.
+    id: 'morphology',
+    date: '2026-10-18',
+    title: 'تحليل صرفي اختياري تحت كل نتيجة',
+    body:
+      'من زرّ الإعدادات (⚙) في أعلى الصفحة يمكنك تفعيل «التحليل الصرفي»: تحت كل نتيجة يظهر جذر كلماتها العربية ووزنها، ومن «المزيد» تصل إلى السمات الصرفية والسوابق واللواحق، والأفعال المشتقة من الجذر مع معانيها المنشورة في ويكي بيانات وتصريفها. وفي الإعدادات نفسها انتقل اختيار المظهر الفاتح والداكن.',
+  },
+  {
     id: 'grouped-citations',
     date: '2026-10-16',
     title: 'تجميع استشهادات المعاجم في مرجع واحد',

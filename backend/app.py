@@ -18,6 +18,11 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.pool import QueuePool
 
+try:
+    from . import morphology  # gunicorn backend.app:app
+except ImportError:
+    import morphology  # pytest imports `app` with backend/ on sys.path
+
 POOL_SIZE = 10
 POOL_RECYCLE = 3600  # Recycle connections after 1 hour
 MAX_OVERFLOW = 20
@@ -83,6 +88,10 @@ TAGS_METADATA = [
     {
         "name": "Metadata",
         "description": "Information about dictionaries and dataset statistics.",
+    },
+    {
+        "name": "Morphology",
+        "description": "Morphological analysis of Arabic terms (farahidi) and the verbs of their roots (arabic-morphology).",
     },
     {
         "name": "Health",
@@ -1015,6 +1024,84 @@ class HealthResponse(BaseModel):
     database: Literal["ok", "unreachable"]
 
 
+class MorphologyAffix(BaseModel):
+    form: str = Field(
+        description="Diacritized surface form of the affix (وَ, بِال, ة, ات…)."
+    )
+    description: str | None = Field(
+        description="The lexicon's label for its function (حرف الجر, ضمير الغائبين…)."
+    )
+
+
+class MorphologyReading(BaseModel):
+    diacritized: str = Field(
+        description="The word vowelled, without the case or mood ending."
+    )
+    lemma: str = Field(description="Dictionary form (vowelled).")
+    root: str | None = Field(
+        description="3- or 4-letter root, every hamza seat written ء; null for particles and most proper nouns."
+    )
+    pattern: str | None = Field(
+        description="Pattern (وزن) of the lemma, e.g. فَاعُول, مُسْتَفْعَل."
+    )
+    stem_pattern: str | None = Field(
+        description="Pattern of the stem as it appears in the word."
+    )
+    pos: str = Field(description="اسم / فعل / حرف")
+    type: str | None = Field(
+        description="Sub-type: اسم فاعل, مصدر صناعي, نسبة, اسم علم…"
+    )
+    features: list[str] = Field(
+        description="The non-empty features in display order: pos, type, gender, number, tense, voice, person, transitivity, augmentation."
+    )
+    proclitics: list[MorphologyAffix]
+    prefixes: list[MorphologyAffix]
+    suffixes: list[MorphologyAffix]
+    enclitics: list[MorphologyAffix]
+    score: float = Field(
+        description="farahidi's out-of-context frequency weight; most readings tie at 0."
+    )
+
+
+class MorphologyWord(BaseModel):
+    word: str
+    analyzed: bool = Field(
+        description="False when the analyzer knows no reading (a loanword, a typo)."
+    )
+    readings: list[MorphologyReading] = Field(
+        description="Distinct readings, the most plausible for a term first: bare readings before ones with clitics, nominal before verbal, common noun before proper noun, then by score; ties go to the reading that is its own lemma, then to اسم جامد."
+    )
+    roots: list[str] = Field(
+        description="Distinct roots of the readings, in the readings' order."
+    )
+
+
+class RootVerb(BaseModel):
+    verb: str = Field(description="Vowelled past form, e.g. اِسْتَعْمَرَ.")
+    pattern: str = Field(
+        description="Pattern name as mazini spells it (فعَل يفعُل, استفعل, تفعلل…)."
+    )
+    trans: Literal["l", "m", "k"] = Field(
+        description="لازم (l), متعدٍّ (m), or both (k)."
+    )
+    deriv: Literal["basic", "deriv"] = Field(
+        description="مجرد (basic) or مزيد (deriv)."
+    )
+    type: str = Field(
+        description="Root class of a bare verb (صحيح سالم, معتل أجوف واوي…); empty otherwise."
+    )
+
+
+class MorphologyResponse(BaseModel):
+    term: str
+    words: list[MorphologyWord] = Field(
+        description="The Arabic words of the term, in order (at most 8)."
+    )
+    verbs: dict[str, list[RootVerb]] = Field(
+        description="The verbs of every root proposed by any reading, keyed by root (arabic-morphology tables). Empty list: no verb known for the root."
+    )
+
+
 @app.get(
     "/api/v1/search",
     tags=["Search"],
@@ -1195,6 +1282,30 @@ def get_stats():
 
 
 @app.get(
+    "/api/v1/morphology",
+    tags=["Morphology"],
+    summary="Morphological analysis of an Arabic term",
+    response_model=MorphologyResponse,
+    response_description="Each word's readings (root, pattern, features, affixes) and the verbs of the proposed roots.",
+)
+def morphology_analysis(
+    q: str = Query(
+        ...,
+        min_length=1,
+        max_length=MAX_QUERY_LENGTH,
+        description="An Arabic term (a search result's headword, typically). Only its Arabic words are analyzed, at most 8 of them; diacritics and ال are fine.",
+    ),
+):
+    """Analyze an Arabic term word by word with [farahidi](https://github.com/forzagreen/farahidi)
+    (a port of AlKhalil Morpho Sys 2) and list, for every root a reading proposes, the
+    verbs of that root from the [arabic-morphology](https://github.com/M-Bakni/arabic-morphology)
+    tables (CC BY 4.0). Everything is computed locally and cached; nothing is looked up online.
+    The site pairs the verbs with their Wikidata lexemes and senses on the client side.
+    """
+    return morphology.analyze_term(q)
+
+
+@app.get(
     "/healthz",
     tags=["Health"],
     summary="Health check",
@@ -1230,3 +1341,7 @@ def index():
 
 
 app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
+
+# The Procfile starts gunicorn with --preload, so this runs once in the master
+# and the forked workers share the ~150 MB lexicon instead of loading it each.
+morphology.warm()

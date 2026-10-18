@@ -64,8 +64,25 @@ def verbs_of_root(root: str) -> list[dict]:
 
 
 def reading_sort_key(analysis):
+    """Readings a term is likely to be first: bare before clitic-bearing,
+    nominal before verbal, common noun before proper noun (farahidi gives
+    proper-noun readings of ذاكرة or إشعاع a small positive score), then
+    farahidi's score. Ties (most readings score 0, and farahidi's own order
+    among them differs between platforms) go to the reading that is its own
+    lemma (a headword is a dictionary form), then to the plain noun (اسم جامد)
+    over the derived types, then to fewer affixes, then to the lemma."""
     clitics = len(analysis.proclitics) + len(analysis.enclitics)
-    return (clitics, analysis.pos == "فعل", -analysis.score)
+    affixes = len(analysis.prefixes) + len(analysis.suffixes)
+    return (
+        clitics,
+        analysis.pos == "فعل",
+        analysis.type == "اسم علم",
+        -analysis.score,
+        analysis.lemma != analysis.diacritized,
+        analysis.type != "اسم جامد",
+        affixes,
+        analysis.lemma,
+    )
 
 
 def _affixes(affixes) -> list[dict]:

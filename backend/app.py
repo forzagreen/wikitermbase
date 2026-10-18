@@ -1069,7 +1069,7 @@ class MorphologyWord(BaseModel):
         description="False when the analyzer knows no reading (a loanword, a typo)."
     )
     readings: list[MorphologyReading] = Field(
-        description="Distinct readings, the most plausible for a term first: bare readings before ones with clitics, nominal before verbal, then by score."
+        description="Distinct readings, the most plausible for a term first: bare readings before ones with clitics, nominal before verbal, common noun before proper noun, then by score; ties go to the reading that is its own lemma, then to اسم جامد."
     )
     roots: list[str] = Field(
         description="Distinct roots of the readings, in the readings' order."

@@ -29,9 +29,11 @@ def test_analyze_word_vowelled_input():
     # Vowels narrow the readings when the lexicon agrees with them...
     assert [r["lemma"] for r in morphology.analyze_word("شَبَكَة")["readings"]] == ["شَبَكَة"]
     narrowed = morphology.analyze_word("خَلِيّة")["readings"]
-    assert unicodedata.normalize("NFC", narrowed[0]["lemma"]) == unicodedata.normalize(
-        "NFC", "خَلِيَّة"
-    )
+    assert 1 < len(narrowed) < len(morphology.analyze_word("خلية")["readings"])
+    # Among tied readings the one that is its own lemma leads (اسم جامد
+    # خَلِيَّة, not the نسبة خَلِيّ + ة), whatever order farahidi enumerates.
+    assert narrowed[0]["lemma"] == narrowed[0]["diacritized"]
+    assert narrowed[0]["type"] == "اسم جامد"
     # ...and are dropped when they match nothing (farahidi reads no word with
     # a vowel after the shadda), rather than losing the word.
     odd = morphology.analyze_word("خَلِيَّة")
@@ -56,6 +58,8 @@ def test_analyze_word_prefers_bare_nominal_readings():
     assert word["readings"][0]["lemma"] == "ضَغْط"
     assert word["readings"][0]["pos"] == "اسم"
     assert word["roots"] == ["ضغط"]
+    # A proper-noun reading scores above the common noun; the term is a noun.
+    assert morphology.analyze_word("ذاكرة")["readings"][0]["type"] != "اسم علم"
     # Readings with clitics come after the bare ones.
     clitic_free = [
         not (r["proclitics"] or r["enclitics"])

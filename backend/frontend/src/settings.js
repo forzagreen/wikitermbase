@@ -12,6 +12,9 @@ export const DEFAULT_SETTINGS = {
   // «تحليل صرفي» under every result group (MorphologySection.jsx). Off by
   // default: it is a specialist's view and costs one request per group.
   morphology: false,
+  // Dictionary entries of a result group shown open, or folded behind the
+  // chevron. Folded keeps a page of 30 groups scannable.
+  groupsExpanded: false,
 };
 
 const read = () => {

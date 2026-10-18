@@ -99,6 +99,22 @@ const SettingsPanel = () => {
             <ThemeToggle />
           </section>
 
+          <section className="border-b border-gray-100 py-3 dark:border-gray-700">
+            <div className="flex items-start justify-between gap-3">
+              <label htmlFor="setting-groups-expanded" className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                فتح مداخل المعاجم
+              </label>
+              <Switch
+                id="setting-groups-expanded"
+                checked={settings.groupsExpanded}
+                onChange={(value) => update({ groupsExpanded: value })}
+              />
+            </div>
+            <p className="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+              يعرض مداخل المعاجم تحت كل نتيجة مفتوحةً من البداية؛ وإلا تبقى مطويّة ويفتحها السهم عند الحاجة.
+            </p>
+          </section>
+
           <section className="pt-3">
             <div className="flex items-start justify-between gap-3">
               <label htmlFor="setting-morphology" className="text-sm font-medium text-gray-800 dark:text-gray-100">

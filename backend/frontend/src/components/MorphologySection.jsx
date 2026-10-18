@@ -20,6 +20,7 @@ import {
   wikidataSenseUrl,
   wiktionaryUrl,
 } from '../wikidata';
+import { termToAnalyze } from '../morphologyTerm';
 
 const TRANS_LABEL = { l: 'لازم', m: 'متعدٍّ', k: 'لازم ومتعدٍّ' };
 const DERIV_LABEL = { basic: 'مجرد', deriv: 'مزيد' };
@@ -39,27 +40,6 @@ const HEADLINE_SLOTS = [
   ['pp', 'اسم المفعول'],
 ];
 const MAX_LISTED_READINGS = 6;
-
-// The group's title (arabic_normalised) has lost its hamzas and diacritics,
-// which the analyzer needs (إنتاجية is a word, انتاجية is not). So the
-// section analyzes the most common spelling among the group's entries,
-// without their parenthesised glosses.
-const termToAnalyze = (group) => {
-  const counts = new Map();
-  for (const occurrence of group.occurences ?? []) {
-    const text = (occurrence.arabic ?? '')
-      .replace(/\(.*?\)/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (text) counts.set(text, (counts.get(text) ?? 0) + 1);
-  }
-  let best = group.arabic_normalised;
-  let bestCount = 0;
-  for (const [text, count] of counts) {
-    if (count > bestCount) [best, bestCount] = [text, count];
-  }
-  return best;
-};
 
 const analysisCache = new Map();
 const fetchAnalysis = (term) => {
@@ -569,8 +549,8 @@ const MorphologySection = ({ group }) => {
             (قد يخطئ)، والأفعال من{' '}
             <a href="https://github.com/M-Bakni/arabic-morphology" target="_blank" rel="noopener noreferrer" className="hover:underline">
               جداول الأفعال العربية
-            </a>{' '}
-            (بوّاب ومير علم، CC BY 4.0)، والمعاني من ويكي بيانات، والتصريف من{' '}
+            </a>
+            ، والمعاني من ويكي بيانات، والتصريف من{' '}
             <a href="https://github.com/forzagreen/mazini-js" target="_blank" rel="noopener noreferrer" className="hover:underline">
               المازني
             </a>

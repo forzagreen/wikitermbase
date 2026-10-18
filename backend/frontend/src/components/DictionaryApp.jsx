@@ -103,8 +103,10 @@ const DictionaryApp = () => {
   const [openPopupId, setOpenPopupId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [stats, setStats] = useState(null);
-  // Optional «تحليل صرفي» section under every group (settings panel).
+  // Settings panel: the optional «تحليل صرفي» section under every group, and
+  // whether a group's dictionary entries start open or folded.
   const [settings] = useSettings();
+  const groupsExpanded = settings.groupsExpanded;
   const searchInputRef = useRef(null);
   const searchTimeoutRef = useRef(null);
   // Only one request in flight: a new search cancels the previous one, so a
@@ -137,6 +139,13 @@ const DictionaryApp = () => {
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, [openPopupId]);
+
+  // Flipping the setting applies to the groups already on screen.
+  useEffect(() => {
+    setExpandedGroups((prev) =>
+      Object.fromEntries(Object.keys(prev).map((index) => [index, groupsExpanded]))
+    );
+  }, [groupsExpanded]);
 
   // Cleanup timeout and in-flight request on unmount
   useEffect(() => {
@@ -350,7 +359,7 @@ const DictionaryApp = () => {
         setResults(data.groups);
         setTotalGroups(data.number_groups ?? data.groups.length);
         const initialExpanded = data.groups.reduce((acc, _, index) => {
-          acc[index] = true;
+          acc[index] = groupsExpanded;
           return acc;
         }, {});
         setExpandedGroups(initialExpanded);
@@ -387,7 +396,7 @@ const DictionaryApp = () => {
       setExpandedGroups((prev) => {
         const next = { ...prev };
         groups.forEach((_, index) => {
-          next[offset + index] = true;
+          next[offset + index] = groupsExpanded;
         });
         return next;
       });

@@ -71,6 +71,12 @@ const loadMazini = () => {
 
 const spacedRoot = (root) => [...root].join(' ');
 
+// The mazini demo opened on this verb (it reads root and wazn from the hash;
+// a wazn it does not know is ignored, the arabic-morphology patterns are its
+// own names).
+const maziniUrl = (root, wazn) =>
+  `https://forzagreen.github.io/mazini-js/#${new URLSearchParams({ root, wazn }).toString()}`;
+
 const Chip = ({ children, muted = false, title }) => (
   <span
     title={title}
@@ -298,10 +304,11 @@ const VerbDetails = ({ root, verb, entries, lexemes, lexemesStatus }) => {
         <Subheading>
           التصريف (
           <a
-            href="https://forzagreen.github.io/mazini-js/"
+            href={maziniUrl(root, patterns[0])}
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-600 hover:underline dark:text-blue-400"
+            title="الجدول الكامل في موقع المازني"
           >
             المازني
           </a>

@@ -242,7 +242,7 @@ const RawSearch = () => {
                     <span>•</span>
                     <span>
                       QID: <a
-                        href={`https://www.wikidata.org/wiki/${item.dictionary_wikidata_id}`}
+                        href={`https://www.wikidata.org/wiki/${item.dictionary_wikidata_id}?uselang=ar`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="group relative text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"

@@ -249,7 +249,7 @@ const DictionaryApp = () => {
       parts.push(
         <span title="عنصر ويكي بيانات">
           QID: <a 
-            href={`https://wikidata.org/wiki/${occurrence.dictionary_wikidata_id}`}
+            href={`https://www.wikidata.org/wiki/${occurrence.dictionary_wikidata_id}?uselang=ar`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300"

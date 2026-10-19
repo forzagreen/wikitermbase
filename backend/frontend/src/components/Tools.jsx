@@ -228,7 +228,7 @@ const OUTPUTS = [
   {
     name: 'ويكي بيانات',
     description: 'مفردات (Lexemes) بمعانيها وصيغها',
-    href: 'https://www.wikidata.org/wiki/Wikidata:Lexicographical_data',
+    href: 'https://www.wikidata.org/wiki/Wikidata:Lexicographical_data?uselang=ar',
   },
   {
     name: 'ويكاموس',

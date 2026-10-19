@@ -476,7 +476,7 @@
 				$dictName.append(
 					$( '<a>' )
 						.attr( {
-							href: 'https://www.wikidata.org/wiki/' + term.dictionary_wikidata_id,
+							href: 'https://www.wikidata.org/wiki/' + term.dictionary_wikidata_id + '?uselang=ar',
 							target: '_blank',
 							rel: 'noopener'
 						} )

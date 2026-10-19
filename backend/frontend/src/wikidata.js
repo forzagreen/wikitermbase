@@ -144,11 +144,12 @@ export const fetchRootLexemes = (root) => {
   return cache.get(root);
 };
 
-export const wikidataLexemeUrl = (id) => `https://www.wikidata.org/wiki/Lexeme:${id}`;
+// uselang=ar: the reader lands on the Arabic interface of Wikidata.
+export const wikidataLexemeUrl = (id) => `https://www.wikidata.org/wiki/Lexeme:${id}?uselang=ar`;
 // A sense's anchor on the lexeme page is its local part (L123-S2 → #S2).
 export const wikidataSenseUrl = (senseId) => {
   const [lexeme, sense] = senseId.split('-');
-  return `https://www.wikidata.org/wiki/Lexeme:${lexeme}#${sense}`;
+  return `${wikidataLexemeUrl(lexeme)}#${sense}`;
 };
 // The page name keeps the tashkeel (كَتَبَ, not كتب).
 export const wiktionaryUrl = (lemma) => `https://ar.wiktionary.org/wiki/${encodeURIComponent(fullKey(lemma))}`;

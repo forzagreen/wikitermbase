@@ -157,7 +157,7 @@ const Dictionaries = () => {
                       {/* Wikidata Link */}
                       {dict.wikidata_id && (
                         <a
-                          href={`https://www.wikidata.org/wiki/${dict.wikidata_id}`}
+                          href={`https://www.wikidata.org/wiki/${dict.wikidata_id}?uselang=ar`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="relative z-10 inline-flex items-center gap-1 text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 text-sm"

@@ -132,7 +132,7 @@ const MaziniTryIt = () => {
             })}
           </dl>
           <a
-            href="https://forzagreen.github.io/mazini-js/"
+            href={`https://forzagreen.github.io/mazini-js/#${new URLSearchParams({ root, wazn }).toString()}`}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-2 inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:underline"

@@ -46,7 +46,7 @@ const cache = new Map();
 // One lemma can have several lexemes (an old entry with English glosses and
 // the one ar-senses created): a key lists them all, the ones with Arabic
 // glosses first.
-const hasArabicGloss = (lexeme) => lexeme.senses.some((s) => s.gloss);
+export const hasArabicGloss = (lexeme) => lexeme.senses.some((s) => s.gloss);
 const sortLexemes = (lexemes) =>
   lexemes.sort(
     (a, b) => Number(hasArabicGloss(b)) - Number(hasArabicGloss(a)) || b.senses.length - a.senses.length

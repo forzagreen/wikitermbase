@@ -21,6 +21,7 @@ import {
   wikidataLexemeUrl,
   wikidataSenseUrl,
   wiktionaryUrl,
+  hasArabicGloss,
 } from '../wikidata';
 import wikidataIcon from '../assets/wikidata.svg';
 import wiktionaryIcon from '../assets/wiktionary.svg';
@@ -225,8 +226,9 @@ const Senses = ({ lexemes, root }) => {
 };
 
 // The verb's links, on its header line: each Wikidata lexeme, and the
-// Wiktionary entry once per lemma (duplicate lexemes share it), or the
-// ar-senses review of a lexeme whose lemma has no entry yet.
+// Wiktionary entry once per lemma (duplicate lexemes share it). A lemma
+// with no entry yet is not mentioned; its senses are what ar-senses
+// reviews (see ReviewChips).
 const LexemeChips = ({ lexemes }) => {
   const wiktionaryLemmas = [...new Set(lexemes.filter((l) => l.wiktionary !== false).map((l) => l.lemma))];
   return (
@@ -246,19 +248,24 @@ const LexemeChips = ({ lexemes }) => {
           ويكاموس
         </ExternalChip>
       ))}
-      {lexemes
-        .filter((l) => l.wiktionary === false)
-        .map((lexeme) => (
-          <ExternalChip
-            key={`review-${lexeme.id}`}
-            href={arSensesReviewUrl(lexeme.id)}
-            title="لا مدخل في ويكاموس بعد: راجع المعاني وانشرها من أداة ar-senses"
-          >
-            مراجعة ونشر في ويكاموس
-          </ExternalChip>
-        ))}
     </>
   );
+};
+
+// Next to the senses heading: the ar-senses review of each lexeme whose
+// senses are still missing or have no Arabic gloss (an old entry glossed in
+// English only). Whether Wiktionary has the entry does not matter here.
+const ReviewChips = ({ lexemes }) => {
+  const pending = lexemes.filter((l) => !hasArabicGloss(l));
+  return pending.map((lexeme) => (
+    <ExternalChip
+      key={lexeme.id}
+      href={arSensesReviewUrl(lexeme.id)}
+      title={`راجع معاني الفعل وانشرها من أداة ar-senses${pending.length > 1 ? ` (${lexeme.id})` : ''}`}
+    >
+      مراجعة المعاني ونشرها
+    </ExternalChip>
+  ));
 };
 
 // The details of the verb picked in the chip row: its patterns, its senses on
@@ -277,7 +284,10 @@ const VerbDetails = ({ root, verb, entries, lexemes, lexemesStatus }) => {
         {lexemesStatus === 'ok' && <LexemeChips lexemes={lexemes} />}
       </div>
       <div>
-        <Subheading>المعاني (ويكي بيانات)</Subheading>
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <InlineHeading>المعاني (ويكي بيانات)</InlineHeading>
+          {lexemesStatus === 'ok' && <ReviewChips lexemes={lexemes} />}
+        </div>
         {lexemesStatus === 'loading' && <p className="text-xs text-gray-400">جارٍ التحميل من ويكي بيانات…</p>}
         {lexemesStatus === 'error' && (
           <p className="text-xs text-red-600 dark:text-red-400">تعذّر الاتصال بويكي بيانات.</p>

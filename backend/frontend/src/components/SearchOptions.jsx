@@ -2,9 +2,12 @@
 //
 // The two optional features of the results page, as a row of switches right
 // under the search box (they used to sit in a ⚙ panel of the header, where
-// nobody found them). Both are off by default and saved in the browser
-// (settings.js). Each switch has an ⓘ button that shows its one-line hint;
-// the hint closes on Esc, on a click outside and on a second click on ⓘ.
+// nobody found them). DictionaryApp mounts the row only while results are on
+// screen, since both options only change how results are rendered; the row
+// starts at the right, where an RTL reader's eye lands. Both are off by
+// default and saved in the browser (settings.js). Each switch has an ⓘ button
+// that shows its one-line hint; the hint closes on Esc, on a click outside
+// and on a second click on ⓘ.
 import { useEffect, useRef, useState } from 'react';
 import { Info, ListTree } from 'lucide-react';
 import FaalIcon from './FaalIcon';
@@ -77,7 +80,7 @@ const SearchOptions = () => {
 
   return (
     <div ref={rootRef} className="mt-2.5">
-      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1.5">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         {OPTIONS.map(({ key, icon: Icon, label }) => {
           const checked = settings[key];
           const labelId = `search-option-${key}-label`;
@@ -124,10 +127,10 @@ const SearchOptions = () => {
           );
         })}
       </div>
-      {/* Under the pills, which sit at the end (left) of the row, and no
+      {/* Under the pills, at the start (right) of the row like them, and no
           wider than its text, so it reads as coming from the ⓘ. */}
       {shown && (
-        <div className="flex justify-end">
+        <div className="flex">
           <p
             id="search-option-hint"
             role="status"

@@ -498,7 +498,10 @@ const DictionaryApp = () => {
           />
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={26} />
         </div>
-        <SearchOptions />
+        {/* Only with results: the options change how results are rendered.
+            `results` survives a refetch, so the row does not blink while the
+            query is being edited. */}
+        {results.length > 0 && <SearchOptions />}
       </div>
 
       {/* Error Message */}

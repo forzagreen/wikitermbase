@@ -10,8 +10,7 @@
 // load on, not from a component: index.html applies the saved preference
 // before first paint, but a browser can still change its reported scheme
 // right after (a fresh Chrome private window first reports dark, then the OS
-// value), and that must be followed whether or not the settings panel, which
-// holds the toggle, has ever been opened.
+// value), and that must be followed on pages that do not mount the toggle.
 import { useCallback, useSyncExternalStore } from 'react';
 
 const STORAGE_KEY = 'theme';

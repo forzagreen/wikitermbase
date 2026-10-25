@@ -1,7 +1,7 @@
 // src/components/MorphologySection.jsx
 //
-// «تحليل صرفي»: the optional section at the end of a result group (settings
-// panel → التحليل الصرفي والدلالي). One row per Arabic word of the headword, with its
+// «تحليل صرفي»: the optional section at the end of a result group (the
+// «التحليل الصرفي والدلالي» switch under the search box, SearchOptions.jsx). One row per Arabic word of the headword, with its
 // root, pattern and features from /api/v1/morphology (farahidi). A row
 // expands to the other readings, the clitics and affixes, and
 // the verbs of the root (arabic-morphology tables, served by the same

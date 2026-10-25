@@ -6,6 +6,7 @@ import SiteHeader from './SiteHeader';
 import SiteFooter from './SiteFooter';
 import GroupedCitation from './GroupedCitation';
 import MorphologySection from './MorphologySection';
+import SearchOptions from './SearchOptions';
 import { useSettings } from '../settings';
 import { fetchStats } from '../api';
 import { citationTemplate, groupCitations } from '../citations';
@@ -497,6 +498,7 @@ const DictionaryApp = () => {
           />
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={26} />
         </div>
+        <SearchOptions />
       </div>
 
       {/* Error Message */}

@@ -1,14 +1,15 @@
 // src/components/SiteHeader.jsx
 //
-// Shared page header: logo, page title, the site navigation and the ⚙
-// settings panel (colour scheme, optional features). Nav links
+// Shared page header: logo, page title, the site navigation and the colour
+// scheme toggle (the optional features of the results page are switches
+// under the search box, SearchOptions.jsx). Nav links
 // carry a text label on sm+ screens (icon-only on phones) and highlight the
 // current page so the navigation reads as navigation, not as a row of
 // look-alike icons.
 import { Link, NavLink } from 'react-router';
 import { BookOpen, Wrench, HelpCircle } from 'lucide-react';
 import Logo from './Logo';
-import SettingsPanel from './SettingsPanel';
+import ThemeToggle from './ThemeToggle';
 import WhatsNew from './WhatsNew';
 import { WIKI_GADGET_URL } from '../siteLinks';
 
@@ -54,7 +55,7 @@ const SiteHeader = ({ title }) => (
           >
             <HelpCircle size={22} />
           </a>
-          <SettingsPanel />
+          <ThemeToggle />
         </nav>
       </div>
     </div>

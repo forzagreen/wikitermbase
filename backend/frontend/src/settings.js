@@ -1,6 +1,6 @@
 // src/settings.js
 //
-// The visitor's settings (the ⚙ panel in the header, SettingsPanel.jsx):
+// The visitor's settings (the switches under the search box, SearchOptions.jsx):
 // one JSON object in localStorage, read once, shared by every component
 // through useSettings(). Nothing is sent anywhere. The colour scheme has its
 // own key and hook (theme.js), from before this panel existed.

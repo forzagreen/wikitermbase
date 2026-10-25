@@ -128,13 +128,14 @@ const SearchOptions = () => {
         })}
       </div>
       {/* Under the pills, at the start (right) of the row like them, and no
-          wider than its text, so it reads as coming from the ⓘ. */}
+          wider than its text, so it reads as coming from the ⓘ. No width cap:
+          the longer hint fits on one line of the results column. */}
       {shown && (
         <div className="flex">
           <p
             id="search-option-hint"
             role="status"
-            className="mt-2 max-w-lg rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-900 dark:border-blue-900 dark:bg-blue-900/30 dark:text-blue-100"
+            className="mt-2 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-900 dark:border-blue-900 dark:bg-blue-900/30 dark:text-blue-100"
           >
             <span className="font-semibold">{shown.label}: </span>
             {shown.hint}

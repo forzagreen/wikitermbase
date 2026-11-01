@@ -65,12 +65,17 @@
     '<circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>' +
     '<circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg>';
 
+  // Small "opens elsewhere" arrow at the end of each row.
+  var LINK_ICON =
+    '<svg class="m" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M7 17 17 7M8 7h9v9"/></svg>';
+
   var STYLE =
     ':host{position:relative;display:inline-block;font:inherit;direction:rtl;' +
     '--es-text:#1f2937;--es-muted:#6b7280;--es-bg:#fff;--es-border:#e5e7eb;--es-hover:#f3f4f6;' +
-    '--es-accent:#1d4ed8;--es-accent-bg:#dbeafe;--es-shadow:0 10px 30px rgba(0,0,0,.15)}' +
+    '--es-accent:#1d4ed8;--es-accent-bg:#dbeafe;--es-band:#f9fafb;--es-shadow:0 10px 30px rgba(0,0,0,.15)}' +
     ':host([dark]){--es-text:#e5e7eb;--es-muted:#9ca3af;--es-bg:#1f2937;--es-border:#374151;--es-hover:#374151;' +
-    '--es-accent:#bfdbfe;--es-accent-bg:rgba(30,58,138,.5);--es-shadow:0 10px 30px rgba(0,0,0,.5)}' +
+    '--es-accent:#bfdbfe;--es-accent-bg:rgba(30,58,138,.5);--es-band:#111827;--es-shadow:0 10px 30px rgba(0,0,0,.5)}' +
     '*{box-sizing:border-box}' +
     'button{display:inline-flex;align-items:center;gap:.375rem;border:0;border-radius:9999px;padding:.5rem .625rem;' +
     'background:transparent;color:var(--es-text);font:inherit;font-size:.875rem;font-weight:500;cursor:pointer;line-height:1}' +
@@ -80,19 +85,23 @@
     '@media (max-width:639px){.label{display:none}}' +
     '.panel{position:absolute;top:calc(100% + .5rem);z-index:1000;width:min(22rem,calc(100vw - 2rem));' +
     'background:var(--es-bg);color:var(--es-text);border:1px solid var(--es-border);border-radius:.75rem;' +
-    'box-shadow:var(--es-shadow);padding:.75rem 0 .25rem;text-align:start}' +
+    'box-shadow:var(--es-shadow);padding:0 0 .25rem;text-align:start;overflow:hidden}' +
     '.panel[hidden]{display:none}.panel.left{left:0}.panel.right{right:0}.panel.fixed{position:fixed;left:1rem;right:1rem;width:auto}' +
-    '.head{padding:0 1rem .5rem}.head b{display:block;font-size:1rem}.head span{display:block;font-size:.75rem;color:var(--es-muted)}' +
+    '.head{padding:.5rem 1rem;background:var(--es-band);border-bottom:1px solid var(--es-border);font-size:.75rem;color:var(--es-muted)}' +
+    '.head b{font-weight:600;color:var(--es-text)}.head b::after{content:" · "}' +
     '.body{max-height:calc(100vh - 10rem);overflow-y:auto}' +
-    'h3{margin:.5rem 1rem .125rem;font-size:.6875rem;font-weight:600;letter-spacing:.02em;color:var(--es-muted)}' +
-    'ul{list-style:none;margin:0;padding:0}' +
-    'a{display:block;padding:.375rem 1rem;color:inherit;text-decoration:none;line-height:1.35}' +
+    'h3{margin:0;padding:.3rem 1rem;background:var(--es-band);border-top:1px solid var(--es-border);border-bottom:1px solid var(--es-border);' +
+    'font-size:.6875rem;font-weight:600;color:var(--es-muted)}' +
+    '.body h3:first-child{border-top:0}ul{padding:.25rem 0}' +
+    'ul{list-style:none;margin:0}' +
+    'a{position:relative;display:block;padding:.375rem 1rem;padding-inline-end:2.25rem;color:inherit;text-decoration:none;line-height:1.35}' +
+    'a .m{position:absolute;inset-inline-end:.875rem;top:.6rem;width:14px;height:14px;color:var(--es-muted);opacity:.6}a:hover .m{opacity:1}' +
     'a:hover,a:focus-visible{background:var(--es-hover);outline:none}' +
     'a[aria-current]{background:var(--es-accent-bg);color:var(--es-accent)}' +
     'a .n{font-weight:600}a .t{display:block;font-size:.75rem;color:var(--es-muted)}' +
     'a[aria-current] .t{color:inherit;opacity:.8}' +
     'a .l{margin:0 .5rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.6875rem;color:var(--es-muted);direction:ltr;unicode-bidi:isolate}' +
-    '.foot{margin-top:.25rem;border-top:1px solid var(--es-border);padding-top:.25rem}' +
+    '.foot{border-top:1px solid var(--es-border);padding-top:.25rem}' +
     '.foot a{display:flex;justify-content:space-between;font-size:.8125rem;font-weight:600}';
 
   function esc(s) {
@@ -110,6 +119,7 @@
         html +=
           '<li><a href="' + esc(t.url) + '"' +
           (isCurrent ? ' aria-current="page"' : ' target="_blank" rel="noopener"') + '>' +
+          (isCurrent ? '' : LINK_ICON) +
           '<span class="n">' + esc(t.name) + '</span>' +
           '<span class="l">' + esc(t.latin) + '</span>' +
           '<span class="t">' + esc(t.tag) + '</span></a></li>';

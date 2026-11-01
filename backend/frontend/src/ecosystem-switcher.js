@@ -20,8 +20,13 @@
 //              button reads as the current nav item.
 //
 // Colour scheme: `data-theme="dark|light"` on <html> wins (the GitHub Pages
-// sites and arabterm set it before paint); otherwise a `dark` class on <html>
-// (wikitermbase, Tailwind); otherwise light.
+// sites and arabterm set it before paint), then Bootstrap's `data-bs-theme`
+// (ar-senses); otherwise a `dark` class on <html> (wikitermbase, Tailwind);
+// otherwise light.
+//
+// A host whose header is not the page colour (ar-senses' blue navbar) sets
+// the button's colours from its own stylesheet; the panel keeps its own:
+//   ecosystem-switcher { --es-btn-text: #fff; --es-btn-hover: rgba(255,255,255,.15); }
 (function () {
   if (typeof window === 'undefined' || !window.customElements) return;
   if (window.customElements.get('ecosystem-switcher')) return;
@@ -71,15 +76,15 @@
     '<path d="M7 17 17 7M8 7h9v9"/></svg>';
 
   var STYLE =
-    ':host{position:relative;display:inline-block;font:inherit;direction:rtl;' +
+    ':host{position:relative;display:inline-block;font:inherit;direction:rtl;--es-btn-text:var(--es-text);--es-btn-hover:var(--es-hover);' +
     '--es-text:#1f2937;--es-muted:#6b7280;--es-bg:#fff;--es-border:#e5e7eb;--es-hover:#f3f4f6;' +
     '--es-accent:#1d4ed8;--es-accent-bg:#dbeafe;--es-band:#f9fafb;--es-shadow:0 10px 30px rgba(0,0,0,.15)}' +
     ':host([dark]){--es-text:#e5e7eb;--es-muted:#9ca3af;--es-bg:#1f2937;--es-border:#374151;--es-hover:#374151;' +
     '--es-accent:#bfdbfe;--es-accent-bg:rgba(30,58,138,.5);--es-band:#111827;--es-shadow:0 10px 30px rgba(0,0,0,.5)}' +
     '*{box-sizing:border-box}' +
     'button{display:inline-flex;align-items:center;gap:.375rem;border:0;border-radius:9999px;padding:.5rem .625rem;' +
-    'background:transparent;color:var(--es-text);font:inherit;font-size:.875rem;font-weight:500;cursor:pointer;line-height:1}' +
-    'button:hover,button[aria-expanded="true"]{background:var(--es-hover)}' +
+    'background:transparent;color:var(--es-btn-text);font:inherit;font-size:.875rem;font-weight:500;cursor:pointer;line-height:1}' +
+    'button:hover,button[aria-expanded="true"]{background:var(--es-btn-hover)}' +
     ':host([active]) button{background:var(--es-accent-bg);color:var(--es-accent)}' +
     'button:focus-visible{outline:2px solid var(--es-accent);outline-offset:2px}' +
     '@media (max-width:639px){.label{display:none}}' +
@@ -135,7 +140,7 @@
 
   function isDark() {
     var html = document.documentElement;
-    var t = html.getAttribute('data-theme');
+    var t = html.getAttribute('data-theme') || html.getAttribute('data-bs-theme');
     if (t === 'dark') return true;
     if (t === 'light') return false;
     return html.classList.contains('dark');
@@ -172,7 +177,7 @@
     this._observer = new MutationObserver(function () {
       self._syncTheme();
     });
-    this._observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+    this._observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'data-bs-theme'] });
   };
 
   EcosystemSwitcher.prototype.disconnectedCallback = function () {

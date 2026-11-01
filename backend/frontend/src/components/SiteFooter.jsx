@@ -13,7 +13,7 @@ const linkClasses =
 
 const FOOTER_LINKS = [
   { to: '/dictionaries', icon: BookOpen, label: 'قائمة المعاجم' },
-  { to: '/tools', icon: Wrench, label: 'منظومة الأدوات' },
+  { to: '/tools', icon: Wrench, label: 'أدوات الحوسبة' },
   { href: WIKI_GADGET_URL, icon: ExternalLink, label: 'أداة ويكيبيديا' },
   { href: '/docs', icon: Code, label: 'واجهة برمجية (API)' },
   { href: GITHUB_URL, icon: Github, label: 'GitHub' },
@@ -25,9 +25,9 @@ const SiteFooter = () => (
       <p className="text-center sm:text-right">
         مسرد الويكي جزء من{' '}
         <Link to="/tools" className="font-semibold hover:text-blue-600 dark:hover:text-blue-400">
-          منظومة حوسبة اللغة العربية
-        </Link>{' '}
-        مفتوحة المصدر، وتصبّ في مشاريع ويكيميديا.
+          أدوات الحوسبة
+        </Link>
+        ، منظومة مفتوحة المصدر لحوسبة اللغة العربية تصبّ في مشاريع ويكيميديا.
       </p>
       <nav aria-label="روابط إضافية" className="flex flex-wrap justify-center gap-x-5 gap-y-2">
         {FOOTER_LINKS.map(({ to, href, icon: Icon, label }) =>

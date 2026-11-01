@@ -5,9 +5,11 @@
 // under the search box, SearchOptions.jsx). Nav links
 // carry a text label on sm+ screens (icon-only on phones) and highlight the
 // current page so the navigation reads as navigation, not as a row of
-// look-alike icons.
-import { Link, NavLink } from 'react-router';
-import { BookOpen, Wrench, HelpCircle } from 'lucide-react';
+// look-alike icons. «أدوات الحوسبة» is the ecosystem menu, the same
+// <ecosystem-switcher> element every sister site carries
+// (src/ecosystem-switcher.js); it is lit as the current item on /tools.
+import { Link, NavLink, useLocation } from 'react-router';
+import { BookOpen, HelpCircle } from 'lucide-react';
 import Logo from './Logo';
 import ThemeToggle from './ThemeToggle';
 import WhatsNew from './WhatsNew';
@@ -15,7 +17,6 @@ import { WIKI_GADGET_URL } from '../siteLinks';
 
 const NAV_ITEMS = [
   { to: '/dictionaries', icon: BookOpen, label: 'المعاجم', title: 'قائمة المعاجم' },
-  { to: '/tools', icon: Wrench, label: 'الأدوات', title: 'منظومة حوسبة اللغة العربية' },
 ];
 
 const navLinkClasses = ({ isActive }) =>
@@ -25,7 +26,9 @@ const navLinkClasses = ({ isActive }) =>
       : 'text-gray-700 hover:bg-gray-200 dark:text-gray-200 dark:hover:bg-gray-700'
   }`;
 
-const SiteHeader = ({ title }) => (
+const SiteHeader = ({ title }) => {
+  const onToolsPage = useLocation().pathname === '/tools';
+  return (
   <header className="bg-white shadow-md dark:bg-gray-800">
     <div className="max-w-7xl mx-auto py-4 sm:py-6 px-4">
       {/* On phones the title drops to its own centered row under the
@@ -44,6 +47,7 @@ const SiteHeader = ({ title }) => (
               <span className="hidden sm:inline">{label}</span>
             </NavLink>
           ))}
+          <ecosystem-switcher current="wikitermbase" active={onToolsPage ? '' : undefined} />
           <WhatsNew />
           <a
             href={WIKI_GADGET_URL}
@@ -60,6 +64,7 @@ const SiteHeader = ({ title }) => (
       </div>
     </div>
   </header>
-);
+  );
+};
 
 export default SiteHeader;

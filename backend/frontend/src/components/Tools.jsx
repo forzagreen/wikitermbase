@@ -1,6 +1,6 @@
 // src/components/Tools.jsx
 //
-// "منظومة حوسبة اللغة العربية": the ecosystem page. Mirrors the project
+// «أدوات الحوسبة»: the ecosystem page. Mirrors the project
 // diagram — three levels (صرفي / دلالي / معجمي), each with a goal, its
 // ready tools — then the Wikimedia outputs row.
 import { useState, useEffect } from 'react';
@@ -86,7 +86,9 @@ const ToolCard = ({ tool, stats }) => {
   );
 };
 
-// The three levels, in the diagram's right-to-left order.
+// The three levels, in the diagram's right-to-left order. The header menu
+// (src/ecosystem-switcher.js) carries a shorter copy of the same list: add a
+// tool in both.
 const LEVELS = [
   {
     key: 'morphology',
@@ -256,13 +258,13 @@ const Tools = () => {
 
   return (
     <div className={`min-h-screen flex flex-col ${themeClasses}`} dir="rtl">
-      <SiteHeader title="منظومة حوسبة اللغة العربية" />
+      <SiteHeader title="أدوات الحوسبة" />
 
       <div className="max-w-7xl mx-auto mt-8 px-4 pb-16 w-full">
         {/* Intro */}
         <div className={`${cardClasses} rounded-lg p-6 mb-8`}>
           <p className="text-lg leading-relaxed text-gray-700 dark:text-gray-200">
-            مسرد الويكي جزء من منظومة مفتوحة المصدر لحوسبة اللغة العربية، تعمل على ثلاثة مستويات:
+            مسرد الويكي جزء من «أدوات الحوسبة»، منظومة مفتوحة المصدر لحوسبة اللغة العربية تعمل على ثلاثة مستويات:
             <strong> صرفي</strong> (تحليل الكلمة وتصريفها)،
             <strong> دلالي</strong> (ضبط المعاني وشروحاتها)،
             <strong> معجمي</strong> (توحيد المصطلحات المعرَّبة).

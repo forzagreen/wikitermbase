@@ -7,7 +7,7 @@ import RawSearch from './components/RawSearch'
 import Dictionaries from './components/Dictionaries'
 import Tools from './components/Tools'
 import './index.css'
-// Registers <ecosystem-switcher> (the «أدوات الحوسبة» menu in the header).
+// Registers <ecosystem-switcher> (the «أدوات التحليل اللغوي» menu in the header).
 import './ecosystem-switcher'
 
 const router = createBrowserRouter([

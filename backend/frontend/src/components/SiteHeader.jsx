@@ -5,7 +5,7 @@
 // under the search box, SearchOptions.jsx). Nav links
 // carry a text label on sm+ screens (icon-only on phones) and highlight the
 // current page so the navigation reads as navigation, not as a row of
-// look-alike icons. «أدوات الحوسبة» is the ecosystem menu, the same
+// look-alike icons. «أدوات التحليل اللغوي» is the ecosystem menu, the same
 // <ecosystem-switcher> element every sister site carries
 // (src/ecosystem-switcher.js); it is lit as the current item on /tools.
 import { Link, NavLink, useLocation } from 'react-router';

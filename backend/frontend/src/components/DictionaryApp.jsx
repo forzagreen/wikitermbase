@@ -1,7 +1,7 @@
 // src/components/DictionaryApp.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Search, ExternalLink, ChevronDown, ChevronUp, Quote, Copy, Check, BookOpen, Wrench, ArrowLeft } from 'lucide-react';
+import { Search, ExternalLink, ChevronDown, Quote, Copy, Check, BookOpen, Wrench, ArrowLeft } from 'lucide-react';
 import SiteHeader from './SiteHeader';
 import SiteFooter from './SiteFooter';
 import GroupedCitation from './GroupedCitation';
@@ -203,7 +203,7 @@ const DictionaryApp = () => {
     if (countByType.thesaurus > 0) clauses.push(formatCountClause(countByType.thesaurus, THESAURUS_FORMS));
     if (countByType.other > 0) clauses.push(formatCountClause(countByType.other, GENERIC_FORMS));
 
-    return `ورد في ${clauses.join(' و ')}:`;
+    return `ورد في ${clauses.join(' و ')}`;
   };
 
   const formatDictionaryInfo = (occurrence) => {
@@ -536,68 +536,93 @@ const DictionaryApp = () => {
           </div>
         )}
         {results.map((group, index) => {
-          // Elected by the API over all the groups of the query (at most one).
+          // Elected by the API over all the groups of the query (at most one);
+          // shown as the card's blue border alone, a badge took too much room.
           const isTopResult = group.suggested === true;
           const citations = groupCitations(group.occurences);
           const groupPopupId = `group-${index}`;
+          const entriesId = `group-${index}-entries`;
+
+          const expanded = !!expandedGroups[index];
+          // The whole header is the toggle (a chevron alone was too small a
+          // target), but a click that selected text (copying a term) is not
+          // a toggle. Links and buttons live in the entries below, never in
+          // the header.
+          const onHeaderClick = () => {
+            if (window.getSelection?.()?.toString()) return;
+            toggleGroup(index);
+          };
 
           return (
-          <div key={index} className={`${cardClasses} rounded-lg mb-6 p-6 ${isTopResult ? 'border-2 border-blue-500' : ''}`}>
-            {/* Card Header */}
-            <div className="flex items-center mb-4">
-              <span className="text-lg font-semibold text-blue-600 ml-4">{index + 1}</span>
-              <div className="flex-1 flex flex-col sm:flex-row sm:items-start gap-4">
-                <div className="text-right">
-                  <span className="text-xl font-bold">{group.arabic_normalised}</span>
-                </div>
-                {isTopResult && (
-                  <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded dark:bg-blue-200 dark:text-blue-800 mb-2 sm:mb-0 self-center sm:self-auto">
-                    الترجمة المقترحة
-                  </span>
-                )}
-                <div dir="ltr" className="text-left overflow-hidden">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                      <LanguageLabel lang="en" />
-                      <span className="text-xl font-bold break-words">{group.english_normalised}</span>
-                    </div>
-                    {group.french_normalised && (
+          <div key={index} title={isTopResult ? 'الترجمة المقترحة' : undefined} className={`${cardClasses} rounded-lg mb-6 ${isTopResult ? 'border-2 border-blue-500' : ''}`}>
+            {/* Card Header: number, terms, badge, dictionary count, chevron. */}
+            <div
+              onClick={onHeaderClick}
+              className={`flex items-center gap-4 px-6 py-5 cursor-pointer select-text transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/40 ${expanded || settings.morphology ? 'rounded-t-lg' : 'rounded-lg'} ${expanded ? 'border-b border-gray-200 dark:border-gray-700' : ''}`}
+            >
+              <span className="text-lg font-semibold text-blue-600 self-start">{index + 1}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                  <div className="text-right">
+                    <span className="text-xl font-bold">{group.arabic_normalised}</span>
+                  </div>
+                  <div dir="ltr" className="text-left overflow-hidden">
+                    <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-2">
-                        <LanguageLabel lang="fr" />
-                        <span className="text-lg text-gray-600 dark:text-gray-300 italic break-words">
-                          {group.french_normalised}
-                        </span>
+                        <LanguageLabel lang="en" />
+                        <span className="text-xl font-bold break-words">{group.english_normalised}</span>
                       </div>
-                    )}
+                      {group.french_normalised && (
+                        <div className="flex items-center gap-2">
+                          <LanguageLabel lang="fr" />
+                          <span className="text-lg text-gray-600 dark:text-gray-300 italic break-words">
+                            {group.french_normalised}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Dictionary entries section */}
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-              <div className="flex justify-between items-center mb-2">
-                <p className="text-gray-500">
+                <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
                   {formatDictionaryCount(group.occurences)}
                 </p>
-                <div className="flex items-center gap-4">
-                  {citations.length > 1 && (
-                    <GroupedCitation
-                      citations={citations}
-                      open={openPopupId === groupPopupId}
-                      onToggle={() => setOpenPopupId(openPopupId === groupPopupId ? null : groupPopupId)}
-                    />
-                  )}
-                  <button
-                    onClick={() => toggleGroup(index)}
-                    className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                  >
-                    {expandedGroups[index] ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                  </button>
-                </div>
               </div>
-              
-              {expandedGroups[index] && group.occurences.map((occurrence, occIndex) => (
+              {/* A real button, so the keyboard reaches the toggle too. */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleGroup(index);
+                }}
+                aria-expanded={expanded}
+                aria-controls={entriesId}
+                aria-label={expanded ? 'طيّ مداخل المعاجم' : 'عرض مداخل المعاجم'}
+                className="flex-shrink-0 rounded-full p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-gray-600 dark:hover:text-gray-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              >
+                <ChevronDown
+                  size={22}
+                  className={`transition-transform ${expanded ? 'rotate-180' : ''}`}
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
+
+            {/* Dictionary entries, only when expanded; the grouped citation
+                action shows with the entries it cites. */}
+            {expanded && (
+            <div className="px-6 pb-6 pt-3">
+              {citations.length > 1 && (
+                <div className="flex justify-end mb-3">
+                  <GroupedCitation
+                    citations={citations}
+                    open={openPopupId === groupPopupId}
+                    onToggle={() => setOpenPopupId(openPopupId === groupPopupId ? null : groupPopupId)}
+                  />
+                </div>
+              )}
+
+              <div id={entriesId}>
+              {group.occurences.map((occurrence, occIndex) => (
                 <div key={occIndex} className={`mb-2 last:mb-0 ${occurrenceClasses} p-3 rounded`}>
                   <div className="flex justify-between items-center gap-2">
                     <div className="flex-1">
@@ -645,9 +670,16 @@ const DictionaryApp = () => {
                   </div>
                 </div>
               ))}
+              </div>
             </div>
+            )}
 
-            {settings.morphology && <MorphologySection group={group} />}
+            {/* Brings its own top divider. */}
+            {settings.morphology && (
+              <div className="px-6 pb-6 -mt-2">
+                <MorphologySection group={group} />
+              </div>
+            )}
           </div>
         )})}
 

@@ -212,11 +212,11 @@ const LEVELS = [
         links: [{ kind: 'site', href: 'https://genar.waeltellat.com/' }],
       },
       {
-        name: 'قاعدة المعاجم',
+        name: 'قاعدة معطيات المعاجم',
         latin: 'arabterm',
         icon: BookOpen,
         description:
-          'المستودع الذي تُنسَّق فيه المعاجم المصدرية وتُراجَع: لكل معجم صفحة تصفّح مستقلة، ومنه تُبنى قاعدة بيانات مسرد الويكي.',
+          'المستودع الذي تُنسَّق فيه الملفات المصدرية للمداخل المعجمية وتُراجَع: لكل معجم صفحة تصفّح مستقلة، ومنه تُبنى قاعدة بيانات مسرد الويكي.',
         links: [
           { kind: 'site', href: 'https://forzagreen.github.io/arabterm/' },
           { kind: 'github', href: 'https://github.com/forzagreen/arabterm' },

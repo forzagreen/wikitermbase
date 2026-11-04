@@ -220,6 +220,7 @@ const LEVELS = [
         links: [
           { kind: 'site', href: 'https://forzagreen.github.io/arabterm/' },
           { kind: 'github', href: 'https://github.com/forzagreen/arabterm' },
+          { kind: 'hf', href: 'https://huggingface.co/datasets/forzagreen/arabterm' },
         ],
       },
     ],

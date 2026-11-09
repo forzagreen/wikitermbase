@@ -320,9 +320,9 @@ const VerbDetails = ({ root, verb, entries, lexemes, lexemesStatus }) => {
   );
 };
 
-// The verbs of the root as a row of chips (verb + pattern, and how many
-// senses Wikidata has once known); the picked one opens its details below
-// the row, one verb at a time, like the readings above.
+// The verbs of the root as rows of chips under their headings (verb +
+// pattern, and how many senses Wikidata has once known); the picked one opens
+// its details below its row, one verb at a time, like the readings above.
 const RootVerbs = ({ root, verbs }) => {
   const [lexemes, setLexemes] = useState(null);
   const [lexemesStatus, setLexemesStatus] = useState('loading');
@@ -345,57 +345,83 @@ const RootVerbs = ({ root, verbs }) => {
     };
   }, [root]);
 
-  // One chip per verb form; كَتَبَ has two بابs, both on its chip.
-  const byForm = new Map();
-  for (const v of verbs) {
-    if (!byForm.has(v.verb)) byForm.set(v.verb, []);
-    byForm.get(v.verb).push(v);
-  }
+  // A triliteral root lists its مجرد verbs (its أبواب: فعَل يفعُل…) apart from
+  // its مزيد ones; a quadriliteral root has a single فعلل, so one list. An
+  // empty list is left out: some roots only have one of the two kinds.
+  const spaced = spacedRoot(root);
+  const sections = (
+    [...root].length === 3
+      ? [
+          [`الأبواب الصرفية للجذر (${spaced})`, verbs.filter((v) => v.deriv === 'basic')],
+          [`مزيدات الجذر (${spaced})`, verbs.filter((v) => v.deriv !== 'basic')],
+        ]
+      : [[`الأفعال المجردة والمزيدة من الجذر (${spaced})`, verbs]]
+  ).filter(([, sectionVerbs]) => sectionVerbs.length > 0);
 
-  if (byForm.size === 0) {
-    return <p className="text-xs text-gray-500 dark:text-gray-400">لا أفعال معروفة لهذا الجذر في جداول الأفعال.</p>;
-  }
-  const pickedEntries = picked === null ? null : byForm.get(picked);
-  return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap gap-1.5">
-        {[...byForm].map(([verb, entries]) => {
-          const verbLexemes = lexemesForVerb(lexemes, verb);
-          const senseCount = verbLexemes.reduce((n, l) => n + l.senses.length, 0);
-          const chosen = verb === picked;
-          return (
-            <button
-              key={verb}
-              type="button"
-              onClick={() => setPicked(chosen ? null : verb)}
-              aria-pressed={chosen}
-              className={`rounded border px-2 py-0.5 text-xs ${
-                chosen
-                  ? 'border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-900/40 dark:text-blue-100'
-                  : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700'
-              }`}
-            >
-              <span className="text-sm font-semibold">{verb}</span>
-              <span className="text-gray-500 dark:text-gray-400"> {entries.map((e) => e.pattern).join(' / ')}</span>
-              {lexemesStatus === 'ok' && senseCount > 0 && (
-                <span className="text-gray-400" title={senseCountLabel(senseCount)}>
-                  {' '}
-                  · {senseCount}
-                </span>
-              )}
-            </button>
-          );
-        })}
+  if (sections.length === 0) {
+    return (
+      <div>
+        <Subheading>الأفعال من الجذر ({spaced})</Subheading>
+        <p className="text-xs text-gray-500 dark:text-gray-400">لا أفعال معروفة لهذا الجذر في جداول الأفعال.</p>
       </div>
-      {pickedEntries && (
-        <VerbDetails
-          root={root}
-          verb={picked}
-          entries={pickedEntries}
-          lexemes={lexemesForVerb(lexemes, picked)}
-          lexemesStatus={lexemesStatus}
-        />
-      )}
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {sections.map(([title, sectionVerbs]) => {
+        // One chip per verb form; كَتَبَ has two بابs, both on its chip.
+        const byForm = new Map();
+        for (const v of sectionVerbs) {
+          if (!byForm.has(v.verb)) byForm.set(v.verb, []);
+          byForm.get(v.verb).push(v);
+        }
+        const pickedEntries = picked === null ? null : byForm.get(picked);
+        return (
+          <div key={title}>
+            <Subheading>{title}</Subheading>
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-1.5">
+                {[...byForm].map(([verb, entries]) => {
+                  const verbLexemes = lexemesForVerb(lexemes, verb);
+                  const senseCount = verbLexemes.reduce((n, l) => n + l.senses.length, 0);
+                  const chosen = verb === picked;
+                  return (
+                    <button
+                      key={verb}
+                      type="button"
+                      onClick={() => setPicked(chosen ? null : verb)}
+                      aria-pressed={chosen}
+                      className={`rounded border px-2 py-0.5 text-xs ${
+                        chosen
+                          ? 'border-blue-500 bg-blue-50 text-blue-800 dark:bg-blue-900/40 dark:text-blue-100'
+                          : 'border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      <span className="text-sm font-semibold">{verb}</span>
+                      <span className="text-gray-500 dark:text-gray-400"> {entries.map((e) => e.pattern).join(' / ')}</span>
+                      {lexemesStatus === 'ok' && senseCount > 0 && (
+                        <span className="text-gray-400" title={senseCountLabel(senseCount)}>
+                          {' '}
+                          · {senseCount}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {pickedEntries && (
+                <VerbDetails
+                  root={root}
+                  verb={picked}
+                  entries={pickedEntries}
+                  lexemes={lexemesForVerb(lexemes, picked)}
+                  lexemesStatus={lexemesStatus}
+                />
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -484,10 +510,7 @@ const WordDetails = ({ word, reading, readingIndex, onPickReading, verbsByRoot }
       </div>
 
       {reading.root && (
-        <div>
-          <Subheading>الأفعال المشتقة من الجذر ({spacedRoot(reading.root)})</Subheading>
-          <RootVerbs root={reading.root} verbs={verbsByRoot[reading.root] ?? []} />
-        </div>
+        <RootVerbs root={reading.root} verbs={verbsByRoot[reading.root] ?? []} />
       )}
     </div>
   );

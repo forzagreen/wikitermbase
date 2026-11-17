@@ -8,7 +8,6 @@ import wikidata_stats
 from wikidata_stats import (
     DICTIONARY,
     ITEM,
-    MAXLAG_WAIT,
     RETRY_WAIT,
     STATS_URL,
     build_statements,
@@ -158,8 +157,8 @@ def test_sync_edits_both_statements_in_one_revision():
     assert fake.edit["assert"] == "user"
     sent = json.loads(fake.edit["data"])["claims"]
     assert [s["id"] for s in sent] == [f"{ITEM}$terms", f"{ITEM}$dicts"]
-    # maxlag is for the edit only: reads, tokens and login must not wait on it.
-    assert [r.get("maxlag") for r in fake.requests] == [None] * 4 + ["5"]
+    # No request waits on maxlag (see the comment in wikidata_stats.py).
+    assert all("maxlag" not in r for r in fake.requests)
 
 
 def test_sync_dry_run_does_not_log_in():
@@ -184,52 +183,11 @@ def test_sync_reports_why_an_edit_was_refused():
         run(FakeWikis(claims(), edit_error=error))
 
 
-class LaggingWikis(FakeWikis):
-    """Answers the first `lagging` requests sent with maxlag with a maxlag error."""
-
-    def __init__(self, item_claims, lagging):
-        super().__init__(item_claims)
-        self.lagging = lagging
-
-    def __call__(self, request):
-        if "maxlag" in request_params(request) and self.lagging:
-            self.lagging -= 1
-            error = {
-                "code": "maxlag",
-                "info": "Waiting for wdqs1014: 6.75 seconds lagged.",
-            }
-            return httpx.Response(
-                200, json={"error": error}, headers={"Retry-After": "5"}
-            )
-        return super().__call__(request)
-
-
 @pytest.fixture
 def slept(monkeypatch):
     delays = []
     monkeypatch.setattr(wikidata_stats.time, "sleep", delays.append)
     return delays
-
-
-def test_sync_waits_out_maxlag(slept):
-    fake = LaggingWikis(claims(500000, 85), lagging=20)
-    assert run(fake) == 0
-    assert fake.actions[-1] == "wbeditentity"
-    assert fake.edit["maxlag"] == "5"
-    assert sum(slept) == 100
-
-
-def test_sync_edits_without_maxlag_when_wikidata_keeps_lagging(slept):
-    fake = LaggingWikis(claims(500000, 85), lagging=1000)
-    assert run(fake) == 0
-    assert "maxlag" not in fake.edit
-    assert sum(slept) == MAXLAG_WAIT
-
-
-def test_sync_does_not_wait_on_maxlag_when_up_to_date(slept):
-    fake = LaggingWikis(claims(509871, 85), lagging=1000)
-    assert run(fake) == 0
-    assert slept == []
 
 
 class RateLimitedWikis(FakeWikis):

@@ -39,14 +39,12 @@ USER_AGENT = "wikitermbase-stats/1.0 (https://github.com/forzagreen/wikitermbase
 # The stats request can land on a webservice restart (deploy-code runs first).
 STATS_ATTEMPTS = 5
 STATS_RETRY_DELAY = 15
-# Only the edit carries maxlag: it is what the parameter protects, and Wikidata's
-# lag includes its query service's (WDQS lag / 60), which stays above 5 s for
-# hours at a time. Sent on every request, it made the token and login calls
-# wait too, and the job failed after 10 minutes without ever trying to edit.
-MAXLAG = 5
-# After waiting this long, make the edit anyway: it is one edit after each DB
-# import (a few a week), not the mass editing maxlag is meant to slow down.
-MAXLAG_WAIT = 300
+# No maxlag: Wikidata's lag includes its query service's (WDQS lag / 60),
+# which stays above 5 s for hours at a time, so waiting it out cost 5 minutes
+# per import, and in the runs checked the lag was still there after 300 s.
+# This is one edit after each DB import (a few a week), not the mass editing
+# maxlag is meant to slow down.
+#
 # 429 (rate limited, GitHub runners share their IPs) and 5xx: honour
 # Retry-After, up to this long per request.
 RETRY_WAIT = 300
@@ -180,17 +178,13 @@ def fetch_stats(client):
     return stats
 
 
-def wikidata(client, method, maxlag=False, **params):
+def wikidata(client, method, **params):
     """Call the Wikidata API, raising on API errors.
 
-    Rate limits and server errors are retried after their Retry-After. With
-    `maxlag`, a lagging Wikidata is waited out for MAXLAG_WAIT, after which the
-    request is sent without maxlag.
+    Rate limits and server errors are retried after their Retry-After.
     """
     params |= {"format": "json", "formatversion": 2}
-    if maxlag:
-        params["maxlag"] = MAXLAG
-    lagged = retried = 0
+    retried = 0
     while True:
         if method == "GET":
             response = client.get(WIKIDATA_API, params=params)
@@ -207,20 +201,6 @@ def wikidata(client, method, maxlag=False, **params):
         response.raise_for_status()
         body = response.json()
         error = body.get("error")
-        if error and error.get("code") == "maxlag":
-            if lagged >= MAXLAG_WAIT:
-                print(
-                    f"Wikidata still lagging after {lagged} s ({error.get('info')}), "
-                    "sending the edit without maxlag"
-                )
-                del params["maxlag"]
-                continue
-            delay = retry_after(response, default=MAXLAG)
-            if not lagged:
-                print(f"Wikidata is lagging ({error.get('info')}), waiting")
-            time.sleep(delay)
-            lagged += delay
-            continue
         if error:
             # "info" is a generic sentence; Wikibase lists the actual reasons
             # (a missing grant, a bot password's page restriction...) here.
@@ -291,7 +271,6 @@ def sync(client, username=None, password=None, dry_run=False, today=None):
     result = wikidata(
         client,
         "POST",
-        maxlag=True,
         action="wbeditentity",
         id=ITEM,
         data=json.dumps({"claims": statements}),

@@ -1,6 +1,7 @@
 """Copy the live term and dictionary counts to WikiTermBase's Wikidata item.
 
-Run by CI after each DB import (`make wikidata_stats`), so that the project page
+Run by CI after each DB import, as a one-off Toolforge job (Wikimedia blocks
+the IP ranges of GitHub's runners), so that the project page
 [[ويكيبيديا:مسرد الويكي]] can read its figures from Wikidata instead of having
 them typed by hand. Two statements on Q133800945 are kept in sync with
 /api/v1/stats:
@@ -16,7 +17,8 @@ the old values. Nothing is edited when Wikidata already has the live counts, so
 re-running is a no-op. The statements are created on the first run.
 
 Credentials are a bot password (Special:BotPasswords on wikidata.org, grant
-"Edit existing pages"): WIKIDATA_USERNAME ("User@BotName") and WIKIDATA_PASSWORD.
+"Edit existing pages"): WIKIDATA_USERNAME ("User@BotName") and WIKIDATA_PASSWORD,
+stored as Toolforge envvars (`toolforge envvars create`).
 `--dry-run` needs neither and prints the edit it would make.
 """
 
@@ -45,7 +47,7 @@ STATS_RETRY_DELAY = 15
 # This is one edit after each DB import (a few a week), not the mass editing
 # maxlag is meant to slow down.
 #
-# 429 (rate limited, GitHub runners share their IPs) and 5xx: honour
+# 429 (rate limited) and 5xx: honour
 # Retry-After, up to this long per request.
 RETRY_WAIT = 300
 

@@ -18,7 +18,7 @@ test:
 run:
 	uv run uvicorn backend.app:app --reload --port 5001
 
-# Copy /api/v1/stats to the Wikidata item (run by CI after DB imports).
+# Copy /api/v1/stats to the Wikidata item. CI runs the script as a Toolforge job after DB imports.
 # Preview without credentials: uv run python backend/wikidata_stats.py --dry-run
 wikidata_stats:
 	uv run python -u backend/wikidata_stats.py

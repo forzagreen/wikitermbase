@@ -131,25 +131,55 @@ jobs:
     # Copy /api/v1/stats to Wikidata (Q133800945), where ويكيبيديا:مسرد_الويكي
     # reads its figures. Runs after each DB import, and on "Run workflow" to
     # re-sync by hand; waits for deploy-code so it doesn't hit the restart.
+    #
+    # The edit is made by a one-off Toolforge job, not from the runner:
+    # Wikimedia globally blocks the Azure ranges GitHub's runners use
+    # (globalblocking-blockedtext-range), and Toolforge's own addresses aren't.
+    # The bot password lives in Toolforge envvars (WIKIDATA_USERNAME /
+    # WIKIDATA_PASSWORD), so GitHub never holds it. The job runs the image
+    # deploy-code builds; `--wait` returns the job's exit code.
     needs: [deploy-code, deploy-db]
     if: |
       !cancelled() && !contains(needs.*.result, 'failure') &&
       github.ref == 'refs/heads/main' &&
       (needs.deploy-db.result == 'success' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
-    # The Wikidata secrets live in this environment, which only main may use,
-    # so a workflow pushed on another branch can't read them.
-    environment: wikidata
     concurrency:
       group: wikidata-stats
       cancel-in-progress: false
     steps:
-    - uses: actions/checkout@v7
-    - uses: astral-sh/setup-uv@v10.1.0
+    - uses: appleboy/ssh-action@v1
       with:
-        python-version: '3.13'
-    - run: make init
-    - run: make wikidata_stats
-      env:
-        WIKIDATA_USERNAME: ${{ secrets.WIKIDATA_USERNAME }}
-        WIKIDATA_PASSWORD: ${{ secrets.WIKIDATA_PASSWORD }}
+        host: login.toolforge.org
+        username: forzagreen
+        key: ${{ secrets.TOOLFORGE_SSH_PRIVATE_KEY }}
+        # SSH fingerprints: https://wikitech.wikimedia.org/wiki/Help:SSH_Fingerprints/login.toolforge.org
+        fingerprint: SHA256:BOuOp0PJ5hHLM5YD30nCLAETdO6VpzCPvTqOU/dKNTc
+        request_pty: true
+        command_timeout: 20m
+        script: |
+          become wikitermbase bash << 'EOF'
+          set -uo pipefail
+
+          # A job left over from an interrupted run would block the name.
+          toolforge jobs delete wikidata-stats >/dev/null 2>&1 || true
+
+          echo "[WIKIDATA] Running the stats job"
+          status=0
+          toolforge jobs run wikidata-stats \
+            --image tool-wikitermbase/tool-wikitermbase:latest \
+            --command "python -u backend/wikidata_stats.py" \
+            --wait 900 || status=$?
+
+          # The job's output reaches the log store a few seconds after it ends.
+          logs=""
+          for i in $(seq 1 12); do
+            logs=$(toolforge jobs logs wikidata-stats 2>/dev/null) && [ -n "$logs" ] && break
+            sleep 5
+          done
+          echo "${logs:-(no logs from the job)}"
+
+          toolforge jobs delete wikidata-stats >/dev/null 2>&1 || true
+          echo "[WIKIDATA] Job exit code: $status"
+          exit "$status"
+          EOF

@@ -1235,6 +1235,7 @@ dependencies = [
     { name = "farahidi" },
     { name = "fastapi" },
     { name = "gunicorn" },
+    { name = "httpx" },
     { name = "pymysql" },
     { name = "sentry-sdk", extra = ["fastapi"] },
     { name = "sqlalchemy" },
@@ -1243,7 +1244,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "ipykernel" },
     { name = "pytest" },
     { name = "ruff" },
@@ -1255,6 +1255,7 @@ requires-dist = [
     { name = "farahidi", specifier = ">=0.4.0" },
     { name = "fastapi" },
     { name = "gunicorn" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "pymysql" },
     { name = "sentry-sdk", extras = ["fastapi"] },
     { name = "sqlalchemy" },
@@ -1263,7 +1264,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "httpx", specifier = ">=0.28.1" },
     { name = "ipykernel" },
     { name = "pytest" },
     { name = "ruff" },

@@ -1,6 +1,6 @@
 // src/components/DomainFilter.jsx
 //
-// «المجال»: narrows a list to the dictionaries of some domains. On the search
+// «تخصيص البحث»: narrows a list to the dictionaries of some domains. On the search
 // page the pills are the domains in which the query has results, with the
 // number of results in each (the API's `domains`, counted before the filter,
 // so the other domains stay on offer); on the dictionaries page, every domain
@@ -56,7 +56,7 @@ const DomainFilter = ({ facets, selected, onChange, className = '' }) => {
       aria-label="حصر النتائج في مجال"
       className={`flex flex-wrap items-center gap-1.5 ${className}`}
     >
-      <span className="ml-1 text-sm font-semibold text-gray-600 dark:text-gray-300">المجال:</span>
+      <span className="ml-1 text-sm font-semibold text-gray-600 dark:text-gray-300">تخصيص البحث:</span>
       <button
         type="button"
         onClick={() => onChange([])}

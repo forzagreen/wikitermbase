@@ -566,6 +566,10 @@ const DictionaryApp = () => {
           />
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={26} />
         </div>
+        {/* Only with results: the options change how results are rendered.
+            `results` survives a refetch, so the row does not blink while the
+            query is being edited. */}
+        {results.length > 0 && <SearchOptions />}
         {/* The domains in which the term has results. Shown with the results
             and, when the search is narrowed to a domain that has none, on its
             own: it is then the way out. */}
@@ -577,10 +581,6 @@ const DictionaryApp = () => {
             onChange={changeDomains}
           />
         )}
-        {/* Only with results: the options change how results are rendered.
-            `results` survives a refetch, so the row does not blink while the
-            query is being edited. */}
-        {results.length > 0 && <SearchOptions />}
       </div>
 
       {/* Error Message */}

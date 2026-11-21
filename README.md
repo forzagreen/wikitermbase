@@ -63,6 +63,7 @@ The primary gadget is meant to be enabled by default (see the [default-gadget cr
 - **Public API & pre-filling**: `Gadget-WikiTerm.js` exposes `mw.libs.wikiTerm = { openDialog: openDialog }`. Companion gadgets and user scripts can call `mw.libs.wikiTerm.openDialog(prefillText)` with an optional search term to open the dialog, pre-fill the search input, automatically trigger the search query, and select the search input text.
 - **Syntax and standards**: Only ES2015 syntax (MediaWiki's Grade A baseline is ES2019, and `requiresES6` cannot be combined with `default`). No `console.*` calls.
 - **Batched pagination**: Results are fetched 30 groups at a time (`limit` / `offset` on `/api/v1/search/aggregated`); "show more" requests the next window. Broad terms have thousands of groups and multi-megabyte full responses. A new request aborts the one in flight.
+- **Domains**: Every result and every dictionary entry shows what its dictionaries are about («طب», «رياضيات»), and a «المجال» row above the results lists the domains in which the term was found, with the number of results in each; picking one searches again within the dictionaries of that domain (`domain=` on the API). All of it comes from the API response (`domains`, `dictionary_domains`), so the gadget needs no request of its own, and shows nothing more than before with an API that does not send domains.
 
 ### Selection Lookup Companion Gadget (`WikiTermSelection`)
 
@@ -99,9 +100,10 @@ npx playwright install firefox webkit     # once; Chrome uses the installed Goog
 npm run matrix                            # Chrome/Firefox/WebKit × Vector 2022 (light+night)/Vector 2010/MonoBook/Timeless/Minerva/Content Translation
 npm run summary                           # Markdown table from tests/out/matrix_results.json (screenshots in tests/out/shots/)
 BROWSERS=chrome SKINS=vector npm run matrix   # subset
+API_BASE=http://localhost:5001 npm run matrix # against a local backend (`make run`) instead of Toolforge
 ```
 
-The matrix opens a real ar.wikipedia article (logged out), injects the working-tree gadget, and drives it end to end: entry point → dialog (lazy OOUI load, bytes and time recorded) → search → expand → citation copy → "show more" → close, failing on any uncaught JavaScript error. `npm run check` is network-free: it enforces a gzipped size budget (10 KB JS, 3 KB CSS) and rejects `console.*` calls.
+The matrix opens a real ar.wikipedia article (logged out), injects the working-tree gadget, and drives it end to end: entry point → dialog (lazy OOUI load, bytes and time recorded) → search → expand → citation copy → "show more" → domain filter → close, failing on any uncaught JavaScript error. `npm run check` is network-free: it enforces a gzipped size budget (11 KB JS, 3 KB CSS) and rejects `console.*` calls.
 
 The same checks run in GitHub Actions ([gadget.yml](.github/workflows/gadget.yml)) on every pull request touching `gadget/`, on pushes to `main`, and weekly. The run's job summary shows the results table and the screenshots + JSON are attached as a downloadable artifact, so the numbers can be checked and re-run by anyone from the [Actions tab](https://github.com/forzagreen/wikitermbase/actions/workflows/gadget.yml).
 

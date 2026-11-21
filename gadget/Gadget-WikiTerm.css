@@ -183,6 +183,75 @@
   margin-left: auto;
 }
 
+/* What a dictionary is about: small labels beside a result and its entries */
+.wikiterm-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.wikiterm-tag {
+  padding: 0 8px;
+  border-radius: 10px;
+  background-color: var(--background-color-neutral, #eaecf0);
+  color: var(--color-subtle, #54595d);
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+/* «المجال»: the domains with results, above the list; one narrows the search */
+.wikiterm-domains {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 10px;
+}
+
+.wikiterm-domains-label {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--color-subtle, #54595d);
+}
+
+.wikiterm-domain,
+.wikiterm-domains-more {
+  font: inherit;
+  font-size: 13px;
+  line-height: 22px;
+  cursor: pointer;
+}
+
+.wikiterm-domain {
+  padding: 0 10px;
+  border: 1px solid var(--border-color-base, #a2a9b1);
+  border-radius: 12px;
+  background-color: var(--background-color-base, #fff);
+  color: var(--color-base, #202122);
+}
+
+.wikiterm-domain:hover {
+  border-color: var(--border-color-progressive--focus, #36c);
+}
+
+.wikiterm-domain-on {
+  border-color: var(--background-color-progressive, #36c);
+  background-color: var(--background-color-progressive, #36c);
+  color: var(--color-inverted-fixed, #fff);
+}
+
+.wikiterm-domains-more {
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--color-progressive, #36c);
+}
+
+.wikiterm-domains-more:hover {
+  text-decoration: underline;
+}
+
 .wikiterm-result-details {
   padding: 16px;
   border-top: 1px solid var(--border-color-muted, #dadde3);

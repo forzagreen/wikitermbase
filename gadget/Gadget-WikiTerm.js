@@ -44,6 +44,10 @@
 	const DESCRIPTION_LIMIT = 200;
 	// Module:ترقيم استشهادات numbers 20 citations and silently drops the rest.
 	const MAX_GROUPED_CITATIONS = 20;
+	// Domains offered under the search box before «مجالات أخرى», and domains
+	// of a result shown in its header before «+N».
+	const DOMAINS_SHOWN = 6;
+	const HEADER_DOMAINS_SHOWN = 3;
 	const USER_CONFIG = window.wikiTermConfig || {};
 
 	// Loaded on demand (first click), never at page load.
@@ -125,6 +129,22 @@
 			'\n}}';
 	}
 
+	// What dictionaries are about («رياضيات», «طب»), as small labels: the
+	// `dictionary_domains` of an entry, the `domains` of a result group.
+	// Past `max` they fold into «+N». Null when the API sends none.
+	function domainTags( domains, max ) {
+		if ( !domains || !domains.length ) {
+			return null;
+		}
+		const tag = ( text ) => $( '<span>' ).addClass( 'wikiterm-tag' ).text( text );
+		const names = domains.map( ( domain ) => domain.name_arabic );
+		const rest = names.splice( max || names.length );
+		return $( '<span>' ).addClass( 'wikiterm-tags' ).append(
+			names.map( tag ),
+			rest.length ? tag( '+' + rest.length ).attr( 'title', rest.join( '، ' ) ) : null
+		);
+	}
+
 	function translationSpan( langTag, text, cls ) {
 		return $( '<span>' ).addClass( cls ).append(
 			$( '<span>' ).addClass( 'wikiterm-lang-tag' ).text( langTag ),
@@ -184,16 +204,24 @@
 			} );
 
 			this.$results = $( '<div>' ).addClass( 'wikiterm-results-container' );
+			this.$domains = $( '<div>' ).addClass( 'wikiterm-domains' ).attr( {
+				role: 'group',
+				'aria-label': 'حصر النتائج في مجال'
+			} ).hide();
 			this.$body.append(
 				this.toolPageMessage.$element,
 				searchForm.$element,
 				this.loadingIndicator.$element,
 				this.errorMessage.$element,
-				$( '<div>' ).addClass( 'wikiterm-content-area' ).append( this.$results )
+				$( '<div>' ).addClass( 'wikiterm-content-area' ).append( this.$domains, this.$results )
 			);
 
 			this.activePopup = null;
 			this.abortController = null;
+			// The domain the search is narrowed to (an item of the API's
+			// `domains`), or null. It stays on from one search to the next.
+			this.domain = null;
+			this.showAllDomains = false;
 
 			this.searchButton.connect( this, { click: 'performSearch' } );
 			this.searchInput.connect( this, { enter: 'performSearch' } );
@@ -282,7 +310,8 @@
 			};
 
 			const url = API_ENDPOINT + '?q=' + encodeURIComponent( '"' + query + '"' ) +
-				'&limit=' + PAGE_SIZE + '&offset=' + offset;
+				'&limit=' + PAGE_SIZE + '&offset=' + offset +
+				( this.domain ? '&domain=' + encodeURIComponent( this.domain.name_tech ) : '' );
 			return fetch( url, { signal: controller.signal, headers: { Accept: 'application/json' } } )
 				.then( ( response ) => {
 					if ( !response.ok ) {
@@ -311,9 +340,12 @@
 			let pending = data.groups || [];
 			let total = Math.max( data.number_groups || 0, pending.length );
 			this.$results.empty().scrollTop( 0 );
+			this.renderDomains( data.domains || [] );
 
 			if ( !pending.length ) {
-				this.showNotice( 'لا توجد نتائج' );
+				this.showNotice( this.domain && data.domains && data.domains.length ?
+					'لا توجد نتائج في مجال «' + this.domain.name_arabic + '»' :
+					'لا توجد نتائج' );
 				this.updateSize();
 				return;
 			}
@@ -368,6 +400,56 @@
 			showPage();
 		};
 
+		// «المجال»: the domains in which the query has results, the largest
+		// first (the API counts them before the filter, so the other domains
+		// stay on offer). A click searches again within that domain; «الكل»,
+		// or a second click, in all of them. Hidden when the API sends none.
+		WikiTermDialog.prototype.renderDomains = function ( facets ) {
+			const selected = this.domain;
+			const isSelected = ( facet ) => !!selected && selected.name_tech === facet.name_tech;
+			// The selected domain is listed even without a result for this
+			// query: otherwise nothing would show that the filter is on.
+			const items = !selected || facets.some( isSelected ) ?
+				facets : facets.concat( selected );
+			const shown = items.filter( ( facet, i ) => this.showAllDomains ||
+				i < DOMAINS_SHOWN || isSelected( facet ) );
+			const more = items.length - shown.length;
+			const pill = ( facet, label, on ) => $( '<button>' )
+				.attr( { type: 'button', 'aria-pressed': String( on ) } )
+				.addClass( 'wikiterm-domain' )
+				.toggleClass( 'wikiterm-domain-on', on )
+				.text( label )
+				.on( 'click', () => {
+					if ( facet || !on ) {
+						this.domain = on ? null : facet;
+						this.performSearch();
+					}
+				} );
+
+			this.$domains.empty().toggle( facets.length > 0 ).append(
+				$( '<span>' ).addClass( 'wikiterm-domains-label' ).text( 'المجال:' ),
+				pill( null, 'الكل', !selected ),
+				shown.map( ( facet ) => pill(
+					facet,
+					facet.name_arabic + ' (' + ( facets.indexOf( facet ) < 0 ? 0 : facet.number_groups ) + ')',
+					isSelected( facet )
+				) )
+			);
+			if ( more || ( this.showAllDomains && items.length > DOMAINS_SHOWN ) ) {
+				this.$domains.append(
+					$( '<button>' )
+						.attr( 'type', 'button' )
+						.addClass( 'wikiterm-domains-more' )
+						.text( more ? 'مجالات أخرى (' + more + ')' : 'أقل' )
+						.on( 'click', () => {
+							this.showAllDomains = !this.showAllDomains;
+							this.renderDomains( facets );
+							this.updateSize();
+						} )
+				);
+			}
+		};
+
 		WikiTermDialog.prototype.createResultCard = function ( group, isHighlighted ) {
 			const $card = $( '<div>' )
 				.addClass( 'wikiterm-result-card' )
@@ -401,6 +483,7 @@
 				.append(
 					$( '<span>' ).addClass( 'wikiterm-arabic-term' ).text( group.arabic_normalised ),
 					$translations,
+					domainTags( group.domains, HEADER_DOMAINS_SHOWN ),
 					citations.length > 1 ? this.createGroupCitationButton( citations ) : null,
 					$( '<div>' ).addClass( 'wikiterm-dictionary-count' )
 						.text( formatDictionaryCount( group.dictionary_ids.length ) ),
@@ -485,7 +568,7 @@
 			} else {
 				$dictName.text( term.dictionary_name_arabic || 'قاموس' );
 			}
-			$dictInfo.append( $dictName );
+			$dictInfo.append( $dictName, domainTags( term.dictionary_domains ) );
 
 			if ( term.page ) {
 				const $page = $( '<span>' ).addClass( 'wikiterm-dictionary-page' );

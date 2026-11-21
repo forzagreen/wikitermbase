@@ -7,6 +7,8 @@ import SiteFooter from './SiteFooter';
 import GroupedCitation from './GroupedCitation';
 import MorphologySection from './MorphologySection';
 import SearchOptions from './SearchOptions';
+import DomainFilter from './DomainFilter';
+import DomainTags from './DomainTags';
 import { useSettings } from '../settings';
 import { fetchStats } from '../api';
 import { citationTemplate, groupCitations } from '../citations';
@@ -94,6 +96,11 @@ const ExpandableText = ({ text, charLimit = 200 }) => {
 // The term of a search is also the page's `?q=`, so a result can be shared or
 // reloaded; a URL longer than the input allows is cut to what the API accepts.
 const termFromParams = (params) => (params.get('q') ?? '').slice(0, MAX_QUERY_LENGTH);
+// Likewise the domains the results are narrowed to: `&domain=<slug>`, repeated.
+const domainsFromParams = (params) => [...new Set(params.getAll('domain').filter(Boolean))];
+const sameList = (a, b) => a.length === b.length && a.every((value, i) => value === b[i]);
+// A result group's header shows this many of its domains, then «+N».
+const GROUP_DOMAINS_SHOWN = 4;
 
 const DictionaryApp = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -109,6 +116,12 @@ const DictionaryApp = () => {
   const [openPopupId, setOpenPopupId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [stats, setStats] = useState(null);
+  // Slugs of the domains the search is narrowed to (none: every dictionary),
+  // and the domains that have results for the displayed query, with their
+  // counts. The ref follows the state, for a search started from a timer.
+  const [domains, setDomains] = useState(() => domainsFromParams(searchParams));
+  const domainsRef = useRef(domains);
+  const [facets, setFacets] = useState([]);
   // Settings panel: the optional «تحليل صرفي» section under every group, and
   // whether a group's dictionary entries start open or folded.
   const [settings] = useSettings();
@@ -121,9 +134,12 @@ const DictionaryApp = () => {
   // Term the displayed results belong to. "Show more" must page that one, not
   // whatever is in the input while the debounce is still pending.
   const resultsTermRef = useRef('');
-  // Term last written to (or read from) `?q=`, so that a search this component
-  // started does not come back through the URL as a second search.
+  const resultsDomainsRef = useRef([]);
+  // Term and domains last written to (or read from) the URL, so that a search
+  // this component started does not come back through the URL as a second
+  // search.
   const urlTermRef = useRef(termFromParams(searchParams));
+  const urlDomainsRef = useRef(domainsFromParams(searchParams));
 
   // Focus search input on mount
   useEffect(() => {
@@ -226,6 +242,18 @@ const DictionaryApp = () => {
       )
     );
 
+    // What the dictionary is about. A click narrows the results to that
+    // domain, a second one widens them again.
+    if (occurrence.dictionary_domains?.length) {
+      parts.push(
+        <DomainTags
+          domains={occurrence.dictionary_domains}
+          selected={domains}
+          onSelect={(slug) => changeDomains(sameList(domains, [slug]) ? [] : [slug])}
+        />
+      );
+    }
+
     // The page links to that page of the dictionary's scan on archive.org,
     // when the API has one (`page_url`).
     if (occurrence.page) {
@@ -322,14 +350,18 @@ const DictionaryApp = () => {
     ));
   };
 
-  // One page of grouped results. `number_groups` is the total for the query.
-  const fetchPage = async (term, offset, signal) => {
+  // One page of grouped results, within `selected` domains if any.
+  // `number_groups` is the total for the query.
+  const fetchPage = async (term, offset, signal, selected) => {
+    const filter = selected.map((slug) => `&domain=${encodeURIComponent(slug)}`).join('');
     const response = await fetch(
-      `/api/v1/search/aggregated?q="${encodeURIComponent(term)}"&limit=${PAGE_SIZE}&offset=${offset}`,
+      `/api/v1/search/aggregated?q="${encodeURIComponent(term)}"&limit=${PAGE_SIZE}&offset=${offset}${filter}`,
       { signal }
     );
     if (!response.ok) {
-      throw new Error('حدث خطأ في البحث. الرجاء المحاولة مرة أخرى.');
+      const error = new Error('حدث خطأ في البحث. الرجاء المحاولة مرة أخرى.');
+      error.status = response.status;
+      throw error;
     }
     return response.json();
   };
@@ -342,28 +374,35 @@ const DictionaryApp = () => {
     return controller;
   };
 
-  // Keeps `?q=` equal to the searched term; replaces the history entry, so
-  // that typing a word letter by letter does not leave one entry per keystroke.
-  const syncUrl = (term) => {
-    if (term === urlTermRef.current) return;
+  // Keeps `?q=` and `&domain=` equal to the search; replaces the history
+  // entry, so that typing a word letter by letter does not leave one entry
+  // per keystroke. Without a term the URL carries no domain either.
+  const syncUrl = (term, selected) => {
+    const urlDomains = term ? selected : [];
+    if (term === urlTermRef.current && sameList(urlDomains, urlDomainsRef.current)) return;
     urlTermRef.current = term;
-    setSearchParams(term ? { q: term } : {}, { replace: true });
+    urlDomainsRef.current = urlDomains;
+    const params = new URLSearchParams();
+    if (term) params.set('q', term);
+    urlDomains.forEach((slug) => params.append('domain', slug));
+    setSearchParams(params, { replace: true });
   };
 
-  // Search function with debouncing
-  const handleSearch = async (term) => {
+  // Search function with debouncing. `selected`: the domains to search in.
+  const handleSearch = async (term, selected = domainsRef.current) => {
     if (term.trim().length < 3) {
-      syncUrl('');
+      syncUrl('', selected);
       abortRef.current?.abort();
       abortRef.current = null;
       setLoading(false);
       setLoadingMore(false);
       setResults([]);
       setTotalGroups(0);
+      setFacets([]);
       return;
     }
 
-    syncUrl(term.trim());
+    syncUrl(term.trim(), selected);
     const controller = startRequest();
     setLoading(true);
     setLoadingMore(false);
@@ -371,10 +410,12 @@ const DictionaryApp = () => {
     setError(null);
 
     try {
-      const data = await fetchPage(term, 0, controller.signal);
+      const data = await fetchPage(term, 0, controller.signal, selected);
 
       if (data && Array.isArray(data.groups)) {
         resultsTermRef.current = term;
+        resultsDomainsRef.current = selected;
+        setFacets(Array.isArray(data.domains) ? data.domains : []);
         setResults(data.groups);
         setTotalGroups(data.number_groups ?? data.groups.length);
         const initialExpanded = data.groups.reduce((acc, _, index) => {
@@ -389,15 +430,32 @@ const DictionaryApp = () => {
       }
     } catch (err) {
       if (err.name === 'AbortError') return; // superseded by a newer search
+      // A domain the database does not have (an old link): search without it.
+      if (err.status === 422 && selected.length > 0) {
+        changeDomains([], term);
+        return;
+      }
       setError(err.message);
       setResults([]);
       setTotalGroups(0);
+      setFacets([]);
     } finally {
       if (abortRef.current === controller) {
         abortRef.current = null;
         setLoading(false);
       }
     }
+  };
+
+  // Narrows the search to `next` domains (none: every dictionary) and runs it
+  // again at once, on what is in the search box.
+  const changeDomains = (next, term = searchTerm) => {
+    domainsRef.current = next;
+    setDomains(next);
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    handleSearch(term, next);
   };
 
   // Appends the next page of the displayed query.
@@ -408,7 +466,12 @@ const DictionaryApp = () => {
     setLoadMoreFailed(false);
 
     try {
-      const data = await fetchPage(resultsTermRef.current, offset, controller.signal);
+      const data = await fetchPage(
+        resultsTermRef.current,
+        offset,
+        controller.signal,
+        resultsDomainsRef.current
+      );
       const groups = Array.isArray(data?.groups) ? data.groups : [];
       setResults((prev) => [...prev, ...groups]);
       setTotalGroups(data?.number_groups ?? offset + groups.length);
@@ -430,19 +493,24 @@ const DictionaryApp = () => {
     }
   };
 
-  // A term arriving through the URL (page load, back/forward) is searched at
+  // A search arriving through the URL (page load, back/forward) is run at
   // once, without the typing debounce.
   const urlTerm = termFromParams(searchParams);
+  const urlDomains = domainsFromParams(searchParams);
+  const urlDomainsKey = urlDomains.join(' ');
   useEffect(() => {
-    if (urlTerm === urlTermRef.current) return;
+    if (urlTerm === urlTermRef.current && sameList(urlDomains, urlDomainsRef.current)) return;
     urlTermRef.current = urlTerm;
+    urlDomainsRef.current = urlDomains;
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
     setSearchTerm(urlTerm);
-    handleSearch(urlTerm);
+    domainsRef.current = urlDomains;
+    setDomains(urlDomains);
+    handleSearch(urlTerm, urlDomains);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlTerm]);
+  }, [urlTerm, urlDomainsKey]);
 
   // The initial `?q=` is searched on mount.
   useEffect(() => {
@@ -498,6 +566,17 @@ const DictionaryApp = () => {
           />
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={26} />
         </div>
+        {/* The domains in which the term has results. Shown with the results
+            and, when the search is narrowed to a domain that has none, on its
+            own: it is then the way out. */}
+        {facets.length > 0 && (
+          <DomainFilter
+            className="mt-3"
+            facets={facets.map((f) => ({ ...f, count: f.number_groups }))}
+            selected={domains}
+            onChange={changeDomains}
+          />
+        )}
         {/* Only with results: the options change how results are rendered.
             `results` survives a refetch, so the row does not blink while the
             query is being edited. */}
@@ -527,7 +606,24 @@ const DictionaryApp = () => {
       <div className="max-w-4xl mx-auto mt-8 px-4 pb-12 w-full">
         {!loading && !error && results.length === 0 && searchTerm.trim().length >= 3 && (
           <div className={`${cardClasses} rounded-lg p-6 text-center`}>
-            <p className="text-lg">عذرًا، لم نعثر على أي نتائج.</p>
+            {domains.length > 0 && facets.length > 0 ? (
+              <>
+                <p className="text-lg">
+                  {domains.length === 1
+                    ? 'لا نتائج في المجال المحدّد.'
+                    : 'لا نتائج في المجالات المحدّدة.'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => changeDomains([])}
+                  className="mt-3 text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  ابحث في كل المجالات
+                </button>
+              </>
+            ) : (
+              <p className="text-lg">عذرًا، لم نعثر على أي نتائج.</p>
+            )}
           </div>
         )}
         {!loading && !error && results.length === 0 && searchTerm.trim().length > 0 && searchTerm.trim().length < 3 && (
@@ -583,9 +679,13 @@ const DictionaryApp = () => {
                     </div>
                   </div>
                 </div>
-                <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-                  {formatDictionaryCount(group.occurences)}
-                </p>
+                {/* Plain labels: nothing in the header is clickable. */}
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {formatDictionaryCount(group.occurences)}
+                  </p>
+                  <DomainTags domains={group.domains} max={GROUP_DOMAINS_SHOWN} />
+                </div>
               </div>
               {/* A real button, so the keyboard reaches the toggle too. */}
               <button

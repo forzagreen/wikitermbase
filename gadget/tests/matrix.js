@@ -3,6 +3,9 @@
 // Browsers: Google Chrome (installed app, via channel 'chrome'), plus Playwright's
 // Firefox and WebKit builds: npx playwright install firefox webkit.
 // Filter with BROWSERS=chrome,firefox and SKINS=vector,minerva.
+// API_BASE=http://localhost:5001 answers the gadget's API calls from a local
+// backend (`make run`) instead of Toolforge, to try an API change before it
+// is deployed.
 // Loads a real ar.wikipedia article (anonymous), injects the gadget from the
 // working tree, and drives it: entry point -> dialog (lazy OOUI load) ->
 // search -> grouped citation -> expand -> citation popup -> "show more".
@@ -18,6 +21,7 @@ const OUT = path.join(__dirname, 'out');
 const SHOTS = path.join(OUT, 'shots');
 fs.mkdirSync(SHOTS, { recursive: true });
 const QUERY = process.env.QUERY || 'computer';
+const API_BASE = process.env.API_BASE;
 
 // Google Chrome when installed (macOS dev machines, GitHub runners), else Playwright's Chromium.
 const launchChrome = () => pw.chromium.launch({ channel: 'chrome' }).catch(() => pw.chromium.launch());
@@ -48,6 +52,18 @@ async function runCase(browserName, browser, c) {
   page.on('pageerror', (e) => r.pageErrors.push(String(e.message || e).split('\n')[0]));
   page.on('console', (m) => { if (m.type() === 'error') r.consoleErrors.push(m.text().split('\n')[0]); });
   const shot = (suffix) => page.screenshot({ path: path.join(SHOTS, `${browserName}-${label}${suffix}.png`) }).catch(() => {});
+  if (API_BASE) {
+    await page.route('https://wikitermbase.toolforge.org/api/**', async (route) => {
+      const url = new URL(route.request().url());
+      const res = await fetch(API_BASE + url.pathname + url.search);
+      await route.fulfill({
+        status: res.status,
+        contentType: 'application/json',
+        headers: { 'access-control-allow-origin': '*' },
+        body: await res.text(),
+      });
+    });
+  }
   try {
     const url = c.url || (PAGE + '?useskin=' + c.skin + (c.night ? '&vectornightmode=1' : ''));
     let t = Date.now();
@@ -144,6 +160,27 @@ async function runCase(browserName, browser, c) {
         r.steps.cardsRendered, { timeout: 30000 });
       r.steps.cardsAfterShowMore = await page.locator('.wikiterm-result-card').count();
     }
+    // Domain filter: the first domain offered searches again within it (every
+    // result is then tagged), «الكل» brings the other results back.
+    const pills = page.locator('.wikiterm-domain');
+    if (await pills.count() > 1) {
+      const selectedPill = () => document.querySelector('.wikiterm-domain-on')?.textContent;
+      const d = { offered: await pills.count() - 1, all: await pills.first().innerText(), picked: await pills.nth(1).innerText() };
+      await pills.nth(1).click();
+      await page.waitForFunction((all) => {
+        const on = document.querySelector('.wikiterm-domain-on');
+        return on && on.textContent !== all && document.querySelector('.wikiterm-result-card');
+      }, d.all, { timeout: 30000 });
+      d.selected = await page.evaluate(selectedPill);
+      d.cards = await page.locator('.wikiterm-result-card').count();
+      d.cardsTagged = await page.locator('.wikiterm-result-card:has(.wikiterm-result-header .wikiterm-tag)').count();
+      await shot('-domain');
+      await pills.first().click();
+      await page.waitForFunction((all) => document.querySelector('.wikiterm-domain-on')?.textContent === all, d.all, { timeout: 30000 });
+      d.restoredCards = await page.locator('.wikiterm-result-card').count();
+      r.steps.domainFilter = d;
+    }
+
     // Close via the dialog's safe action; the dialog must disappear.
     await page.locator('.oo-ui-processDialog-actions-safe a').first().click();
     await input.waitFor({ state: 'hidden', timeout: 15000 });

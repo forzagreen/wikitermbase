@@ -1,14 +1,16 @@
 import configparser
+import dataclasses
 import itertools
 import logging
 import os
 import re
+import time
 from collections import Counter
 from functools import lru_cache
 from typing import Literal
 
 import sentry_sdk
-from fastapi import FastAPI, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -87,7 +89,7 @@ TAGS_METADATA = [
     },
     {
         "name": "Metadata",
-        "description": "Information about dictionaries and dataset statistics.",
+        "description": "Information about dictionaries, their domains and dataset statistics.",
     },
     {
         "name": "Morphology",
@@ -299,6 +301,144 @@ def arabterm_url(name_tech: str | None) -> str | None:
     if not name_tech:
         return None
     return f"{ARABTERM_PAGES_URL}{name_tech}/"
+
+
+# --- Domains -----------------------------------------------------------------
+#
+# What a dictionary is about («رياضيات», «طب»): arabterm's `domain` table, one
+# row per value of "main subject" (P921) on the dictionaries' Wikidata items,
+# linked to the dictionaries by `dictionary_domain`. A dictionary has one
+# domain or several. The search endpoints tag every result with the domains of
+# its dictionary, say how many results each domain has, and can keep only the
+# results of some domains (`domain=`).
+
+# The two tables hold a few dozen rows and change only with a DB import, so
+# they are read at most once per DOMAINS_TTL seconds, not on every search.
+DOMAINS_TTL = 300
+
+
+@dataclasses.dataclass(frozen=True)
+class DomainIndex:
+    # Every domain: the `domain` row plus `number_dictionaries` and
+    # `number_terms`, the most used first.
+    domains: list[dict] = dataclasses.field(default_factory=list)
+    # dictionary id -> the tags of its domains, [{"name_tech", "name_arabic"}].
+    by_dictionary: dict[int, list[dict]] = dataclasses.field(default_factory=dict)
+
+    @property
+    def names(self) -> dict[str, str]:
+        """Arabic name of every domain, by slug, in the order of `domains`."""
+        return {d["name_tech"]: d["name_arabic"] for d in self.domains}
+
+
+def fetch_domain_index() -> DomainIndex:
+    """Read the domains and what dictionaries they tag.
+
+    A database imported from a dump that predates the domains has neither
+    table: the index is then empty and search works as before, untagged.
+    """
+    try:
+        domains = {
+            row["id"]: {**row, "number_dictionaries": 0, "number_terms": 0}
+            for row in execute_with_retry(
+                text(
+                    "SELECT id, name_tech, name_arabic, name_english, name_french,"
+                    " wikidata_id FROM `domain` ORDER BY id"
+                )
+            )
+            .mappings()
+            .all()
+        }
+        links = (
+            execute_with_retry(
+                text(
+                    "SELECT dd.dictionary_id, dd.domain_id, d.nbr_entries"
+                    " FROM dictionary_domain dd"
+                    " JOIN dictionary d ON d.id = dd.dictionary_id"
+                    " ORDER BY dd.dictionary_id, dd.domain_id"
+                )
+            )
+            .mappings()
+            .all()
+        )
+    except SQLAlchemyError:
+        logger.warning("No domain tables in the database: results are not tagged")
+        return DomainIndex()
+
+    by_dictionary: dict[int, list[dict]] = {}
+    for link in links:
+        domain = domains.get(link["domain_id"])
+        if domain is None:
+            continue
+        domain["number_dictionaries"] += 1
+        domain["number_terms"] += link["nbr_entries"] or 0
+        by_dictionary.setdefault(link["dictionary_id"], []).append(
+            {"name_tech": domain["name_tech"], "name_arabic": domain["name_arabic"]}
+        )
+    ordered = sorted(
+        domains.values(), key=lambda d: (-d["number_dictionaries"], d["id"])
+    )
+    return DomainIndex(domains=ordered, by_dictionary=by_dictionary)
+
+
+_domain_index_cache: tuple[float, DomainIndex] | None = None
+
+
+def domain_index() -> DomainIndex:
+    """fetch_domain_index(), cached for DOMAINS_TTL seconds."""
+    global _domain_index_cache
+    now = time.monotonic()
+    if _domain_index_cache is None or now >= _domain_index_cache[0]:
+        _domain_index_cache = (now + DOMAINS_TTL, fetch_domain_index())
+    return _domain_index_cache[1]
+
+
+def tag_terms(terms: list[dict], index: DomainIndex) -> None:
+    """Give every term the domains of its dictionary, as `dictionary_domains`.
+    A term whose dictionary has none is left without the key."""
+    for term in terms:
+        tags = index.by_dictionary.get(term.get("dictionary_id"))
+        if tags:
+            term["dictionary_domains"] = tags
+
+
+def filter_terms_by_domain(terms: list[dict], selected: list[str]) -> list[dict]:
+    """The terms whose dictionary has one of the `selected` domains (slugs);
+    all of them when nothing is selected. Expects tagged terms (tag_terms)."""
+    if not selected:
+        return terms
+    wanted = set(selected)
+    return [
+        term
+        for term in terms
+        if any(tag["name_tech"] in wanted for tag in term.get("dictionary_domains", ()))
+    ]
+
+
+def validate_domains(selected: list[str] | None, index: DomainIndex) -> list[str]:
+    """The `domain` query values, deduplicated; 422 on one that is not a
+    domain of this database."""
+    selected = list(dict.fromkeys(selected or []))
+    unknown = [slug for slug in selected if slug not in index.names]
+    if unknown:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown domain: {', '.join(unknown)}. See /api/v1/domains.",
+        )
+    return selected
+
+
+def domain_facets(counts: Counter, index: DomainIndex, count_key: str) -> list[dict]:
+    """`counts` (by domain slug) as the response's `domains` list: the domains
+    that have results, the largest first, ties in the order of the index."""
+    order = {slug: i for i, slug in enumerate(index.names)}
+    return [
+        {"name_tech": slug, "name_arabic": index.names[slug], count_key: count}
+        for slug, count in sorted(
+            counts.items(), key=lambda item: (-item[1], order.get(item[0], 0))
+        )
+        if slug in index.names
+    ]
 
 
 def normalise_arabic(text: str) -> str:
@@ -787,6 +927,63 @@ def elect_suggested_group(scores: list[int]) -> int | None:
     return ranked[0]
 
 
+def arabic_memberships(term: dict) -> list[tuple[str, str]]:
+    """The groups a term with an Arabic value belongs to, as (normalised
+    variant, raw part) pairs: one per distinct part of its `arabic` field
+    (see split_translations), in order."""
+    seen_variants = set()
+    pairs = []
+    for raw_part in split_translations(term["arabic"]):
+        variant = normalise_arabic(raw_part)
+        if variant and variant not in seen_variants:
+            seen_variants.add(variant)
+            pairs.append((variant, raw_part))
+    return pairs or [(normalise_arabic(term["arabic"]), term["arabic"])]
+
+
+def count_groups_by_domain(results: list[dict]) -> Counter:
+    """How many groups aggregate_terms() would return for each domain alone.
+
+    A group is in a domain when one of its occurrences comes from a dictionary
+    of that domain, and filtering the rows on a domain keeps exactly those
+    groups, so the counts are read off the group keys without aggregating
+    once per domain. Expects tagged terms (tag_terms).
+    """
+    domains_by_variant: dict[str, set[str]] = {}
+    counts: Counter = Counter()
+    for term in results:
+        slugs = [tag["name_tech"] for tag in term.get("dictionary_domains", ())]
+        if not slugs or not (term.get("english") or "").strip():
+            continue  # aggregate_terms ignores rows without English
+        if "arabic" not in term:
+            counts.update(slugs)  # a group of its own
+            continue
+        for variant, _raw_part in arabic_memberships(term):
+            domains_by_variant.setdefault(variant, set()).update(slugs)
+    for slugs in domains_by_variant.values():
+        counts.update(slugs)
+    return counts
+
+
+def group_domains(occurences: list[dict]) -> list[dict]:
+    """The domains of a group's dictionaries, as tags, the domain of most of
+    its dictionaries first (ties: in order of appearance)."""
+    dictionaries_by_slug: dict[str, set] = {}
+    names: dict[str, str] = {}
+    for term in occurences:
+        for tag in term.get("dictionary_domains", ()):
+            dictionaries_by_slug.setdefault(tag["name_tech"], set()).add(
+                term.get("dictionary_id")
+            )
+            names[tag["name_tech"]] = tag["name_arabic"]
+    return [
+        {"name_tech": slug, "name_arabic": names[slug]}
+        for slug in sorted(
+            dictionaries_by_slug, key=lambda s: -len(dictionaries_by_slug[s])
+        )
+    ]
+
+
 def aggregate_terms(results: list[dict], query: str = "") -> list[dict]:
     """Aggregate terms by arabic term (after cleaning it)."""
     # Ignore rows without an English value (NULL, empty or whitespace-only):
@@ -814,18 +1011,9 @@ def aggregate_terms(results: list[dict], query: str = "") -> list[dict]:
 
     # For each term: list of (normalised_variant, raw_part) pairs, one per
     # distinct part of its arabic field (deduplicated, order preserved).
-    memberships_by_id = {}
-    for term in results_with_arabic:
-        seen_variants = set()
-        pairs = []
-        for raw_part in split_translations(term["arabic"]):
-            variant = normalise_arabic(raw_part)
-            if variant and variant not in seen_variants:
-                seen_variants.add(variant)
-                pairs.append((variant, raw_part))
-        memberships_by_id[id(term)] = pairs or [
-            (normalise_arabic(term["arabic"]), term["arabic"])
-        ]
+    memberships_by_id = {
+        id(term): arabic_memberships(term) for term in results_with_arabic
+    }
 
     # variant -> list of (term, raw_part) contributed by that variant.
     groups_dict = dict()
@@ -924,6 +1112,13 @@ def paginate_groups(
     return groups[offset : offset + limit]
 
 
+class DomainTag(BaseModel):
+    """A domain as it tags a result: its slug and its Arabic name."""
+
+    name_tech: str = Field(description="Slug, the value the `domain` parameter takes.")
+    name_arabic: str
+
+
 class TermResult(BaseModel):
     """A term row joined with its dictionary metadata.
 
@@ -952,11 +1147,31 @@ class TermResult(BaseModel):
     dictionary_wikidata_id: str | None = None
     dictionary_dict_type: str | None = None
     dictionary_tier: int | None = None
+    dictionary_domains: list[DomainTag] | None = Field(
+        None,
+        description="What the term's dictionary is about (one domain or several).",
+    )
+
+
+class DomainResultCount(DomainTag):
+    number_results: int = Field(
+        description="Results of the query in this domain, whatever `domain` selects."
+    )
+
+
+class DomainGroupCount(DomainTag):
+    number_groups: int = Field(
+        description="Groups of the query in this domain, whatever `domain` selects: the `number_groups` that `domain=<name_tech>` alone would return."
+    )
 
 
 class SearchResponse(BaseModel):
     q: str
     number_results: int
+    domains: list[DomainResultCount] = Field(
+        [],
+        description="The domains that have results for `q`, the largest first. Counted before the `domain` filter, so that a client can offer the other domains.",
+    )
     results: list[TermResult]
 
 
@@ -969,6 +1184,10 @@ class TermGroup(BaseModel):
     english_normalised: str
     french_normalised: str | None = None
     dictionary_ids: list[int]
+    domains: list[DomainTag] | None = Field(
+        None,
+        description="The domains of the group's dictionaries, the one of most of them first.",
+    )
     total_relevance: float
     suggested: bool = Field(
         False,
@@ -985,6 +1204,10 @@ class AggregatedSearchResponse(BaseModel):
     number_groups: int
     offset: int = 0
     limit: int | None = None
+    domains: list[DomainGroupCount] = Field(
+        [],
+        description="The domains that have groups for `q`, the largest first. Counted before the `domain` filter, so that a client can offer the other domains.",
+    )
     groups: list[TermGroup]
 
 
@@ -1007,11 +1230,38 @@ class Dictionary(BaseModel):
         description="Printed page p is page p + page_offset of the scan (Wikidata P8330).",
     )
     arabterm_url: str | None = None
+    domains: list[DomainTag] = Field(
+        [], description="What the dictionary is about (one domain or several)."
+    )
 
 
 class DictionariesResponse(BaseModel):
     number: int
     dictionaries: list[Dictionary]
+
+
+class Domain(BaseModel):
+    """A subject that dictionaries are about: a row of the ``domain`` table."""
+
+    name_tech: str = Field(
+        description="Slug, the value the `domain` parameter of the search endpoints takes."
+    )
+    name_arabic: str
+    name_english: str | None = None
+    name_french: str | None = None
+    wikidata_id: str | None = Field(
+        None,
+        description='The Wikidata item that the dictionaries of this domain have as "main subject" (P921).',
+    )
+    number_dictionaries: int
+    number_terms: int = Field(
+        description="Terms of the dictionaries of this domain. A dictionary with two domains counts in both."
+    )
+
+
+class DomainsResponse(BaseModel):
+    number: int
+    domains: list[Domain]
 
 
 class StatsResponse(BaseModel):
@@ -1121,15 +1371,37 @@ def search(
         True,
         description="Include each term's `description` field in the response. Set to `false` to slim the payload.",
     ),
+    domain: list[str] | None = Query(
+        None,
+        description="Keep only the results from dictionaries of this domain: a `name_tech` from `/api/v1/domains`, e.g. `mathematics`. Repeat the parameter for several domains (`domain=physics&domain=chemistry`): a dictionary of any of them qualifies. An unknown domain is a 422.",
+        examples=[["mathematics"]],
+    ),
 ):
     """Search across all dictionaries and return individual matching terms.
 
     Each result includes the term's columns plus its parent dictionary's
-    `name_arabic` and `wikidata_id`, ordered by full-text relevance.
+    `name_arabic`, `wikidata_id` and domains, ordered by full-text relevance.
     For grouped/de-duplicated results, prefer `/api/v1/search/aggregated`.
+
+    `domain` narrows the search to the dictionaries of some domains; `domains`
+    counts the results of every domain before that filter.
     """
+    index = domain_index()
+    selected = validate_domains(domain, index)
     results = search_terms_mariadb(q, include_descriptions)
-    return {"q": q, "number_results": len(results), "results": results}
+    tag_terms(results, index)
+    facets = Counter(
+        tag["name_tech"]
+        for term in results
+        for tag in term.get("dictionary_domains", ())
+    )
+    results = filter_terms_by_domain(results, selected)
+    return {
+        "q": q,
+        "number_results": len(results),
+        "domains": domain_facets(facets, index, "number_results"),
+        "results": results,
+    }
 
 
 @app.get(
@@ -1162,6 +1434,11 @@ def search_aggregated(
         0,
         ge=0,
         description="Number of groups to skip, in the order described below. The next page is `offset + len(groups)`; there is one while that is lower than `number_groups`.",
+    ),
+    domain: list[str] | None = Query(
+        None,
+        description="Keep only the results from dictionaries of this domain: a `name_tech` from `/api/v1/domains`, e.g. `mathematics`. Repeat the parameter for several domains (`domain=physics&domain=chemistry`): a dictionary of any of them qualifies. An unknown domain is a 422.",
+        examples=[["mathematics"]],
     ),
 ):
     """Search and group results by normalised Arabic term.
@@ -1200,6 +1477,15 @@ def search_aggregated(
     Rows without an English value are ignored: they are data errors tracked in
     the arabterm repository. `/api/v1/search` still returns them.
 
+    **Domains.** Every occurrence carries the domains of its dictionary
+    (`dictionary_domains`) and every group those of its dictionaries
+    (`domains`). `domain` keeps only the occurrences from dictionaries of the
+    given domains *before* grouping, so the groups, their dictionary counts,
+    the suggested translation and `number_groups` are those of a search within
+    these domains. The response's `domains` lists the domains that have groups
+    for `q` with their `number_groups`, counted without the filter: what a
+    client needs to offer "the same search in another domain".
+
     **Pagination.** `limit` and `offset` select a window of the ordered groups;
     `number_groups` is always the total. Grouping and ordering are computed
     over every matching row on each request — the server keeps no state
@@ -1208,7 +1494,15 @@ def search_aggregated(
     """
     sentry_sdk.set_tag("search.q", q[:200])  # Sentry caps tag values at 200 chars
 
+    index = domain_index()
+    selected = validate_domains(domain, index)
+    # How often the domain filter is used, and for which domains.
+    sentry_sdk.set_tag("search.domain", ",".join(selected)[:200] or "none")
+
     results = search_terms_mariadb(q, include_descriptions)
+    tag_terms(results, index)
+    facets = count_groups_by_domain(results)
+    results = filter_terms_by_domain(results, selected)
 
     # Disable arabterm URIs as it's disabled in their website
     if DISABLE_ARABTERM_URIS:
@@ -1218,18 +1512,24 @@ def search_aggregated(
 
     groups = aggregate_terms(results, q)
     number_groups = len(groups)
+    page = paginate_groups(groups, offset, limit)
+    for group in page:
+        tags = group_domains(group["occurences"])
+        if tags:
+            group["domains"] = tags
 
     sentry_sdk.set_tag("search.number_groups", str(number_groups))
     sentry_sdk.set_measurement("search.number_groups", number_groups)
     # How often clients go past the first page, and how slow those requests are.
     sentry_sdk.set_tag("search.offset", str(offset))
     logger.info(
-        "search_aggregated q=%r fulltext=%r number_groups=%d offset=%d limit=%s",
+        "search_aggregated q=%r fulltext=%r number_groups=%d offset=%d limit=%s domain=%s",
         q,
         fulltext_query(q),
         number_groups,
         offset,
         limit,
+        ",".join(selected) or None,
     )
 
     return {
@@ -1237,7 +1537,8 @@ def search_aggregated(
         "number_groups": number_groups,
         "offset": offset,
         "limit": limit,
-        "groups": paginate_groups(groups, offset, limit),
+        "domains": domain_facets(facets, index, "number_groups"),
+        "groups": page,
     }
 
 
@@ -1257,11 +1558,38 @@ def list_dicts():
     search endpoints back to a human-readable source name.
     """
     result = execute_with_retry(text("SELECT * FROM dictionary ORDER BY id DESC"))
+    by_dictionary = domain_index().by_dictionary
     dictionaries = [
-        {**row, "arabterm_url": arabterm_url(row.get("name_tech"))}
+        {
+            **row,
+            "arabterm_url": arabterm_url(row.get("name_tech")),
+            "domains": by_dictionary.get(row["id"], []),
+        }
         for row in result.mappings().all()
     ]
     return {"number": len(dictionaries), "dictionaries": dictionaries}
+
+
+@app.get(
+    "/api/v1/domains",
+    tags=["Metadata"],
+    summary="List domains",
+    response_model=DomainsResponse,
+    response_description="Every domain that tags a dictionary.",
+)
+def list_domains():
+    """Return the domains: the subjects the dictionaries are about.
+
+    Domains come from "main subject" (P921) on the dictionaries' Wikidata
+    items, under shorter names. They are sorted by number of dictionaries, the
+    largest first. A `name_tech` is what the `domain` parameter of the search
+    endpoints takes, and what `dictionary_domains` and `domains` carry in
+    their results.
+
+    The list is empty when the database predates the domains.
+    """
+    domains = domain_index().domains
+    return {"number": len(domains), "domains": domains}
 
 
 @app.get(

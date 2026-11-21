@@ -1,6 +1,6 @@
 // src/api.js
 //
-// The two metadata endpoints, fetched at most once per page load. Several
+// The metadata endpoints, fetched at most once per page load. Several
 // components on the same page need the counts (the landing cards, the
 // "what's new" panel, the dictionaries page), and /api/v1/dicts weighs
 // 13 KB gzipped, so they share one request instead of each sending its own.
@@ -30,3 +30,7 @@ export const fetchStats = () => fetchOnce('/api/v1/stats', (data) => data);
 // The dictionaries, most recently added first (descending id).
 export const fetchDicts = () =>
   fetchOnce('/api/v1/dicts', (data) => (Array.isArray(data?.dictionaries) ? data.dictionaries : []));
+
+// The domains that tag the dictionaries, the one of most dictionaries first.
+export const fetchDomains = () =>
+  fetchOnce('/api/v1/domains', (data) => (Array.isArray(data?.domains) ? data.domains : []));

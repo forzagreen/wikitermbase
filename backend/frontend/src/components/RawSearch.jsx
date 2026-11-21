@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router';
 import { Search, ExternalLink, ChevronDown, ChevronUp, Link2, Loader2, Quote, Check, Copy } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import { citationTemplate } from '../citations';
+import DomainTags from './DomainTags';
 
 // The API rejects longer queries (a pasted paragraph is not a term).
 const MAX_QUERY_LENGTH = 200;
@@ -219,6 +220,7 @@ const RawSearch = () => {
               {/* Dictionary Info */}
               <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mt-2">
                 <span>{item.dictionary_name_arabic}</span>
+                <DomainTags domains={item.dictionary_domains} />
                 {item.page && (
                   <>
                     <span>•</span>

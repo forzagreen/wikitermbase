@@ -5,12 +5,17 @@ from app import (
     MAX_QUERY_LENGTH,
     MAX_QUERY_VARIANTS,
     NO_MATCH,
+    DomainIndex,
     aggregate_terms,
     app,
     arabterm_url,
     archive_page_url,
+    count_groups_by_domain,
     expand_query,
+    fetch_domain_index,
+    filter_terms_by_domain,
     fulltext_query,
+    group_domains,
     normalise_arabic,
     normalise_english,
     normalise_french,
@@ -21,8 +26,10 @@ from app import (
     singular_candidates,
     spelling_candidates,
     split_translations,
+    tag_terms,
 )
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import ProgrammingError
 
 SEARCH_PATHS = ["/api/v1/search", "/api/v1/search/aggregated"]
 
@@ -950,3 +957,265 @@ def test_search_documents_query_length_limit(client, path):
     parameters = client.get("/openapi.json").json()["paths"][path]["get"]["parameters"]
     (q,) = [p for p in parameters if p["name"] == "q"]
     assert q["schema"]["maxLength"] == MAX_QUERY_LENGTH
+
+
+# --- Domains -----------------------------------------------------------------
+
+MATHS = {"name_tech": "mathematics", "name_arabic": "رياضيات"}
+ASTRONOMY = {"name_tech": "astronomy", "name_arabic": "علم الفلك"}
+MEDICINE = {"name_tech": "medicine", "name_arabic": "طب"}
+
+
+def _domain(tag, id_, number_dictionaries):
+    return {
+        "id": id_,
+        **tag,
+        "name_english": tag["name_tech"].capitalize(),
+        "name_french": None,
+        "wikidata_id": f"Q{id_}",
+        "number_dictionaries": number_dictionaries,
+        "number_terms": 100 * number_dictionaries,
+    }
+
+
+# Dictionary 1 is about mathematics and astronomy, 2 about mathematics,
+# 3 about medicine; dictionary 4 has no domain.
+DOMAIN_INDEX = DomainIndex(
+    domains=[_domain(MATHS, 9, 2), _domain(MEDICINE, 2, 1), _domain(ASTRONOMY, 25, 1)],
+    by_dictionary={1: [MATHS, ASTRONOMY], 2: [MATHS], 3: [MEDICINE]},
+)
+
+
+def _domain_terms():
+    """Rows as search_terms_mariadb returns them, before tagging."""
+    rows = [
+        # (id, dictionary_id, arabic, english)
+        (1, 1, "مدار", "orbit"),
+        (2, 2, "مدار", "orbit"),
+        (3, 3, "مدار؛ حَجاج", "orbit"),  # packed: also the group "حجاج"
+        (4, 3, "حجاج", "orbit"),
+        (5, 4, "فلك", "orbit"),  # a dictionary without a domain
+        (6, 3, None, "orbit"),  # no Arabic: a group of its own
+        (7, 3, "مدار", " "),  # no English: ignored by the aggregation
+    ]
+    terms = []
+    for term_id, dictionary_id, arabic, english in rows:
+        term = {
+            "id": term_id,
+            "dictionary_id": dictionary_id,
+            "dictionary_name_arabic": f"معجم {dictionary_id}",
+            "english": english,
+            "relevance": 1.0,
+        }
+        if arabic is not None:
+            term["arabic"] = arabic
+        terms.append(term)
+    return terms
+
+
+def test_tag_terms_adds_the_domains_of_the_dictionary():
+    terms = _domain_terms()
+    tag_terms(terms, DOMAIN_INDEX)
+    assert terms[0]["dictionary_domains"] == [MATHS, ASTRONOMY]
+    assert terms[2]["dictionary_domains"] == [MEDICINE]
+    # A dictionary without a domain: no key, rather than an empty list.
+    assert "dictionary_domains" not in terms[4]
+
+
+def test_tag_terms_without_domain_tables_changes_nothing():
+    terms = _domain_terms()
+    tag_terms(terms, DomainIndex())
+    assert all("dictionary_domains" not in term for term in terms)
+
+
+@pytest.mark.parametrize(
+    "selected, expected_ids",
+    [
+        ([], [1, 2, 3, 4, 5, 6, 7]),
+        (["astronomy"], [1]),
+        (["mathematics"], [1, 2]),
+        # Several domains: a dictionary of any of them qualifies.
+        (["astronomy", "medicine"], [1, 3, 4, 6, 7]),
+    ],
+)
+def test_filter_terms_by_domain(selected, expected_ids):
+    terms = _domain_terms()
+    tag_terms(terms, DOMAIN_INDEX)
+    kept = filter_terms_by_domain(terms, selected)
+    assert [term["id"] for term in kept] == expected_ids
+
+
+def test_count_groups_by_domain_is_what_filtering_would_return():
+    """The count of a domain is the number of groups a search within that
+    domain returns, whatever the rows look like (packed, no Arabic, no
+    English, untagged)."""
+    terms = _domain_terms()
+    tag_terms(terms, DOMAIN_INDEX)
+    counts = count_groups_by_domain(terms)
+    assert counts == {"mathematics": 1, "astronomy": 1, "medicine": 3}
+    for slug in DOMAIN_INDEX.names:
+        groups = aggregate_terms(filter_terms_by_domain(terms, [slug]), '"orbit"')
+        assert counts[slug] == len(groups), slug
+
+
+def test_group_domains_puts_the_domain_of_most_dictionaries_first():
+    terms = _domain_terms()
+    tag_terms(terms, DOMAIN_INDEX)
+    # Dictionaries 1 and 2 are about mathematics, 1 alone about astronomy.
+    assert group_domains(terms[:2]) == [MATHS, ASTRONOMY]
+    # Two entries of dictionary 3 do not outvote the two dictionaries.
+    assert group_domains(terms[:4]) == [MATHS, ASTRONOMY, MEDICINE]
+    assert group_domains([terms[4]]) == []
+
+
+class FakeRows(FakeResult):
+    """FakeResult for code that iterates over the mappings."""
+
+    def __iter__(self):
+        return iter(self.rows)
+
+
+def test_fetch_domain_index(monkeypatch):
+    domains = [
+        {
+            "id": 2,
+            **MEDICINE,
+            "name_english": "Medicine",
+            "name_french": "Médecine",
+            "wikidata_id": "Q1192539",
+        },
+        {
+            "id": 9,
+            **MATHS,
+            "name_english": "Mathematics",
+            "name_french": "Mathématiques",
+            "wikidata_id": "Q66785817",
+        },
+    ]
+    links = [
+        {"dictionary_id": 1, "domain_id": 9, "nbr_entries": 40},
+        {"dictionary_id": 2, "domain_id": 9, "nbr_entries": 60},
+        {"dictionary_id": 3, "domain_id": 2, "nbr_entries": None},
+        {"dictionary_id": 3, "domain_id": 9, "nbr_entries": None},
+    ]
+    monkeypatch.setattr(
+        "app.execute_with_retry",
+        lambda query, params=None: FakeRows(
+            links if "dictionary_domain" in str(query) else domains
+        ),
+    )
+    index = fetch_domain_index()
+    # The most used domain first.
+    assert [d["name_tech"] for d in index.domains] == ["mathematics", "medicine"]
+    assert index.domains[0]["number_dictionaries"] == 3
+    assert index.domains[0]["number_terms"] == 100
+    assert index.domains[0]["wikidata_id"] == "Q66785817"
+    assert index.by_dictionary == {1: [MATHS], 2: [MATHS], 3: [MEDICINE, MATHS]}
+    assert index.names == {"mathematics": "رياضيات", "medicine": "طب"}
+
+
+def test_fetch_domain_index_without_the_tables(monkeypatch):
+    # A database imported from a dump that predates the domains.
+    def no_such_table(query, params=None):
+        raise ProgrammingError(str(query), params, Exception("1146, no such table"))
+
+    monkeypatch.setattr("app.execute_with_retry", no_such_table)
+    assert fetch_domain_index() == DomainIndex()
+
+
+@pytest.fixture
+def domain_client(monkeypatch):
+    """The API over _domain_terms() and DOMAIN_INDEX, without a database."""
+    monkeypatch.setattr("app.domain_index", lambda: DOMAIN_INDEX)
+    monkeypatch.setattr(
+        "app.search_terms_mariadb", lambda q, include_descriptions=True: _domain_terms()
+    )
+    return TestClient(app)
+
+
+def test_search_aggregated_tags_groups_and_counts_domains(domain_client):
+    data = domain_client.get(
+        "/api/v1/search/aggregated", params={"q": '"orbit"'}
+    ).json()
+    assert data["number_groups"] == 4
+    assert data["domains"] == [
+        {**MEDICINE, "number_groups": 3},
+        {**MATHS, "number_groups": 1},
+        {**ASTRONOMY, "number_groups": 1},
+    ]
+    orbit = next(g for g in data["groups"] if g.get("arabic_normalised") == "مدار")
+    assert orbit["domains"] == [MATHS, ASTRONOMY, MEDICINE]
+    assert orbit["occurences"][0]["dictionary_domains"] == [MATHS, ASTRONOMY]
+    # The group of the dictionary without a domain carries none.
+    untagged = next(g for g in data["groups"] if g.get("arabic_normalised") == "فلك")
+    assert "domains" not in untagged
+
+
+def test_search_aggregated_filters_by_domain_before_grouping(domain_client):
+    data = domain_client.get(
+        "/api/v1/search/aggregated",
+        params={"q": '"orbit"', "domain": ["mathematics"]},
+    ).json()
+    assert data["number_groups"] == 1
+    (group,) = data["groups"]
+    # Only the two mathematics dictionaries are left in the group.
+    assert group["dictionary_ids"] == [1, 2]
+    assert group["domains"] == [MATHS, ASTRONOMY]
+    # The other domains are still offered, with their unfiltered counts.
+    assert {**MEDICINE, "number_groups": 3} in data["domains"]
+
+
+def test_search_aggregated_accepts_several_domains(domain_client):
+    data = domain_client.get(
+        "/api/v1/search/aggregated",
+        params={"q": '"orbit"', "domain": ["astronomy", "medicine"]},
+    ).json()
+    orbit = next(g for g in data["groups"] if g.get("arabic_normalised") == "مدار")
+    assert orbit["dictionary_ids"] == [1, 3]
+    assert data["number_groups"] == 3
+
+
+def test_search_filters_and_counts_results_by_domain(domain_client):
+    data = domain_client.get(
+        "/api/v1/search", params={"q": '"orbit"', "domain": "medicine"}
+    ).json()
+    assert [r["id"] for r in data["results"]] == [3, 4, 6, 7]
+    assert data["number_results"] == 4
+    assert data["domains"] == [
+        {**MEDICINE, "number_results": 4},
+        {**MATHS, "number_results": 2},
+        {**ASTRONOMY, "number_results": 1},
+    ]
+
+
+@pytest.mark.parametrize("path", SEARCH_PATHS)
+def test_search_rejects_unknown_domain(domain_client, path):
+    response = domain_client.get(path, params={"q": '"orbit"', "domain": "alchemy"})
+    assert response.status_code == 422
+    assert "alchemy" in response.json()["detail"]
+
+
+@pytest.mark.parametrize("path", SEARCH_PATHS)
+def test_search_without_domain_tables(monkeypatch, path):
+    # Search must keep working, untagged, on a database without the tables.
+    monkeypatch.setattr("app.domain_index", lambda: DomainIndex())
+    monkeypatch.setattr(
+        "app.search_terms_mariadb", lambda q, include_descriptions=True: _domain_terms()
+    )
+    data = TestClient(app).get(path, params={"q": '"orbit"'}).json()
+    assert data["domains"] == []
+    rows = data.get("results") or [o for g in data["groups"] for o in g["occurences"]]
+    assert rows and all("dictionary_domains" not in row for row in rows)
+
+
+def test_list_domains(domain_client):
+    data = domain_client.get("/api/v1/domains").json()
+    assert data["number"] == 3
+    assert data["domains"][0] == {
+        **MATHS,
+        "name_english": "Mathematics",
+        "name_french": None,
+        "wikidata_id": "Q9",
+        "number_dictionaries": 2,
+        "number_terms": 200,
+    }

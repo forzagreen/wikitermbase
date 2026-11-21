@@ -28,6 +28,14 @@ import PageLinkDemo from './components/PageLinkDemo';
 export const FEATURES = [
   {
     // Keep the ids stable: they are what the browser remembers having seen.
+    id: 'domains',
+    date: '2026-11-21',
+    title: 'البحث في مجال بعينه',
+    body:
+      'صار لكل معجم وسمٌ يبيّن مجاله (طب، رياضيات، قانون…) يظهر مع كل نتيجة. وبعد البحث تظهر تحت مربع البحث المجالات التي ورد فيها المصطلح وعدد نتائج كلٍّ منها: اضغط على مجال لتحصر النتائج في معاجمه، كأن تبحث عن «cell» في معاجم علم الأحياء وحدها. وفي صفحة المعاجم يمكنك عرض معاجم مجال واحد.',
+    link: { to: '/?q=cell&domain=biology', label: 'مثال: cell في علم الأحياء' },
+  },
+  {
     id: 'search-url',
     date: '2026-10-19',
     title: 'رابط لكل بحث',

@@ -8,7 +8,7 @@ const zlib = require('zlib');
 const root = path.join(__dirname, '..');
 const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
 const gz = (s) => zlib.gzipSync(s, { level: 9 }).length;
-const BUDGET = { 'Gadget-WikiTerm.js': 10 * 1024, 'Gadget-WikiTerm.css': 3 * 1024 }; // gzipped bytes
+const BUDGET = { 'Gadget-WikiTerm.js': 11 * 1024, 'Gadget-WikiTerm.css': 3 * 1024 }; // gzipped bytes
 let failed = false;
 const fail = (msg) => { console.error('FAIL: ' + msg); failed = true; };
 

@@ -1,8 +1,11 @@
 // src/components/Dictionaries.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router';
 import { ExternalLink, BookOpen } from 'lucide-react';
 import SiteHeader from './SiteHeader';
 import SiteFooter from './SiteFooter';
+import DomainFilter from './DomainFilter';
+import DomainTags from './DomainTags';
 import { fetchDicts, fetchStats } from '../api';
 
 const Dictionaries = () => {
@@ -10,6 +13,42 @@ const Dictionaries = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState(null);
+  // The domains the list is narrowed to are the page's `?domain=`, so that a
+  // list of one domain's dictionaries can be shared.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selected = useMemo(
+    () => [...new Set(searchParams.getAll('domain').filter(Boolean))],
+    [searchParams]
+  );
+  const selectDomains = (next) => {
+    const params = new URLSearchParams();
+    next.forEach((slug) => params.append('domain', slug));
+    setSearchParams(params, { replace: true });
+  };
+
+  // Every domain with its number of dictionaries, the largest first.
+  const facets = useMemo(() => {
+    const byslug = new Map();
+    dictionaries.forEach((dict) =>
+      (dict.domains ?? []).forEach((domain) => {
+        const facet = byslug.get(domain.name_tech) ?? { ...domain, count: 0 };
+        facet.count += 1;
+        byslug.set(domain.name_tech, facet);
+      })
+    );
+    return [...byslug.values()].sort((a, b) => b.count - a.count);
+  }, [dictionaries]);
+
+  // A dictionary of any of the selected domains qualifies.
+  const shown = useMemo(
+    () =>
+      selected.length === 0
+        ? dictionaries
+        : dictionaries.filter((dict) =>
+            (dict.domains ?? []).some((domain) => selected.includes(domain.name_tech))
+          ),
+    [dictionaries, selected]
+  );
 
   // Total term count comes from /api/v1/stats (same source as the home
   // page), so the two numbers always agree; failure just shows '-'.
@@ -68,7 +107,12 @@ const Dictionaries = () => {
           <div className="mb-6 text-center">
             <p className="text-lg text-gray-600 dark:text-gray-300">
               <span>
-                عدد المعاجم: <span className="font-bold">{formatNumber(dictionaries.length)}</span>
+                عدد المعاجم:{' '}
+                <span className="font-bold">
+                  {selected.length > 0
+                    ? `${formatNumber(shown.length)} من ${formatNumber(dictionaries.length)}`
+                    : formatNumber(dictionaries.length)}
+                </span>
               </span>
               <span className="mx-3 text-gray-400" aria-hidden="true">·</span>
               <span>
@@ -95,10 +139,20 @@ const Dictionaries = () => {
           </div>
         )}
 
+        {/* Domain filter */}
+        {!loading && !error && (
+          <DomainFilter
+            className="mb-6 justify-center"
+            facets={facets}
+            selected={selected}
+            onChange={selectDomains}
+          />
+        )}
+
         {/* Dictionaries Grid */}
         {!loading && !error && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {dictionaries.map((dict) => (
+            {shown.map((dict) => (
               <div
                 key={dict.id}
                 className={`${cardClasses} rounded-lg p-4 hover:shadow-lg transition-shadow relative ${dict.arabterm_url ? 'hover:ring-2 hover:ring-blue-400' : ''}`}
@@ -109,10 +163,22 @@ const Dictionaries = () => {
                     className="text-blue-500 flex-shrink-0 mt-1"
                   />
                   <div className="flex-1 min-w-0">
-                    {/* Dictionary Type */}
-                    {DICT_TYPE_LABELS[dict.dict_type] && (
-                      <div className="mb-2">
+                    {/* Dictionary type and domains. The domains are buttons
+                        above the card's stretched link: a click narrows the
+                        list to that domain, a second one widens it again. */}
+                    {(DICT_TYPE_LABELS[dict.dict_type] || dict.domains?.length > 0) && (
+                      <div className="mb-2 flex flex-wrap items-center gap-1.5">
                         <DictTypeLabel dictType={dict.dict_type} />
+                        <DomainTags
+                          className="relative z-10"
+                          domains={dict.domains}
+                          selected={selected}
+                          onSelect={(slug) =>
+                            selectDomains(
+                              selected.length === 1 && selected[0] === slug ? [] : [slug]
+                            )
+                          }
+                        />
                       </div>
                     )}
 

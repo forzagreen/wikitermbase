@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import {
   ExternalLink, BookOpen, Github, Play, Database, Code, FlaskConical,
-  Layers, Languages, Sparkles, Hammer, Search, ArrowLeft, WandSparkles,
+  Layers, Languages, Sparkles, Hammer, Search, ArrowLeft, WandSparkles, ScanText,
 } from 'lucide-react';
 import SiteHeader from './SiteHeader';
 import SiteFooter from './SiteFooter';
@@ -222,6 +222,15 @@ const LEVELS = [
           { kind: 'github', href: 'https://github.com/forzagreen/arabterm' },
           { kind: 'hf', href: 'https://huggingface.co/datasets/forzagreen/arabterm' },
         ],
+      },
+      {
+        name: 'مراجعة المعاجم',
+        latin: 'ocr-dicts',
+        icon: ScanText,
+        description:
+          'أداة لمراجعة المعاجم المقروءة آلياً، من صور صفحاتها الممسوحة ضوئياً أو من نصّها الرقمي: يقابل المراجع كل مدخل بصورته الأصلية فيؤكّد القراءة أو يصحّحها، حرفاً وحركةً. المعجم الذي تكتمل مراجعته يُنشر في قاعدة معطيات المعاجم.',
+        facts: ['مقابلة بصورة الأصل', 'نشر في arabterm'],
+        links: [{ kind: 'site', href: 'https://review.waeltellat.com/' }],
       },
     ],
   },

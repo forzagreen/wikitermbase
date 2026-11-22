@@ -400,7 +400,7 @@
 			showPage();
 		};
 
-		// «المجال»: the domains in which the query has results, the largest
+		// «الحقول الدلالية»: the domains in which the query has results, the largest
 		// first (the API counts them before the filter, so the other domains
 		// stay on offer). A click searches again within that domain; «الكل»,
 		// or a second click, in all of them. Hidden when the API sends none.
@@ -427,7 +427,7 @@
 				} );
 
 			this.$domains.empty().toggle( facets.length > 0 ).append(
-				$( '<span>' ).addClass( 'wikiterm-domains-label' ).text( 'المجال:' ),
+				$( '<span>' ).addClass( 'wikiterm-domains-label' ).text( 'الحقول الدلالية:' ),
 				pill( null, 'الكل', !selected ),
 				shown.map( ( facet ) => pill(
 					facet,

@@ -200,7 +200,7 @@
   white-space: nowrap;
 }
 
-/* «المجال»: the domains with results, above the list; one narrows the search */
+/* «الحقول الدلالية»: the domains with results, above the list; one narrows the search */
 .wikiterm-domains {
   display: flex;
   flex-wrap: wrap;

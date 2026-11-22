@@ -25,7 +25,7 @@ const MAX_QUERY_LENGTH = 200;
 // The full hint does not fit a phone's search box. A placeholder is an
 // attribute, so CSS cannot swap it. 640px is Tailwind's `sm`.
 const SEARCH_HINT = 'ابحث عن مصطلح (بالإنجليزية أو الفرنسية أو العربية)...';
-const SEARCH_HINT_PHONE = 'ابحث (عربي، إنجليزي، فرنسي)...';
+const SEARCH_HINT_PHONE = 'ابحث (إنجليزي، فرنسي، عربي)...';
 const wideScreen = window.matchMedia('(min-width: 640px)');
 const subscribeToWidth = (onChange) => {
   wideScreen.addEventListener('change', onChange);

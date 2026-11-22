@@ -1,5 +1,5 @@
 // src/components/DictionaryApp.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useSyncExternalStore } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Search, ExternalLink, ChevronDown, Quote, Copy, Check, BookOpen, Wrench, ArrowLeft } from 'lucide-react';
 import SiteHeader from './SiteHeader';
@@ -21,6 +21,17 @@ const formatNumber = (num) =>
 const PAGE_SIZE = 30;
 // The API rejects longer queries (a pasted paragraph is not a term).
 const MAX_QUERY_LENGTH = 200;
+
+// The full hint does not fit a phone's search box. A placeholder is an
+// attribute, so CSS cannot swap it. 640px is Tailwind's `sm`.
+const SEARCH_HINT = 'ابحث عن مصطلح (بالإنجليزية أو الفرنسية أو العربية)...';
+const SEARCH_HINT_PHONE = 'ابحث (عربي، إنجليزي، فرنسي)...';
+const wideScreen = window.matchMedia('(min-width: 640px)');
+const subscribeToWidth = (onChange) => {
+  wideScreen.addEventListener('change', onChange);
+  return () => wideScreen.removeEventListener('change', onChange);
+};
+const isWideScreen = () => wideScreen.matches;
 
 // Shown under the search box while it is empty: points first-time visitors
 // to the two other pages and fills what would otherwise be a blank screen.
@@ -103,6 +114,7 @@ const sameList = (a, b) => a.length === b.length && a.every((value, i) => value 
 const GROUP_DOMAINS_SHOWN = 4;
 
 const DictionaryApp = () => {
+  const wide = useSyncExternalStore(subscribeToWidth, isWideScreen, isWideScreen);
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(() => termFromParams(searchParams));
   const [expandedGroups, setExpandedGroups] = useState({});
@@ -558,8 +570,8 @@ const DictionaryApp = () => {
           <input
             ref={searchInputRef}
             type="text"
-            className={`w-full px-5 py-4 text-lg rounded-xl border shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${inputClasses}`}
-            placeholder="ابحث عن مصطلح (بالإنجليزية أو الفرنسية أو العربية)..."
+            className={`w-full pr-5 pl-14 py-4 text-lg text-ellipsis placeholder:text-sm sm:placeholder:text-lg rounded-xl border shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${inputClasses}`}
+            placeholder={wide ? SEARCH_HINT : SEARCH_HINT_PHONE}
             maxLength={MAX_QUERY_LENGTH}
             value={searchTerm}
             onChange={handleSearchInputChange}

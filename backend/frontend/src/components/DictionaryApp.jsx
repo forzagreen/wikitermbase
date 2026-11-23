@@ -116,7 +116,10 @@ const GROUP_DOMAINS_SHOWN = 4;
 const DictionaryApp = () => {
   const wide = useSyncExternalStore(subscribeToWidth, isWideScreen, isWideScreen);
   const [searchParams, setSearchParams] = useSearchParams();
+  // `searchTerm` is the draft in the input; `submittedTerm` is the term last
+  // searched, the one the messages about the results must follow.
   const [searchTerm, setSearchTerm] = useState(() => termFromParams(searchParams));
+  const [submittedTerm, setSubmittedTerm] = useState(() => termFromParams(searchParams).trim());
   const [expandedGroups, setExpandedGroups] = useState({});
   const [results, setResults] = useState([]);
   // Total groups for the current query; `results` holds the pages loaded so far.
@@ -130,21 +133,19 @@ const DictionaryApp = () => {
   const [stats, setStats] = useState(null);
   // Slugs of the domains the search is narrowed to (none: every dictionary),
   // and the domains that have results for the displayed query, with their
-  // counts. The ref follows the state, for a search started from a timer.
+  // counts.
   const [domains, setDomains] = useState(() => domainsFromParams(searchParams));
-  const domainsRef = useRef(domains);
   const [facets, setFacets] = useState([]);
   // Settings panel: the optional «تحليل صرفي» section under every group, and
   // whether a group's dictionary entries start open or folded.
   const [settings] = useSettings();
   const groupsExpanded = settings.groupsExpanded;
   const searchInputRef = useRef(null);
-  const searchTimeoutRef = useRef(null);
   // Only one request in flight: a new search cancels the previous one, so a
   // slow response for a broad term can't overwrite the results of a newer one.
   const abortRef = useRef(null);
   // Term the displayed results belong to. "Show more" must page that one, not
-  // whatever is in the input while the debounce is still pending.
+  // a draft in the input that has not been searched.
   const resultsTermRef = useRef('');
   const resultsDomainsRef = useRef([]);
   // Term and domains last written to (or read from) the URL, so that a search
@@ -184,15 +185,8 @@ const DictionaryApp = () => {
     );
   }, [groupsExpanded]);
 
-  // Cleanup timeout and in-flight request on unmount
-  useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-      abortRef.current?.abort();
-    };
-  }, []);
+  // Cancel the in-flight request on unmount
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const toggleGroup = (index) => {
     setExpandedGroups(prev => ({
@@ -386,9 +380,8 @@ const DictionaryApp = () => {
     return controller;
   };
 
-  // Keeps `?q=` and `&domain=` equal to the search; replaces the history
-  // entry, so that typing a word letter by letter does not leave one entry
-  // per keystroke. Without a term the URL carries no domain either.
+  // Keeps `?q=` and `&domain=` equal to the search, in the same history entry.
+  // Without a term the URL carries no domain either.
   const syncUrl = (term, selected) => {
     const urlDomains = term ? selected : [];
     if (term === urlTermRef.current && sameList(urlDomains, urlDomainsRef.current)) return;
@@ -400,21 +393,24 @@ const DictionaryApp = () => {
     setSearchParams(params, { replace: true });
   };
 
-  // Search function with debouncing. `selected`: the domains to search in.
-  const handleSearch = async (term, selected = domainsRef.current) => {
-    if (term.trim().length < 3) {
+  // Runs a search. `selected`: the domains to search in.
+  const handleSearch = async (input, selected = domains) => {
+    const term = input.trim();
+    setSubmittedTerm(term);
+    if (term.length < 3) {
       syncUrl('', selected);
       abortRef.current?.abort();
       abortRef.current = null;
       setLoading(false);
       setLoadingMore(false);
+      setError(null);
       setResults([]);
       setTotalGroups(0);
       setFacets([]);
       return;
     }
 
-    syncUrl(term.trim(), selected);
+    syncUrl(term, selected);
     const controller = startRequest();
     setLoading(true);
     setLoadingMore(false);
@@ -460,13 +456,10 @@ const DictionaryApp = () => {
   };
 
   // Narrows the search to `next` domains (none: every dictionary) and runs it
-  // again at once, on what is in the search box.
-  const changeDomains = (next, term = searchTerm) => {
-    domainsRef.current = next;
+  // again at once, on the term last searched: a draft in the input waits for
+  // the search button.
+  const changeDomains = (next, term = submittedTerm) => {
     setDomains(next);
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
     handleSearch(term, next);
   };
 
@@ -505,8 +498,7 @@ const DictionaryApp = () => {
     }
   };
 
-  // A search arriving through the URL (page load, back/forward) is run at
-  // once, without the typing debounce.
+  // A search arriving through the URL (page load, back/forward) is run at once.
   const urlTerm = termFromParams(searchParams);
   const urlDomains = domainsFromParams(searchParams);
   const urlDomainsKey = urlDomains.join(' ');
@@ -514,11 +506,7 @@ const DictionaryApp = () => {
     if (urlTerm === urlTermRef.current && sameList(urlDomains, urlDomainsRef.current)) return;
     urlTermRef.current = urlTerm;
     urlDomainsRef.current = urlDomains;
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
     setSearchTerm(urlTerm);
-    domainsRef.current = urlDomains;
     setDomains(urlDomains);
     handleSearch(urlTerm, urlDomains);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -530,18 +518,12 @@ const DictionaryApp = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSearchInputChange = (e) => {
-    const newTerm = e.target.value;
-    setSearchTerm(newTerm);
-
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    // Wait 600 ms before searching
-    searchTimeoutRef.current = setTimeout(() => {
-      handleSearch(newTerm);
-    }, 600);
+  // The search button or Enter. On a phone the keyboard would stay open over
+  // the results.
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!wide) searchInputRef.current?.blur();
+    handleSearch(searchTerm);
   };
 
   const themeClasses = 'bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-white';
@@ -566,21 +548,31 @@ const DictionaryApp = () => {
 
       {/* Search Bar */}
       <div className="max-w-4xl w-full mx-auto mt-8 px-4">
-        <div className="relative">
+        <form role="search" onSubmit={handleSubmit} className="relative">
           <input
             ref={searchInputRef}
             type="text"
-            className={`w-full pr-5 pl-14 py-4 text-lg text-ellipsis placeholder:text-sm sm:placeholder:text-lg rounded-xl border shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${inputClasses}`}
+            enterKeyHint="search"
+            aria-label="مصطلح البحث"
+            className={`w-full pr-5 pl-16 sm:pl-28 py-4 text-lg text-ellipsis placeholder:text-sm sm:placeholder:text-lg rounded-xl border shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent ${inputClasses}`}
             placeholder={wide ? SEARCH_HINT : SEARCH_HINT_PHONE}
             maxLength={MAX_QUERY_LENGTH}
             value={searchTerm}
-            onChange={handleSearchInputChange}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={26} />
-        </div>
+          {/* Icon alone on a phone, where the hint needs the room. */}
+          <button
+            type="submit"
+            aria-label="بحث"
+            className="absolute left-2 inset-y-2 flex items-center gap-2 px-3 sm:px-4 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-800"
+          >
+            <Search size={20} aria-hidden="true" />
+            <span className="hidden sm:inline">بحث</span>
+          </button>
+        </form>
         {/* Only with results: the options change how results are rendered.
-            `results` survives a refetch, so the row does not blink while the
-            query is being edited. */}
+            `results` survives a refetch, so the row does not blink during a
+            new search. */}
         {results.length > 0 && <SearchOptions />}
         {/* The domains in which the term has results. Shown with the results
             and, when the search is narrowed to a domain that has none, on its
@@ -611,12 +603,12 @@ const DictionaryApp = () => {
         </div>
       )}
 
-      {/* Landing cards (empty search box only) */}
-      {searchTerm.trim().length === 0 && <LandingCards stats={stats} />}
+      {/* Landing cards (until a search is made) */}
+      {submittedTerm.length === 0 && <LandingCards stats={stats} />}
 
       {/* Results Section */}
       <div className="max-w-4xl mx-auto mt-8 px-4 pb-12 w-full">
-        {!loading && !error && results.length === 0 && searchTerm.trim().length >= 3 && (
+        {!loading && !error && results.length === 0 && submittedTerm.length >= 3 && (
           <div className={`${cardClasses} rounded-lg p-6 text-center`}>
             {domains.length > 0 && facets.length > 0 ? (
               <>
@@ -638,7 +630,7 @@ const DictionaryApp = () => {
             )}
           </div>
         )}
-        {!loading && !error && results.length === 0 && searchTerm.trim().length > 0 && searchTerm.trim().length < 3 && (
+        {!loading && !error && results.length === 0 && submittedTerm.length > 0 && submittedTerm.length < 3 && (
           <div className={`${cardClasses} rounded-lg p-6 text-center`}>
             <p className="text-lg">يرجى إدخال 3 أحرف على الأقل للبحث.</p>
           </div>

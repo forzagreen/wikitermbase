@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from app import (
     MATCH_AS_TYPED,
@@ -5,6 +7,7 @@ from app import (
     MAX_QUERY_LENGTH,
     MAX_QUERY_VARIANTS,
     NO_MATCH,
+    SHORT_TERM_MAX_ROWS,
     DomainIndex,
     aggregate_terms,
     app,
@@ -23,6 +26,8 @@ from app import (
     query_match_rank,
     query_matches_term,
     search_terms_mariadb,
+    short_latin_term,
+    short_term_patterns,
     singular_candidates,
     spelling_candidates,
     split_translations,
@@ -1219,3 +1224,70 @@ def test_list_domains(domain_client):
         "number_dictionaries": 2,
         "number_terms": 200,
     }
+
+
+@pytest.mark.parametrize(
+    "query, expected",
+    [
+        ('"pH"', "pH"),
+        ("pH", "pH"),
+        ('"C#"', "C#"),
+        ('"3D"', "3D"),
+        ('"كم"', None),  # indexed, goes through MATCH
+        ('"DNA"', None),
+        ('"a"', None),
+        ('"a b"', None),
+    ],
+)
+def test_short_latin_term(query, expected):
+    assert short_latin_term(query) == expected
+
+
+def test_two_arabic_letters_are_sent_unquoted():
+    # A quoted phrase of two Arabic letters matches nothing in InnoDB.
+    assert fulltext_query('"كم"') == "كم"
+    assert fulltext_query("كم") == "كم"
+    assert fulltext_query('"نظام"') == '"نظام"'
+
+
+@pytest.mark.parametrize(
+    "value, is_word, is_entry",
+    [
+        ("pH", True, True),
+        ("acidity; pH", True, True),
+        ("soil pH", True, False),
+        ("pH-value", True, False),
+        ("process heat ( pH)", True, False),
+        ("phase", False, False),
+        ("graph", False, False),
+    ],
+)
+def test_short_term_patterns(value, is_word, is_entry):
+    # MariaDB runs these with PCRE; Python's `re` has no \\p{L}.
+    patterns = short_term_patterns("pH")
+    word = patterns["word"].replace(r"[\p{L}\p{N}]", r"[^\W_]")
+    assert bool(re.search(word, value)) is is_word
+    assert bool(re.search(patterns["entry"], value)) is is_entry
+
+
+def test_short_latin_query_scans_with_a_cap(monkeypatch):
+    seen = {}
+
+    class Empty:
+        def mappings(self):
+            return self
+
+        def all(self):
+            return []
+
+    def fake_execute(query, params=None):
+        seen["sql"], seen["params"] = str(query), params
+        return Empty()
+
+    monkeypatch.setattr("app.execute_with_retry", fake_execute)
+    search_terms_mariadb('"pH"')
+    assert "REGEXP" in seen["sql"] and "MATCH" not in seen["sql"]
+    assert seen["params"]["max_rows"] == SHORT_TERM_MAX_ROWS
+
+    search_terms_mariadb('"كم"')
+    assert "MATCH" in seen["sql"] and seen["params"] == {"query": "كم"}

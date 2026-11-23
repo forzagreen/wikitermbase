@@ -8,6 +8,7 @@ import DomainTags from './DomainTags';
 
 // The API rejects longer queries (a pasted paragraph is not a term).
 const MAX_QUERY_LENGTH = 200;
+const MIN_QUERY_LENGTH = 2;
 
 const RawSearch = () => {
   // The searched term is also the page's `?q=`, so a result can be shared.
@@ -15,6 +16,8 @@ const RawSearch = () => {
   const [searchQuery, setSearchQuery] = useState(
     () => (searchParams.get('q') ?? '').slice(0, MAX_QUERY_LENGTH)
   );
+  // The term last searched: typing searches nothing until the button or Enter.
+  const [submittedQuery, setSubmittedQuery] = useState('');
   const [results, setResults] = useState([]);
   const [morphResults, setMorphResults] = useState(null);
   const [expandedItems, setExpandedItems] = useState(new Set());
@@ -35,32 +38,30 @@ const RawSearch = () => {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [openPopupId]);
 
-  useEffect(() => {
-    const debounceTimer = setTimeout(() => {
-      const term = searchQuery.trim();
-      setSearchParams(
-        (prev) => {
-          if ((prev.get('q') ?? '') === (term.length >= 3 ? term : '')) return prev;
-          return term.length >= 3 ? { q: term } : {};
-        },
-        { replace: true }
-      );
-      if (searchQuery.trim().length >= 3) {
-        performSearch(searchQuery);
-        if (isArabic(searchQuery)) {
-          performMorphAnalysis(searchQuery);
-        } else {
-          setMorphResults(null);
-        }
+  const runSearch = (rawQuery) => {
+    const term = rawQuery.trim();
+    const valid = term.length >= MIN_QUERY_LENGTH;
+    setSubmittedQuery(term);
+    setSearchParams(valid ? { q: term } : {}, { replace: true });
+    if (valid) {
+      performSearch(term);
+      if (isArabic(term)) {
+        performMorphAnalysis(term);
       } else {
-        setResults([]);
         setMorphResults(null);
       }
-    }, 300);
+    } else {
+      setError(null);
+      setResults([]);
+      setMorphResults(null);
+    }
+  };
 
-    return () => clearTimeout(debounceTimer);
+  // The initial `?q=` is searched on mount.
+  useEffect(() => {
+    if (searchQuery.trim()) runSearch(searchQuery);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery]);
+  }, []);
 
   // Other utility functions remain the same...
   const isArabic = (text) => {
@@ -119,22 +120,38 @@ const RawSearch = () => {
             <h1 className="text-3xl font-bold text-right dark:text-white">قاموس المصطلحات التقنية</h1>
             <ThemeToggle />
           </div>
-          <div className="relative">
+          <form
+            className="relative"
+            role="search"
+            onSubmit={(e) => {
+              e.preventDefault();
+              runSearch(searchQuery);
+            }}
+          >
             <input
               type="text"
+              enterKeyHint="search"
               placeholder="ابحث عن مصطلح..."
               maxLength={MAX_QUERY_LENGTH}
-              className="w-full p-4 pl-12 text-lg rounded-lg border border-gray-300 dark:border-gray-600 
+              className="w-full p-4 pl-14 sm:pl-28 text-lg rounded-lg border border-gray-300 dark:border-gray-600 
                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
                       dark:bg-gray-800 dark:text-white dark:placeholder-gray-400"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                if (!e.target.value.trim()) runSearch('');
+              }}
               autoFocus
             />
-            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500">
-              {isLoading ? <Loader2 className="animate-spin" /> : <Search />}
-            </div>
-          </div>
+            <button
+              type="submit"
+              aria-label="بحث"
+              className="absolute left-2 top-2 bottom-2 flex items-center gap-2 px-3 sm:px-5 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 dark:focus-visible:ring-offset-gray-800"
+            >
+              {isLoading ? <Loader2 size={20} className="animate-spin" aria-hidden="true" /> : <Search size={20} aria-hidden="true" />}
+              <span className="hidden sm:inline">بحث</span>
+            </button>
+          </form>
         </div>
 
         {/* Morphological Analysis Section */}
@@ -174,14 +191,14 @@ const RawSearch = () => {
         )}
 
         {/* Empty State */}
-        {!isLoading && searchQuery.trim().length >= 3 && results.length === 0 && !error && (
+        {!isLoading && submittedQuery.length >= MIN_QUERY_LENGTH && results.length === 0 && !error && (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            لا توجد نتائج للبحث عن "{searchQuery}"
+            لا توجد نتائج للبحث عن "{submittedQuery}"
           </div>
         )}
-        {!isLoading && searchQuery.trim().length > 0 && searchQuery.trim().length < 3 && results.length === 0 && !error && (
+        {!isLoading && submittedQuery.length > 0 && submittedQuery.length < MIN_QUERY_LENGTH && results.length === 0 && !error && (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            يرجى إدخال 3 أحرف على الأقل للبحث.
+            يرجى إدخال حرفين على الأقل للبحث.
           </div>
         )}
 

@@ -229,8 +229,7 @@ def search_terms_mariadb(
     # term frequency, so most rows of a broad query tie on it (80% for "نظام").
     # Without it, two runs could order groups differently and the paginated
     # windows of /api/v1/search/aggregated would overlap or skip.
-    search_query = text("""
-        SELECT
+    columns = """
             t.*,
             d.name_arabic as dictionary_name_arabic,
             d.name_tech as dictionary_name_tech,
@@ -239,16 +238,39 @@ def search_terms_mariadb(
             d.tier as dictionary_tier,
             d.archive_org_url as dictionary_archive_org_url,
             d.page_offset as dictionary_page_offset,
-            MATCH(t.arabic, t.english, t.french, t.description)
-            AGAINST(:query IN NATURAL LANGUAGE MODE) as relevance
-        FROM term t
-        JOIN dictionary d ON t.dictionary_id = d.id
-        WHERE MATCH(t.arabic, t.english, t.french, t.description)
-        AGAINST(:query IN NATURAL LANGUAGE MODE)
-        ORDER BY relevance DESC, t.id
-    """)
+    """
+    short_term = short_latin_term(query_text)
+    if short_term:
+        # Not in the fulltext index (see short_latin_term). A whole entry
+        # ("pH") outranks a word of a longer one ("soil pH").
+        search_query = text(f"""
+            SELECT {columns}
+                IF(t.english REGEXP :entry OR t.french REGEXP :entry, 2.0, 1.0)
+                as relevance
+            FROM term t
+            JOIN dictionary d ON t.dictionary_id = d.id
+            WHERE t.english REGEXP :word OR t.french REGEXP :word
+            ORDER BY relevance DESC, t.id
+            LIMIT :max_rows
+        """)
+        params = {
+            **short_term_patterns(short_term),
+            "max_rows": SHORT_TERM_MAX_ROWS,
+        }
+    else:
+        search_query = text(f"""
+            SELECT {columns}
+                MATCH(t.arabic, t.english, t.french, t.description)
+                AGAINST(:query IN NATURAL LANGUAGE MODE) as relevance
+            FROM term t
+            JOIN dictionary d ON t.dictionary_id = d.id
+            WHERE MATCH(t.arabic, t.english, t.french, t.description)
+            AGAINST(:query IN NATURAL LANGUAGE MODE)
+            ORDER BY relevance DESC, t.id
+        """)
+        params = {"query": fulltext_query(query_text)}
 
-    result = execute_with_retry(search_query, {"query": fulltext_query(query_text)})
+    result = execute_with_retry(search_query, params)
     results = result.mappings().all()
 
     # Remove excluded fields
@@ -507,6 +529,50 @@ def _strip_query_quotes(query: str) -> str:
 def _is_quoted(query: str) -> bool:
     query = query.strip()
     return len(query) >= 2 and query[0] == query[-1] == '"'
+
+
+# --- Two-character queries ----------------------------------------------------
+#
+# InnoDB's fulltext index has a minimum token size of 3 (not changeable on
+# ToolsDB) that it counts differently on each side. Two Arabic letters are 4
+# bytes and do get indexed, but a quoted phrase of them matches nothing, so
+# they are sent unquoted (`"كم"` 0 rows, `كم` 129). Two Latin characters are not
+# indexed at all (`pH`), so those scan the English and French columns instead:
+# about 0.15 s over the 630k terms. Function words are why that scan is capped:
+# `de` is a word of 63,049 terms, `of` of 20,261.
+
+SHORT_QUERY_LENGTH = 2
+SHORT_TERM_MAX_ROWS = 2000
+_ARABIC_SCRIPT_RE = re.compile(r"[\u0600-\u06FF]")
+
+
+def _short_query(query: str) -> str | None:
+    """The bare query when it is a single two-character token."""
+    bare = _strip_query_quotes(query)
+    if (
+        len(bare) != SHORT_QUERY_LENGTH
+        or '"' in bare
+        or any(ch.isspace() for ch in bare)
+    ):
+        return None
+    return bare
+
+
+def short_latin_term(query: str) -> str | None:
+    """The two-character token the fulltext index cannot find, if `query` is
+    one; two Arabic letters are indexed and go through `fulltext_query`."""
+    bare = _short_query(query)
+    return bare if bare and not _ARABIC_SCRIPT_RE.search(bare) else None
+
+
+def short_term_patterns(term: str) -> dict[str, str]:
+    """REGEXP patterns for `term` as a word of a field, and as a whole entry
+    of it (see SEPARATOR_RE). Case follows the column's collation."""
+    escaped = re.escape(term)
+    return {
+        "word": rf"(?<![\p{{L}}\p{{N}}]){escaped}(?![\p{{L}}\p{{N}}])",
+        "entry": rf"(?:^|[;/،؛])\s*{escaped}\s*(?:$|[;/،؛])",
+    }
 
 
 # --- Query expansion ---------------------------------------------------------
@@ -790,6 +856,9 @@ def fulltext_query(query: str) -> str:
     each variant is quoted too and the phrase semantics survive. An unquoted
     query already ORs its tokens; the variants' tokens just join the bag.
     """
+    short = _short_query(query)
+    if short:
+        return short  # see "Two-character queries"
     variants = expand_query(query)
     if len(variants) == 1:
         return query
@@ -1364,7 +1433,7 @@ def search(
     q: str = Query(
         ...,
         max_length=MAX_QUERY_LENGTH,
-        description="Free-text query, at most 256 characters. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode. Wrap it in double quotes for a phrase search. Latin-script queries are also searched as their singular (`telescopes` → `telescope`), hyphen-free (`e-mail` → `email`) and British/American (`colour centre` → `color center`) variants; a quoted query stays a phrase search, its variants are searched as phrases too.",
+        description="Free-text query, at most 256 characters. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode. Wrap it in double quotes for a phrase search. Latin-script queries are also searched as their singular (`telescopes` → `telescope`), hyphen-free (`e-mail` → `email`) and British/American (`colour centre` → `color center`) variants; a quoted query stays a phrase search, its variants are searched as phrases too. A two-character Latin query (`pH`) is matched as a word of the English and French fields, whole entries first, at most 2000 rows.",
         examples=["telescope", "اشتقاق"],
     ),
     include_descriptions: bool = Query(
@@ -1416,7 +1485,7 @@ def search_aggregated(
     q: str = Query(
         ...,
         max_length=MAX_QUERY_LENGTH,
-        description="Free-text query, at most 256 characters. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode. Wrap it in double quotes for a phrase search. Latin-script queries are also searched as their singular (`telescopes` → `telescope`), hyphen-free (`e-mail` → `email`) and British/American (`colour centre` → `color center`) variants; a quoted query stays a phrase search, its variants are searched as phrases too.",
+        description="Free-text query, at most 256 characters. Matched against Arabic, English, French and description fields using MariaDB `MATCH ... AGAINST` in natural-language mode. Wrap it in double quotes for a phrase search. Latin-script queries are also searched as their singular (`telescopes` → `telescope`), hyphen-free (`e-mail` → `email`) and British/American (`colour centre` → `color center`) variants; a quoted query stays a phrase search, its variants are searched as phrases too. A two-character Latin query (`pH`) is matched as a word of the English and French fields, whole entries first, at most 2000 rows.",
         examples=["telescope", "اشتقاق"],
     ),
     include_descriptions: bool = Query(

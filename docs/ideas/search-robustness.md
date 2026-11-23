@@ -50,9 +50,12 @@ step). They overturned several assumptions of the original plan.
   latter only matches rows containing the prefixed form), `ة/ه` (`"مكتبه"` 1
   unrelated row), `ى/ي` (`"مستشفى"` 145 vs `"مستشفي"` 0). Diacritics and
   hamza-on-alif are folded by the collation as expected.
-- `"pH"` → 0 rows: tokens < 3 chars are dropped (`innodb_ft_min_token_size`,
-  not changeable on ToolsDB). Still open; the autocomplete B-tree below is the
-  planned answer.
+- `"pH"` → 0 rows in the index: tokens < 3 chars are dropped
+  (`innodb_ft_min_token_size`, not changeable on ToolsDB). Two-character
+  queries are now handled outside it, see `short_latin_term` in
+  `backend/app.py`: Latin ones scan English and French with a word-boundary
+  `REGEXP` (capped at 2,000 rows), Arabic ones are indexed and only need to be
+  sent unquoted. Latin short words *inside* a longer phrase are still dropped.
 
 **Cost.**
 - Expansion widens result sets, and response size is what users wait for

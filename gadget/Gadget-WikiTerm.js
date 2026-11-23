@@ -33,7 +33,7 @@
 	const TOOL_PAGE_URL = 'https://ar.wikipedia.org/wiki/ويكيبيديا:مسرد_الويكي';
 	const LABEL = 'مسرد الويكي';
 	const TOOLTIP = 'ابحث عن مصطلح في مسرد الويكي';
-	const MIN_QUERY_LENGTH = 3;
+	const MIN_QUERY_LENGTH = 2;
 	// The API rejects longer queries (a pasted paragraph is not a term).
 	const MAX_QUERY_LENGTH = 200;
 	const REQUEST_TIMEOUT_MS = 20000;
@@ -249,7 +249,7 @@
 				return;
 			}
 			if ( query.length < MIN_QUERY_LENGTH ) {
-				this.showNotice( 'يرجى إدخال ' + MIN_QUERY_LENGTH + ' أحرف على الأقل للبحث.' );
+				this.showNotice( 'يرجى إدخال حرفين على الأقل للبحث.' );
 				return;
 			}
 			if ( query.length > MAX_QUERY_LENGTH ) {

@@ -15,6 +15,8 @@ const RawSearch = () => {
   const [searchQuery, setSearchQuery] = useState(
     () => (searchParams.get('q') ?? '').slice(0, MAX_QUERY_LENGTH)
   );
+  // The term last searched; `searchQuery` is the draft in the input.
+  const [submittedQuery, setSubmittedQuery] = useState(() => searchQuery.trim());
   const [results, setResults] = useState([]);
   const [morphResults, setMorphResults] = useState(null);
   const [expandedItems, setExpandedItems] = useState(new Set());
@@ -35,32 +37,35 @@ const RawSearch = () => {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [openPopupId]);
 
-  useEffect(() => {
-    const debounceTimer = setTimeout(() => {
-      const term = searchQuery.trim();
-      setSearchParams(
-        (prev) => {
-          if ((prev.get('q') ?? '') === (term.length >= 3 ? term : '')) return prev;
-          return term.length >= 3 ? { q: term } : {};
-        },
-        { replace: true }
-      );
-      if (searchQuery.trim().length >= 3) {
-        performSearch(searchQuery);
-        if (isArabic(searchQuery)) {
-          performMorphAnalysis(searchQuery);
-        } else {
-          setMorphResults(null);
-        }
+  // The search button, Enter, or a `?q=` in the URL at page load.
+  const runSearch = (input) => {
+    const term = input.trim();
+    setSubmittedQuery(term);
+    setSearchParams(
+      (prev) => {
+        if ((prev.get('q') ?? '') === (term.length >= 3 ? term : '')) return prev;
+        return term.length >= 3 ? { q: term } : {};
+      },
+      { replace: true }
+    );
+    if (term.length >= 3) {
+      performSearch(term);
+      if (isArabic(term)) {
+        performMorphAnalysis(term);
       } else {
-        setResults([]);
         setMorphResults(null);
       }
-    }, 300);
+    } else {
+      setError(null);
+      setResults([]);
+      setMorphResults(null);
+    }
+  };
 
-    return () => clearTimeout(debounceTimer);
+  useEffect(() => {
+    if (submittedQuery) runSearch(submittedQuery);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery]);
+  }, []);
 
   // Other utility functions remain the same...
   const isArabic = (text) => {
@@ -119,22 +124,36 @@ const RawSearch = () => {
             <h1 className="text-3xl font-bold text-right dark:text-white">قاموس المصطلحات التقنية</h1>
             <ThemeToggle />
           </div>
-          <div className="relative">
+          <form
+            role="search"
+            className="relative"
+            onSubmit={(e) => {
+              e.preventDefault();
+              runSearch(searchQuery);
+            }}
+          >
             <input
               type="text"
+              enterKeyHint="search"
+              aria-label="مصطلح البحث"
               placeholder="ابحث عن مصطلح..."
               maxLength={MAX_QUERY_LENGTH}
-              className="w-full p-4 pl-12 text-lg rounded-lg border border-gray-300 dark:border-gray-600 
+              className="w-full p-4 pl-16 sm:pl-28 text-lg rounded-lg border border-gray-300 dark:border-gray-600
                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
                       dark:bg-gray-800 dark:text-white dark:placeholder-gray-400"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               autoFocus
             />
-            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500">
-              {isLoading ? <Loader2 className="animate-spin" /> : <Search />}
-            </div>
-          </div>
+            <button
+              type="submit"
+              aria-label="بحث"
+              className="absolute left-2 inset-y-2 flex items-center gap-2 px-3 sm:px-4 rounded-md bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-800"
+            >
+              {isLoading ? <Loader2 size={20} className="animate-spin" aria-hidden="true" /> : <Search size={20} aria-hidden="true" />}
+              <span className="hidden sm:inline">بحث</span>
+            </button>
+          </form>
         </div>
 
         {/* Morphological Analysis Section */}
@@ -174,12 +193,12 @@ const RawSearch = () => {
         )}
 
         {/* Empty State */}
-        {!isLoading && searchQuery.trim().length >= 3 && results.length === 0 && !error && (
+        {!isLoading && submittedQuery.length >= 3 && results.length === 0 && !error && (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            لا توجد نتائج للبحث عن "{searchQuery}"
+            لا توجد نتائج للبحث عن "{submittedQuery}"
           </div>
         )}
-        {!isLoading && searchQuery.trim().length > 0 && searchQuery.trim().length < 3 && results.length === 0 && !error && (
+        {!isLoading && submittedQuery.length > 0 && submittedQuery.length < 3 && results.length === 0 && !error && (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
             يرجى إدخال 3 أحرف على الأقل للبحث.
           </div>

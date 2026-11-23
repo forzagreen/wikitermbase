@@ -483,13 +483,23 @@ def normalise_french(text: str) -> str:
 # Deliberately excludes the plain ',' -- entries also use it for headword
 # inversion ("profile, hydraulic") and gender/POS annotations
 # ("vitesse commerciale, f"), so splitting on it would fabricate bogus terms.
-SEPARATOR_RE = re.compile(r"[;/،؛]")
+# A balanced <...> is one unit: a separator inside it belongs to a qualifier
+# ("تشغيل, <لنقاط، لجهاز>") and does not start a new translation.
+TRANSLATION_RE = re.compile(r"(?:<[^<>]*>|[^;/،؛])+")
+
+# Dictionaries whose <...> is a qualifier giving the sense of a term
+# ("تعديل, <لبند>", "تقادم <لرنان>", "يحمى, فعل <مهمات>"). It is not part of the
+# term, so it is ignored when grouping. Not every dictionary qualifies: in
+# others <...> wraps a proper name that is the term ("عدد <آبي>", Abbe number).
+QUALIFIER_DICTIONARIES = {"electropedia"}
+# From the "<", or from the comma before it, to the end of the translation.
+QUALIFIER_RE = re.compile(r"\s*(?:,[^<]*)?<.*", re.DOTALL)
 
 
 def split_translations(value: str) -> list[str]:
     """Split a field that may pack multiple synonymous translations into its
-    individual parts (see SEPARATOR_RE), trimming incidental whitespace."""
-    return [part.strip() for part in SEPARATOR_RE.split(value) if part.strip()]
+    individual parts (see TRANSLATION_RE), trimming incidental whitespace."""
+    return [part.strip() for part in TRANSLATION_RE.findall(value) if part.strip()]
 
 
 def _strip_query_quotes(query: str) -> str:
@@ -826,7 +836,7 @@ def query_match_rank(term: dict, query: str) -> int:
     if arabic:
         query_ar = normalise_arabic(query_typed)
         if query_ar and any(
-            normalise_arabic(part) == query_ar for part in split_translations(arabic)
+            variant == query_ar for variant, _raw_part in arabic_memberships(term)
         ):
             return MATCH_AS_TYPED
 
@@ -930,10 +940,14 @@ def elect_suggested_group(scores: list[int]) -> int | None:
 def arabic_memberships(term: dict) -> list[tuple[str, str]]:
     """The groups a term with an Arabic value belongs to, as (normalised
     variant, raw part) pairs: one per distinct part of its `arabic` field
-    (see split_translations), in order."""
+    (see split_translations), in order, without its qualifier if it has one
+    (see QUALIFIER_DICTIONARIES). The row itself keeps the qualifier."""
+    has_qualifiers = term.get("dictionary_name_tech") in QUALIFIER_DICTIONARIES
     seen_variants = set()
     pairs = []
     for raw_part in split_translations(term["arabic"]):
+        if has_qualifiers:
+            raw_part = QUALIFIER_RE.sub("", raw_part)
         variant = normalise_arabic(raw_part)
         if variant and variant not in seen_variants:
             seen_variants.add(variant)
@@ -1450,8 +1464,10 @@ def search_aggregated(
     its own group by exact normalised match — e.g. an Arabic field of
     `"مِقراب؛ راصدة"` contributes a virtual occurrence to the (pre-existing)
     `مقراب` group and another to a standalone `راصدة` group, without merging
-    those two groups together. Each group elects the most common original
-    Arabic spelling among the parts that reached it, the most common
+    those two groups together. A qualifier in Electropedia (`تعديل, <لبند>`) is
+    ignored for grouping and stays visible on the occurrence. Each group elects
+    the most common original Arabic spelling among the parts that reached it,
+    the most common
     normalised English translation, and — when present — the most common
     normalised French translation. Within a group, occurrences are ordered by
     dictionary type (`terminology`, then `language`, then `thesaurus`;

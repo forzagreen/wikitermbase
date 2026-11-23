@@ -8,6 +8,7 @@ from app import (
     DomainIndex,
     aggregate_terms,
     app,
+    arabic_memberships,
     arabterm_url,
     archive_page_url,
     count_groups_by_domain,
@@ -310,6 +311,10 @@ def test_aggregate_terms_orders_occurences_by_dict_type_then_tier():
         # annotations ("vitesse commerciale, f"), so splitting on it would
         # fabricate bogus translations.
         ("profile, hydraulic", ["profile, hydraulic"]),
+        # A separator inside a <qualifier> does not start a new translation,
+        # and an unbalanced bracket does not hide the separators after it.
+        ("تشغيل, <لنقاط، لجهاز>؛ عمل", ["تشغيل, <لنقاط، لجهاز>", "عمل"]),
+        ("منظمة >; اتحاد>", ["منظمة >", "اتحاد>"]),
     ],
 )
 def test_split_translations(input_text, expected_output):
@@ -695,6 +700,66 @@ def test_aggregate_terms_packed_row_joins_each_variants_group_separately():
     assert rasida_group["dictionary_ids"] == [2]
     # The virtual occurrence still shows the full, original citation.
     assert rasida_group["occurences"][0]["arabic"] == "مِقراب؛ راصدة"
+
+
+def _electropedia_term(arabic):
+    return {
+        "arabic": arabic,
+        "english": "modification",
+        "dictionary_id": 785,
+        "dictionary_name_tech": "electropedia",
+        "relevance": 1.0,
+    }
+
+
+@pytest.mark.parametrize(
+    "arabic, expected",
+    [
+        ("تعديل, <لبند>", ["تعديل"]),
+        ("تقادم <لرنان كهروإجهادى>", ["تقادم"]),
+        ("رابط خاص<الأجواء المتفجرة>", ["رابط خاص"]),
+        # Part of speech before the qualifier, and text after it.
+        ("يحمى, فعل <مهمات>", ["يحمى"]),
+        ("رابط, <في البرمجة> إسم", ["رابط"]),
+        ("تهيئة, <مرتبط بخلايا >الوقود", ["تهيئة"]),
+        # Packed synonyms keep their own qualifiers.
+        ("خطأ دائم, <لبند>؛ خطأ مستمر, <لبند>", ["خطأ دائم", "خطأ مستمر"]),
+        ("تشغيل, <لنقاط، لجهاز>", ["تشغيل"]),
+        # The form in the database before arabterm removed the stray '،':
+        # the qualifier must not become a group of its own.
+        ("تعديل،, <لبند>", ["تعديل"]),
+    ],
+)
+def test_arabic_memberships_ignores_qualifiers(arabic, expected):
+    pairs = arabic_memberships(_electropedia_term(arabic))
+    assert [raw_part for _variant, raw_part in pairs] == expected
+
+
+def test_arabic_memberships_keeps_brackets_of_other_dictionaries():
+    # Here <...> wraps a proper name that is part of the term (Abbe number).
+    term = {"arabic": "عدد <آبي>", "dictionary_name_tech": "other_dictionary"}
+    assert arabic_memberships(term) == [("عدد ابي", "عدد <آبي>")]
+
+
+def test_aggregate_terms_groups_a_qualified_term_with_the_plain_one():
+    plain = {
+        "arabic": "تعديل",
+        "english": "modification",
+        "dictionary_id": 1,
+        "relevance": 1.0,
+    }
+    qualified = _electropedia_term("تعديل, <لبند>")
+    groups = aggregate_terms([qualified, plain], "تعديل")
+
+    assert len(groups) == 1
+    assert groups[0]["arabic_normalised"] == "تعديل"
+    assert groups[0]["dictionary_ids"] == [1, 785]
+    # The entry still shows its qualifier.
+    assert "تعديل, <لبند>" in {o["arabic"] for o in groups[0]["occurences"]}
+
+
+def test_query_matches_a_term_with_a_qualifier():
+    assert query_matches_term(_electropedia_term("تعديل, <لبند>"), "تعديل")
 
 
 def test_aggregate_terms_does_not_transitively_merge_unrelated_groups():

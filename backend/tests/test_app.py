@@ -1284,3 +1284,20 @@ def test_list_domains(domain_client):
         "number_dictionaries": 2,
         "number_terms": 200,
     }
+
+
+def test_web_manifest_and_its_icons_are_served(client):
+    response = client.get("/manifest.webmanifest")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/manifest+json")
+
+    manifest = response.json()
+    assert manifest["display"] == "standalone"
+    sizes = {icon["sizes"] for icon in manifest["icons"]}
+    assert {"192x192", "512x512"} <= sizes  # Chrome's install criteria
+    for icon in manifest["icons"]:
+        served = client.get(icon["src"])
+        assert served.status_code == 200
+        assert served.headers["content-type"] == "image/png"
+
+    assert client.get("/icons/apple-touch-icon.png").status_code == 200

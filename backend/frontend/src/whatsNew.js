@@ -28,6 +28,13 @@ import PageLinkDemo from './components/PageLinkDemo';
 export const FEATURES = [
   {
     // Keep the ids stable: they are what the browser remembers having seen.
+    id: 'install-app',
+    date: '2026-11-23',
+    title: 'ثبّت مسرد الويكي على هاتفك',
+    body:
+      'يمكنك الآن إضافة الموقع إلى هاتفك ليفتح من أيقونته كأي تطبيق. في أندرويد: افتح قائمة المتصفح ⋮ واختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية». وفي آيفون: اضغط زر المشاركة في المتصفح واختر «إضافة إلى الشاشة الرئيسية». يحتاج البحث إلى اتصال بالإنترنت.',
+  },
+  {
     id: 'domains',
     date: '2026-11-21',
     title: 'البحث في مجال بعينه',

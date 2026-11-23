@@ -35,6 +35,10 @@ const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 export function applyTheme(theme) {
   const isDark = theme === 'dark' || (theme === 'auto' && systemDarkQuery.matches);
   document.documentElement.classList.toggle('dark', isDark);
+  // The phone's status bar in the installed app: the header's colour.
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', isDark ? '#1f2937' : '#ffffff');
 }
 
 let current = getStoredTheme();

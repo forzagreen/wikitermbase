@@ -40,6 +40,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIST = os.path.join(BASE_DIR, "frontend", "dist")
 INDEX_HTML = os.path.join(FRONTEND_DIST, "index.html")
 ASSETS_DIR = os.path.join(FRONTEND_DIST, "assets")
+ICONS_DIR = os.path.join(FRONTEND_DIST, "icons")
+WEB_MANIFEST = os.path.join(FRONTEND_DIST, "manifest.webmanifest")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -1684,7 +1686,13 @@ def index():
     return FileResponse(INDEX_HTML)
 
 
+@app.get("/manifest.webmanifest", include_in_schema=False)
+def web_manifest():
+    return FileResponse(WEB_MANIFEST, media_type="application/manifest+json")
+
+
 app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
+app.mount("/icons", StaticFiles(directory=ICONS_DIR), name="icons")
 
 # The Procfile starts gunicorn with --preload, so this runs once in the master
 # and the forked workers share the ~150 MB lexicon instead of loading it each.
